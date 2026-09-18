@@ -1,0 +1,93 @@
+# Transaction V1 (SIMD-0385). Every claim is backed by an item in `sources`.
+# Activation status is not stored here: it is read from the feature gate account at check time.
+schema_version: 1
+id: tx-v1
+rev: 1
+axis: protocol
+subject:
+  type: simd
+  name: SIMD-0385
+  title: Transaction V1 Format
+applies:
+  gates:
+    - address: txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL
+      label: enable_tx_v1
+      activated_slot: 447120000
+      effect: Validators accept and process version 1 transactions.
+relations: []
+breaks:
+  - surface: rpc
+    summary: >-
+      getTransaction and getBlock (with full transaction details) fail with JSON-RPC error -32015
+      "Transaction version (1) is not supported by the requesting client" when the request omits
+      maxSupportedTransactionVersion or sets it to 0 and the result contains a version 1 transaction.
+    evidence: [2, 3]
+  - surface: decoder
+    summary: >-
+      A serialized version 1 transaction starts with byte 0x81 (version prefix 0x80 | 1). Decoders that
+      accept only legacy and version 0 layouts cannot parse it.
+    evidence: [0, 3]
+  - surface: sdk
+    summary: >-
+      @solana/kit 8.0.0 removed compute-unit-limit helpers and fixed transaction size constants in favour
+      of resource-limit helpers, because version 1 transactions have a larger size limit and carry their
+      own resource configuration.
+    evidence: [4]
+detect:
+  - rule: rpc-max-version-zero
+    kind: code-pattern
+    confidence: breaks
+    summary: RPC read call pins maxSupportedTransactionVersion to the literal 0.
+    languages: [ts, js]
+    pattern: 'maxSupportedTransactionVersion\s*:\s*0\b'
+  - rule: rpc-max-version-dynamic
+    kind: code-pattern
+    confidence: check
+    summary: maxSupportedTransactionVersion is set from a non-literal value; verify it resolves to 1 or higher.
+    languages: [ts, js]
+    pattern: 'maxSupportedTransactionVersion\s*:\s*[A-Za-z_$]'
+  - rule: kit-below-8
+    kind: lockfile-version
+    confidence: check
+    summary: '@solana/kit older than 8.0.0 predates the version 1 resource-limit API.'
+    package:
+      ecosystem: npm
+      name: '@solana/kit'
+      range: '<8.0.0'
+  - rule: rpc-reads-v1-transaction
+    kind: runtime-probe
+    confidence: breaks
+    summary: The project's transaction reader is run against a known version 1 transaction.
+    probe:
+      method: getTransaction
+      fixture: mainnet-beta:4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
+      expect: Result has version 1 and no JSON-RPC error.
+fix:
+  - summary: Pass maxSupportedTransactionVersion 1 in getTransaction, getBlock and block subscriptions.
+    for_rules: [rpc-max-version-zero, rpc-max-version-dynamic, rpc-reads-v1-transaction]
+  - summary: Upgrade @solana/kit to 8.0.0 or later and replace compute-unit-limit helpers with the resource-limit helpers.
+    for_rules: [kit-below-8]
+    links:
+      - https://github.com/anza-xyz/kit/releases/tag/v8.0.0
+sources:
+  - kind: simd
+    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0385-transaction-v1.md
+    retrieved: '2026-09-18'
+    note: Document status at retrieval is Review; front matter has no feature key yet.
+  - kind: source-code
+    ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs
+    retrieved: '2026-09-18'
+    note: 'Module enable_tx_v1, registered as "SIMD-0385: Transaction V1".'
+  - kind: rpc-observation
+    ref: mainnet-beta getBlock slot 448063686
+    retrieved: '2026-09-18'
+    note: >-
+      maxSupportedTransactionVersion 0 returns -32015; with 1 the block returns 1139 transactions,
+      98 of them version 1.
+  - kind: rpc-observation
+    ref: mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
+    retrieved: '2026-09-18'
+    note: Parameter omitted and parameter 0 both return -32015; parameter 1 returns version 1, first byte 0x81.
+  - kind: release
+    ref: https://github.com/anza-xyz/kit/releases/tag/v8.0.0
+    retrieved: '2026-09-18'

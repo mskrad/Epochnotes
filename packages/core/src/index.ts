@@ -1,2 +1,10 @@
-/** Version of the registry entry format this library reads and writes. */
-export const ENTRY_SCHEMA_VERSION = 1;
+export { canonicalize, CanonicalizationError, entryLeafHash, toHex } from './canonical.js';
+export { type FileReport, type RegistryReport, validatePath } from './load.js';
+export { ENTRY_SCHEMA_VERSION, type Entry, entryJsonSchema, entrySchema } from './schema.js';
+export {
+  type Issue,
+  type ValidationResult,
+  validateEntry,
+  validateEntryYaml,
+  validateRegistry,
+} from './validate.js';

@@ -78,7 +78,11 @@
         "properties": {
           "surface": { "enum": ["rpc", "decoder", "stream", "program", "sdk", "wallet", "economics"] },
           "summary": { "type": "string", "minLength": 1 },
-          "evidence": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "description": "Indexes into sources[]" }
+          "evidence": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Indexes into sources[]"
+          }
         }
       }
     },

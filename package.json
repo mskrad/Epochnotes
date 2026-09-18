@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
-    "lint": "eslint . && prettier --check .",
+    "lint": "eslint . && prettier --check . && node scripts/check-language.mjs",
     "format": "prettier --write .",
     "build:program": "anchor build",
     "verify:ts": "npm run build && npm run test && npm run lint",

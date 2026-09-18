@@ -4,10 +4,10 @@
 /CLAUDE.md
 /.claude/
 
-# проектная документация (дизайн, планы) — локально; в git только пользовательское
+# design notes and plans stay local; git carries only what users need
 /docs/
 
-# сборка и зависимости
+# build output and dependencies
 node_modules/
 dist/
 *.tsbuildinfo
@@ -15,7 +15,7 @@ target/
 .anchor/
 test-ledger/
 
-# ключи
+# keys and secrets
 *-keypair.json
 *.keypair.json
 .env*

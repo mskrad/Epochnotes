@@ -1,5 +1,5 @@
 import type { webcrypto } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createKeyPairFromBytes, getAddressFromPublicKey } from '@solana/kit';
@@ -7,17 +7,21 @@ import { createKeyPairFromBytes, getAddressFromPublicKey } from '@solana/kit';
 import { type ContentAttempt, ContentUnavailableError, fetchCommittedContent } from './content-source.js';
 import { validatePath } from './load.js';
 import { verifyMerkleProof } from './merkle.js';
-import type { Entry } from './schema.js';
 import type { Issue } from './validate.js';
 import {
   buildVersion,
   type EntryProof,
   type Manifest,
+  pinIssues,
+  type PreviousVersion,
   proveEntry,
+  revocationIssues,
+  revokedIds,
   signManifest,
   verifyContent,
   verifyLog,
   type VersionContent,
+  type VersionPin,
 } from './version.js';
 
 /** Layout of a versions directory: `<n>.json` manifests and `<merkle_root>.jsonl` content files. */
@@ -29,7 +33,14 @@ export function readRawLog(versionsDir: string): unknown[] {
   return readdirSync(versionsDir)
     .filter((name) => /^\d+\.json$/.test(name))
     .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))
-    .map((name) => JSON.parse(readFileSync(join(versionsDir, name), 'utf8')) as unknown);
+    .map((name) => {
+      try {
+        return JSON.parse(readFileSync(join(versionsDir, name), 'utf8')) as unknown;
+      } catch {
+        // Left for `verifyLog` to report as a malformed manifest: garbage from a server is a finding, not a crash.
+        return undefined;
+      }
+    });
 }
 
 export function readTrustedPublishers(file: string): string[] {
@@ -41,30 +52,46 @@ export function readTrustedPublishers(file: string): string[] {
     .map((publisher) => publisher.key as string);
 }
 
+type PrivateKey = webcrypto.CryptoKey;
+
 /** A publisher key in the format `solana-keygen` writes: a JSON array of the 64 secret-key bytes. */
 export async function loadPublisherKey(
   keyFile: string,
-): Promise<{ address: string; privateKey: webcrypto.CryptoKey }> {
-  const bytes = Uint8Array.from(JSON.parse(readFileSync(keyFile, 'utf8')) as number[]);
-  const pair = await createKeyPairFromBytes(bytes);
-  return { address: await getAddressFromPublicKey(pair.publicKey), privateKey: pair.privateKey };
+): Promise<{ address: string; privateKey: PrivateKey }> {
+  const text = readFileSync(keyFile, 'utf8');
+  try {
+    const pair = await createKeyPairFromBytes(Uint8Array.from(JSON.parse(text) as number[]));
+    return { address: await getAddressFromPublicKey(pair.publicKey), privateKey: pair.privateKey };
+  } catch {
+    // Says nothing about the contents on purpose: parser errors quote their input, and this input is a secret.
+    throw new Error(`${keyFile} is not a keypair in solana-keygen format (a JSON array of 64 bytes)`);
+  }
 }
 
 export type VerifiedVersion =
   | { ok: true; manifest: Manifest; log: Manifest[]; content: VersionContent; contentSource: string }
   | { ok: false; issues: Issue[]; attempts?: ContentAttempt[] };
 
-/**
- * Verifies a publisher's log and the content of its latest version without trusting the server:
- * signatures and the prev_root chain first, then the content against the hash and root it commits to.
- */
-export async function verifyLatestVersion(options: {
+export interface VerifyOptions {
   versionsDir: string;
   trustedPublishers: string[];
   mirrors?: string[];
-}): Promise<VerifiedVersion> {
+  /** The version seen last time; without it a rolled-back or rewritten log cannot be told from a current one. */
+  pin?: VersionPin;
+}
+
+/**
+ * Verifies a publisher's log and the content of its latest version without trusting the server:
+ * signatures and the prev_root chain, the remembered version if any, then the content against the hash
+ * and root it commits to, then the rule that only the whole log can show: a revoked id never returns.
+ */
+export async function verifyLatestVersion(options: VerifyOptions): Promise<VerifiedVersion> {
   const log = await verifyLog(readRawLog(options.versionsDir), options.trustedPublishers);
   if (!log.ok) return log;
+  if (options.pin !== undefined) {
+    const rollback = pinIssues(log.manifests, options.pin);
+    if (rollback.length > 0) return { ok: false, issues: rollback };
+  }
   const manifest = log.manifests[log.manifests.length - 1] as Manifest;
   const local = contentFile(options.versionsDir, manifest.merkle_root);
   try {
@@ -76,6 +103,8 @@ export async function verifyLatestVersion(options: {
     });
     const content = verifyContent(manifest, fetched.bytes);
     if (!content.ok) return content;
+    const reused = revocationIssues(log.manifests.slice(0, -1), content.content);
+    if (reused.length > 0) return { ok: false, issues: reused };
     return {
       ok: true,
       manifest,
@@ -104,48 +133,40 @@ export type EntryVerification =
   | { ok: false; issues: Issue[] };
 
 /** Proves that an entry belongs to the latest verified version of the log. */
-export async function verifyEntry(options: {
-  versionsDir: string;
-  trustedPublishers: string[];
-  entryId: string;
-  mirrors?: string[];
-}): Promise<EntryVerification> {
+export async function verifyEntry(options: VerifyOptions & { entryId: string }): Promise<EntryVerification> {
   const version = await verifyLatestVersion(options);
   if (!version.ok) return { ok: false, issues: version.issues };
   const proof = proveEntry(version.content, options.entryId);
   if (proof === undefined) {
-    const revoked = version.log.some((manifest) => manifest.revoked.includes(options.entryId));
+    const revoked = revokedIds(version.log).includes(options.entryId);
     return {
       ok: false,
       issues: [
         {
           path: options.entryId,
           message: revoked
-            ? `Entry was revoked by its publisher`
+            ? 'Entry was revoked by its publisher'
             : `No such entry in version ${version.manifest.n}`,
           hint: `Version ${version.manifest.n} holds: ${version.content.entries.map((entry) => entry.id).join(', ')}.`,
         },
       ],
     };
   }
-  // The proof is rebuilt from verified content, so this cannot fail here; it is what a light client runs.
-  if (
-    !verifyMerkleProof(
-      Buffer.from(proof.leaf, 'hex'),
-      proof.proof,
-      Buffer.from(version.manifest.merkle_root, 'hex'),
-    )
-  ) {
-    return {
-      ok: false,
-      issues: [
-        {
-          path: options.entryId,
-          message: 'Merkle proof does not lead to the signed root',
-          hint: 'Report this: it is a bug.',
-        },
-      ],
+  // The same bounded check a light client runs with only the entry, its proof and the signed manifest.
+  const bounded = verifyMerkleProof({
+    leaf: Buffer.from(proof.leaf, 'hex'),
+    index: proof.index,
+    leafCount: version.manifest.entry_count,
+    proof: proof.proof,
+    root: Buffer.from(version.manifest.merkle_root, 'hex'),
+  });
+  if (!bounded) {
+    const issue = {
+      path: options.entryId,
+      message: 'Merkle proof does not lead to the signed root',
+      hint: 'Report this: it is a bug.',
     };
+    return { ok: false, issues: [issue] };
   }
   return {
     ok: true,
@@ -184,32 +205,34 @@ export async function publishVersion(options: {
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
   const key = await loadPublisherKey(options.keyFile);
 
-  let previous: { manifest: Manifest; entries: Entry[] } | undefined;
   const rawLog = readRawLog(options.versionsDir);
   const owner = (rawLog[0] as { publisher?: unknown } | undefined)?.publisher;
   if (typeof owner === 'string' && owner !== key.address) {
+    const hint = 'A log has one publisher: sign with its key, or publish into another versions directory.';
     return {
       ok: false,
       issues: [
-        {
-          path: 'publisher',
-          message: `The log belongs to ${owner}, but the key is ${key.address}`,
-          hint: 'A log has one publisher: sign with its key, or publish into another versions directory.',
-        },
+        { path: 'publisher', message: `The log belongs to ${owner}, but the key is ${key.address}`, hint },
       ],
     };
   }
+  let previous: PreviousVersion | undefined;
   if (rawLog.length > 0) {
     const latest = await verifyLatestVersion({
       versionsDir: options.versionsDir,
       trustedPublishers: [key.address],
     });
-    if (!latest.ok)
+    if (!latest.ok) {
       return {
         ok: false,
         issues: latest.issues.map((issue) => ({ ...issue, path: `existing log, ${issue.path}` })),
       };
-    previous = { manifest: latest.manifest, entries: latest.content.entries };
+    }
+    previous = {
+      manifest: latest.manifest,
+      entries: latest.content.entries,
+      revokedBefore: revokedIds(latest.log),
+    };
   }
 
   const built = buildVersion({
@@ -224,15 +247,18 @@ export async function publishVersion(options: {
   if (built.unchanged) return { ok: true, published: false, manifest: built.manifest };
 
   const manifest = await signManifest(built.manifest, key.privateKey);
-  const files = [
-    contentFile(options.versionsDir, manifest.merkle_root),
-    manifestFile(options.versionsDir, manifest.n),
-  ];
+  const target = manifestFile(options.versionsDir, manifest.n);
+  const files = [contentFile(options.versionsDir, manifest.merkle_root), target];
   if (options.dryRun !== true) {
     mkdirSync(options.versionsDir, { recursive: true });
     writeFileSync(files[0] as string, built.content.bytes);
-    // The manifest goes last: a log never names content that is not there.
-    writeFileSync(files[1] as string, `${JSON.stringify(manifest, null, 2)}\n`);
+    // The manifest goes last, whole or not at all, and never over an existing version: a log never names
+    // content that is not there, and two publishes racing for one number cannot both win.
+    const staged = `${target}.${process.pid}.tmp`;
+    writeFileSync(staged, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
+    if (existsSync(target))
+      throw new Error(`Version ${manifest.n} already exists: another publish ran at the same time`);
+    renameSync(staged, target);
   }
   return { ok: true, published: true, dryRun: options.dryRun === true, manifest, files };
 }

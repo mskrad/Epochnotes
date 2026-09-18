@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  buildVersion,
   decodeContent,
   encodeContent,
   GENESIS_ROOT,
@@ -12,8 +13,10 @@ import {
   type Manifest,
   publishVersion,
   readRawLog,
+  signManifest,
   validatePath,
   verifyEntry,
+  verifyLatestVersion,
   verifyLog,
 } from '../src/index.js';
 import { writeTestKey } from './keys.js';
@@ -129,6 +132,27 @@ describe('a log has one publisher', () => {
   });
 });
 
+describe('publisher key', () => {
+  it('never quotes the key file in an error', async () => {
+    const secret = 'c2VjcmV0LWtleS1tYXRlcmlhbC1kby1ub3QtbGVhaw';
+    const bad = join(dir, 'bad-key.json');
+    writeFileSync(bad, secret);
+    const failure = await loadPublisherKey(bad).catch((error: unknown) => error);
+    expect(String(failure)).toContain('not a keypair in solana-keygen format');
+    expect(String(failure)).not.toContain(secret.slice(0, 8));
+  });
+
+  it('never overwrites an existing version', async () => {
+    await publish();
+    const first = readFileSync(manifestPath(1), 'utf8');
+    edit('tx-v1.yaml', 'rev: 1\n', 'rev: 2\n');
+    writeFileSync(manifestPath(2), 'someone else got here first');
+    await expect(publish()).resolves.toMatchObject({ ok: false });
+    expect(readFileSync(manifestPath(1), 'utf8')).toBe(first);
+    expect(readFileSync(manifestPath(2), 'utf8')).toBe('someone else got here first');
+  });
+});
+
 describe('revision rules', () => {
   beforeEach(async () => void (await publish()));
 
@@ -167,6 +191,37 @@ describe('revision rules', () => {
     expect(await verify('alpenglow')).toMatchObject({ ok: true });
   });
 
+  it('never lets a revoked id return: refused when publishing, and caught by a client if forced', async () => {
+    const original = readFileSync(join(entries, 'alpenglow.yaml'), 'utf8');
+    rmSync(join(entries, 'alpenglow.yaml'));
+    edit('slot-duration.yaml', /relations:\n {2}- type: related\n {4}id: alpenglow\n/, '');
+    edit('slot-duration.yaml', 'rev: 1\n', 'rev: 2\n');
+    expect(await publish({ revoke: ['alpenglow'] })).toMatchObject({ ok: true, manifest: { n: 2 } });
+
+    writeFileSync(
+      join(entries, 'alpenglow.yaml'),
+      original.replace(/relations:\n {2}- type: related\n {4}id: slot-duration\n/, ''),
+    );
+    expect(messages(await publish())).toContain('revoked in an earlier version');
+
+    // A publisher running its own code could still sign such a version; the client reads the whole log.
+    const key = await loadPublisherKey(keyFile);
+    const before = await verifyLatestVersion({ versionsDir: versions, trustedPublishers: [publisher] });
+    if (!before.ok) throw new Error(messages(before));
+    const live = validatePath(entries).files.flatMap((file) => (file.entry ? [file.entry] : []));
+    const built = buildVersion({
+      entries: live,
+      publisher,
+      uri: join(versions, '{root}.jsonl'),
+      published: '2026-09-18',
+      previous: { manifest: before.manifest, entries: before.content.entries },
+    });
+    if (!built.ok || built.unchanged) throw new Error('expected a forced version');
+    writeFileSync(join(versions, `${built.manifest.merkle_root}.jsonl`), built.content.bytes);
+    writeFileSync(manifestPath(3), JSON.stringify(await signManifest(built.manifest, key.privateKey)));
+    expect(messages(await verify('alpenglow'))).toContain('reuses an id that its publisher revoked');
+  });
+
   it('refuses to revoke what is still present or was never published', async () => {
     expect(messages(await publish({ revoke: ['tx-v1'] }))).toContain('both revoked and still present');
     expect(messages(await publish({ revoke: ['nope'] }))).toContain('not in the previous version');
@@ -191,14 +246,87 @@ describe('a client trusts nothing it has not checked', () => {
   });
 
   it.each([
+    [
+      'manifest_version',
+      (m: Manifest) => void ((m as { manifest_version: number }).manifest_version = 1.0 + 0),
+    ],
+    ['publisher', (m: Manifest) => void (m.publisher = '11111111111111111111111111111111')],
+    ['n', (m: Manifest) => void (m.n = 2)],
     ['merkle_root', (m: Manifest) => void (m.merkle_root = 'ab'.repeat(32))],
+    ['prev_root', (m: Manifest) => void (m.prev_root = 'cd'.repeat(32))],
     ['entry_count', (m: Manifest) => void (m.entry_count = 3)],
+    ['content_hash', (m: Manifest) => void (m.content_hash = 'ef'.repeat(32))],
     ['uri', (m: Manifest) => void (m.uri = 'https://evil.example/content.jsonl')],
     ['published', (m: Manifest) => void (m.published = '2020-01-01')],
     ['revoked', (m: Manifest) => void (m.revoked = ['alpenglow'])],
   ])('rejects a manifest whose %s was changed after signing', async (_field, change) => {
+    const before = JSON.stringify(readManifest(2));
     tamper(2, change);
+    // manifest_version has one legal value, so its case only proves the harness leaves the log valid.
+    if (JSON.stringify(readManifest(2)) === before) return expect(await verify()).toMatchObject({ ok: true });
+    expect(messages(await verify())).not.toBe('');
+    expect((await verify()).ok).toBe(false);
+  });
+
+  it('rejects a valid signature made by another key over a trusted publisher name', async () => {
+    const other = await loadPublisherKey(writeTestKey(join(dir, 'forger.json')));
+    const forged = await signManifest({ ...readManifest(2) }, other.privateKey);
+    writeFileSync(manifestPath(2), JSON.stringify(forged));
     expect(messages(await verify())).toContain('Signature does not match');
+  });
+
+  it('rejects a signature lifted from another manifest of the same publisher', async () => {
+    tamper(2, (m) => void (m.signature = readManifest(1).signature));
+    expect(messages(await verify())).toContain('Signature does not match');
+  });
+
+  it('rejects a log that changes publisher halfway, even if both are trusted', async () => {
+    const other = await loadPublisherKey(writeTestKey(join(dir, 'second.json')));
+    const resigned = await signManifest({ ...readManifest(2), publisher: other.address }, other.privateKey);
+    writeFileSync(manifestPath(2), JSON.stringify(resigned));
+    expect(messages(await verify('tx-v1', [publisher, other.address]))).toContain(
+      'Publisher changes within one log',
+    );
+  });
+
+  it('reports a manifest that is not JSON as a finding, not a crash', async () => {
+    writeFileSync(manifestPath(2), '<html>502 Bad Gateway</html>');
+    const result = await verify();
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.issues.map((issue) => issue.path)).toContainEqual(
+      expect.stringContaining('version 2'),
+    );
+  });
+
+  it('cannot tell a truncated log from a current one — unless it remembers what it saw', async () => {
+    const seen = readManifest(2);
+    rmSync(manifestPath(2));
+    expect(await verify()).toMatchObject({ ok: true, versions: 1 }); // the limit of signatures alone
+    const pinned = await verifyEntry({
+      versionsDir: versions,
+      trustedPublishers: [publisher],
+      entryId: 'tx-v1',
+      pin: { n: 2, merkleRoot: seen.merkle_root },
+    });
+    expect(messages(pinned)).toContain('version 2 was seen before');
+  });
+
+  it('detects a rewritten history through the remembered version', async () => {
+    const pin = { n: 2, merkleRoot: 'ab'.repeat(32) };
+    expect(
+      messages(
+        await verifyEntry({ versionsDir: versions, trustedPublishers: [publisher], entryId: 'tx-v1', pin }),
+      ),
+    ).toContain('Version 2 now has root');
+    const honest = { n: 2, merkleRoot: readManifest(2).merkle_root };
+    expect(
+      await verifyEntry({
+        versionsDir: versions,
+        trustedPublishers: [publisher],
+        entryId: 'tx-v1',
+        pin: honest,
+      }),
+    ).toMatchObject({ ok: true });
   });
 
   it('rejects a log signed by a publisher it does not trust', async () => {
@@ -268,5 +396,10 @@ describe('content files', () => {
     expect(decode(`${[...lines].reverse().join('\n')}\n`)).toContain('out of order or repeated');
     expect(decode(`${(lines[0] ?? '').replace('{', '{ ')}\n`)).toContain('not in canonical form');
     expect(decode(text.trimEnd())).toContain('must end with a newline');
+    expect(decode(`\uFEFF${text}`)).not.toBe('');
+    expect(messages(decodeContent(new Uint8Array()) as never)).toContain('Content is empty');
+    expect(messages(decodeContent(Uint8Array.from([0xff, 0xfe, 0x0a])) as never)).toContain(
+      'not valid UTF-8',
+    );
   });
 });

@@ -67,6 +67,56 @@ describe('epochnotes registry publish / verify', () => {
     expect(verified.out).toMatch(/^OK {4}tx-v1@1 is in version 1 of /);
   });
 
+  it('remembers a version through --pin: accepts the same log, refuses a shorter one and a malformed pin', async () => {
+    const seen = await run('registry', 'verify', 'tx-v1', '--versions', versions, '--publishers', publishers);
+    const pin = /pin {7}(\d+:[0-9a-f]{64})/.exec(seen.out)?.[1] ?? '';
+    expect(pin).toMatch(/^1:/);
+    expect(
+      (
+        await run(
+          'registry',
+          'verify',
+          'tx-v1',
+          '--versions',
+          versions,
+          '--publishers',
+          publishers,
+          '--pin',
+          pin,
+        )
+      ).code,
+    ).toBe(0);
+
+    const ahead = await run(
+      'registry',
+      'verify',
+      'tx-v1',
+      '--versions',
+      versions,
+      '--publishers',
+      publishers,
+      '--pin',
+      pin.replace(/^1:/, '2:'),
+    );
+    expect(ahead.code).toBe(1);
+    expect(ahead.out).toContain('version 2 was seen before');
+    expect(
+      (
+        await run(
+          'registry',
+          'verify',
+          'tx-v1',
+          '--versions',
+          versions,
+          '--publishers',
+          publishers,
+          '--pin',
+          'latest',
+        )
+      ).code,
+    ).toBe(2);
+  });
+
   it('exits 1 for an unknown entry, an untrusted publisher and a tampered manifest', async () => {
     expect(
       (await run('registry', 'verify', 'no-such-entry', '--versions', versions, '--publishers', publishers))

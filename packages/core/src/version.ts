@@ -72,7 +72,27 @@ export function encodeContent(entries: Entry[]): VersionContent {
 export function decodeContent(
   bytes: Uint8Array,
 ): { ok: true; content: VersionContent } | { ok: false; issues: Issue[] } {
-  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  let text: string;
+  try {
+    // Strict decoding, BOM kept: bytes that are not exactly what `encodeContent` writes must not decode to the same entries.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: 'content',
+          message: 'Content is not valid UTF-8',
+          hint: 'The file is corrupted or is not a registry version.',
+        },
+      ],
+    };
+  }
+  if (bytes.length === 0)
+    return {
+      ok: false,
+      issues: [{ path: 'content', message: 'Content is empty', hint: 'A version holds at least one entry.' }],
+    };
   const lines = text.split('\n');
   if (lines.pop() !== '')
     return {
@@ -129,8 +149,22 @@ export function decodeContent(
 }
 
 /** What an edit between two versions is allowed to look like. */
-function revisionIssues(previous: Entry[], next: Entry[], revoke: string[]): Issue[] {
+function revisionIssues(
+  previous: Entry[],
+  next: Entry[],
+  revoke: string[],
+  revokedBefore: string[],
+): Issue[] {
   const issues: Issue[] = [];
+  for (const entry of next) {
+    if (revokedBefore.includes(entry.id)) {
+      issues.push({
+        path: entry.id,
+        message: 'This id was revoked in an earlier version',
+        hint: 'A revoked id is never reused: publish the change under a new id.',
+      });
+    }
+  }
   const before = new Map(previous.map((entry) => [entry.id, entry]));
   const after = new Map(next.map((entry) => [entry.id, entry]));
   for (const entry of next) {
@@ -183,6 +217,8 @@ function revisionIssues(previous: Entry[], next: Entry[], revoke: string[]): Iss
 export interface PreviousVersion {
   manifest: Manifest;
   entries: Entry[];
+  /** Every id revoked anywhere in the log so far. */
+  revokedBefore?: string[];
 }
 
 export type BuildResult =
@@ -210,7 +246,12 @@ export function buildVersion(options: {
     };
   const issues = [
     ...validateRegistry(options.entries),
-    ...revisionIssues(options.previous?.entries ?? [], options.entries, revoke),
+    ...revisionIssues(
+      options.previous?.entries ?? [],
+      options.entries,
+      revoke,
+      options.previous?.revokedBefore ?? [],
+    ),
   ];
   if (options.previous !== undefined && options.previous.manifest.publisher !== options.publisher) {
     issues.push({
@@ -385,4 +426,58 @@ export function proveEntry(content: VersionContent, id: string): EntryProof | un
     index,
     proof: buildMerkleProof(buildMerkleLevels(content.leaves), index),
   };
+}
+
+/** Every id revoked anywhere in a log. */
+export function revokedIds(log: Manifest[]): string[] {
+  return [...new Set(log.flatMap((manifest) => manifest.revoked))];
+}
+
+/** A client-side check of what only the whole log can show: a revoked id never comes back. */
+export function revocationIssues(log: Manifest[], content: VersionContent): Issue[] {
+  const revoked = new Set(revokedIds(log));
+  return content.entries
+    .filter((entry) => revoked.has(entry.id))
+    .map((entry) => ({
+      path: entry.id,
+      message: 'Entry reuses an id that its publisher revoked earlier',
+      hint: 'Do not rely on this entry; report it to the publisher.',
+    }));
+}
+
+/** What a client remembers from its last successful verification: `<n>:<merkle_root>`. */
+export interface VersionPin {
+  n: number;
+  merkleRoot: string;
+}
+
+export function parsePin(value: string): VersionPin | undefined {
+  const match = /^(\d+):([0-9a-f]{64})$/.exec(value);
+  return match === null ? undefined : { n: Number(match[1]), merkleRoot: match[2] as string };
+}
+
+/**
+ * Signatures and the prev_root chain prove a log is internally consistent, not that it is complete: a
+ * server can serve only its first k versions. A client that remembers the last version it saw detects
+ * that, and detects a publisher signing two different histories.
+ */
+export function pinIssues(log: Manifest[], pin: VersionPin): Issue[] {
+  const at = log[pin.n - 1];
+  if (at === undefined)
+    return [
+      {
+        path: 'log',
+        message: `The log has ${log.length} version(s), but version ${pin.n} was seen before`,
+        hint: 'The log was rolled back or truncated; do not use it.',
+      },
+    ];
+  if (at.merkle_root !== pin.merkleRoot)
+    return [
+      {
+        path: `version ${pin.n}`,
+        message: `Version ${pin.n} now has root ${at.merkle_root.slice(0, 16)}..., not the ${pin.merkleRoot.slice(0, 16)}... seen before`,
+        hint: 'The history was rewritten; do not use it.',
+      },
+    ];
+  return [];
 }

@@ -1,4 +1,4 @@
-import { publishVersion, readTrustedPublishers, verifyEntry } from '@epochnotes/core';
+import { parsePin, publishVersion, readTrustedPublishers, verifyEntry } from '@epochnotes/core';
 import type { Command } from 'commander';
 
 import { EXIT } from './registry.js';
@@ -84,12 +84,19 @@ export function addVersionCommands(registry: Command): void {
     .option('--versions <dir>', 'directory of the version log', 'registry/versions')
     .option('--publishers <file>', 'trusted publishers', 'registry/publishers.json')
     .option('--mirror <url...>', 'hash-addressed mirrors tried after the manifest uri')
+    .option('--pin <n:root>', 'the version seen last time; detects a rolled-back or rewritten log')
     .option('--json', 'print the result as JSON, including the Merkle proof')
     .action(
       async (
         entryId: string,
-        options: { versions: string; publishers: string; mirror?: string[]; json?: boolean },
+        options: { versions: string; publishers: string; mirror?: string[]; pin?: string; json?: boolean },
       ) => {
+        const pin = options.pin === undefined ? undefined : parsePin(options.pin);
+        if (options.pin !== undefined && pin === undefined) {
+          console.error('--pin must look like 3:<64 hex characters>, as printed by a previous verify.');
+          process.exitCode = EXIT.environment;
+          return;
+        }
         let result;
         try {
           result = await verifyEntry({
@@ -97,6 +104,7 @@ export function addVersionCommands(registry: Command): void {
             trustedPublishers: readTrustedPublishers(options.publishers),
             entryId,
             ...(options.mirror === undefined ? {} : { mirrors: options.mirror }),
+            ...(pin === undefined ? {} : { pin }),
           });
         } catch (error) {
           console.error(`Cannot verify: ${(error as Error).message}`);
@@ -115,6 +123,10 @@ export function addVersionCommands(registry: Command): void {
           );
           console.log(
             `  log       ${result.versions} version(s), signatures and prev_root chain verified\n  content   ${result.contentSource} (sha256 matches the manifest)`,
+          );
+          console.log(`  pin       ${manifest.n}:${manifest.merkle_root}`);
+          console.log(
+            '  note      signatures prove the log is consistent, not complete: pass --pin next time to detect a rollback.',
           );
         }
         process.exitCode = EXIT.ok;

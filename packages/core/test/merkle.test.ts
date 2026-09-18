@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMerkleLevels,
   buildMerkleProof,
+  merkleDepth,
+  type MerkleProofNode,
   merkleRoot,
   rootFromProof,
   verifyMerkleProof,
@@ -14,9 +16,14 @@ import {
 const leaf = (seed: number) => createHash('sha256').update(`leaf-${seed}`).digest();
 const leavesOf = (count: number) => Array.from({ length: count }, (_, index) => leaf(index));
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
+const at = <T>(items: T[], index: number): T => {
+  const item = items[index];
+  if (item === undefined) throw new Error(`no item ${index}`);
+  return item;
+};
 
-describe('merkle tree', () => {
-  it.each([1, 2, 3, 4, 5, 8, 9, 17])('matches the VRE SDK byte for byte with %i leaves', (count) => {
+describe('compatibility with the VRE SDK', () => {
+  it.each([1, 2, 3, 4, 5, 8, 9, 17])('builds the same levels and proofs with %i leaves', (count) => {
     const leaves = leavesOf(count);
     const ours = buildMerkleLevels(leaves);
     const theirs = vre.buildMerkleLevels(leaves);
@@ -26,43 +33,112 @@ describe('merkle tree', () => {
     }
   });
 
-  it('proves every leaf and nothing else', () => {
-    const leaves = leavesOf(7);
-    const levels = buildMerkleLevels(leaves);
-    const root = merkleRoot(levels);
-    leaves.forEach((item, index) => {
-      const proof = buildMerkleProof(levels, index);
-      expect(verifyMerkleProof(item, proof, root)).toBe(true);
-      expect(verifyMerkleProof(leaf(99), proof, root)).toBe(false);
-      expect(verifyMerkleProof(item, proof, leaf(100))).toBe(false);
+  it.each([1, 2, 3, 6, 7])('each side verifies the proofs of the other, with %i leaves', (count) => {
+    // VRE's verifier hashes a snapshot line itself, so the leaves here are made its way.
+    const lines = Array.from({ length: count }, (_, index) => `{"id":"p${index}","order":${index}}\n`);
+    const leaves = lines.map((line) => vre.hashSnapshotLeafLine(line));
+    const ours = buildMerkleLevels(leaves);
+    const theirs = vre.buildMerkleLevels(leaves);
+    lines.forEach((line, index) => {
+      // our proof and root, their verifier
+      expect(
+        vre.verifySnapshotMerkleProof({
+          line,
+          proof: buildMerkleProof(ours, index),
+          merkleRoot: Buffer.from(merkleRoot(ours)),
+        }),
+      ).toBe(true);
+      // their proof and root, our verifier
+      const theirRoot = at(at(theirs, theirs.length - 1), 0);
+      expect(
+        verifyMerkleProof({
+          leaf: at(leaves, index),
+          index,
+          leafCount: count,
+          proof: vre.buildMerkleProof(theirs, index),
+          root: theirRoot,
+        }),
+      ).toBe(true);
     });
+    // and both reject a line that is not in the tree
+    expect(
+      vre.verifySnapshotMerkleProof({
+        line: '{"id":"x"}\n',
+        proof: buildMerkleProof(ours, 0),
+        merkleRoot: Buffer.from(merkleRoot(ours)),
+      }),
+    ).toBe(false);
   });
+});
 
-  it('rejects a proof with a flipped side, a changed sibling or a malformed step', () => {
+describe('proof verification', () => {
+  it.each([1, 2, 3, 5, 7, 8])(
+    'accepts every leaf at its own index and nowhere else, with %i leaves',
+    (count) => {
+      const leaves = leavesOf(count);
+      const levels = buildMerkleLevels(leaves);
+      const root = merkleRoot(levels);
+      leaves.forEach((item, index) => {
+        const proof = buildMerkleProof(levels, index);
+        expect(proof).toHaveLength(merkleDepth(count));
+        expect(verifyMerkleProof({ leaf: item, index, leafCount: count, proof, root })).toBe(true);
+        expect(verifyMerkleProof({ leaf: leaf(99), index, leafCount: count, proof, root })).toBe(false);
+        expect(verifyMerkleProof({ leaf: item, index, leafCount: count, proof, root: leaf(100) })).toBe(
+          false,
+        );
+        if (count > 1)
+          expect(
+            verifyMerkleProof({ leaf: item, index: (index + 1) % count, leafCount: count, proof, root }),
+          ).toBe(false);
+      });
+    },
+  );
+
+  it('rejects an inner node presented as a leaf with a shorter proof', () => {
     const leaves = leavesOf(4);
     const levels = buildMerkleLevels(leaves);
     const root = merkleRoot(levels);
-    const target = leaves[1] as Buffer;
-    const proof = buildMerkleProof(levels, 1);
-    const [first, ...rest] = proof as [MerkleProofNode, ...MerkleProofNode[]];
-    expect(verifyMerkleProof(target, [{ ...first, position: 'right' }, ...rest], root)).toBe(false);
-    expect(verifyMerkleProof(target, [{ ...first, sibling: hex(leaf(50)) }, ...rest], root)).toBe(false);
-    expect(verifyMerkleProof(target, [{ ...first, sibling: 'zz' }], root)).toBe(false);
-    expect(() => rootFromProof(new Uint8Array(31), proof)).toThrow('31 bytes');
+    const inner = at(at(levels, 1), 0);
+    const shorter = buildMerkleProof(levels, 0).slice(1);
+    // The unbounded fold does reach the root — which is exactly why the bounded check exists.
+    expect(hex(rootFromProof(inner, shorter))).toBe(hex(root));
+    expect(verifyMerkleProof({ leaf: inner, index: 0, leafCount: 4, proof: shorter, root })).toBe(false);
+    expect(verifyMerkleProof({ leaf: inner, index: 0, leafCount: 2, proof: shorter, root })).toBe(true); // a different, 2-leaf tree
   });
 
-  it('has the known ambiguity of self-paired odd nodes, which callers must bound', () => {
+  it('rejects the repeated last leaf of a self-paired odd node', () => {
     const [a, b, c] = leavesOf(3) as [Buffer, Buffer, Buffer];
-    // Same root for [a, b, c] and [a, b, c, c]: this is why a manifest states its entry count and content
-    // refuses a repeated entry (see version.test.ts).
-    expect(hex(merkleRoot(buildMerkleLevels([a, b, c])))).toBe(
-      hex(merkleRoot(buildMerkleLevels([a, b, c, c]))),
-    );
+    const padded = buildMerkleLevels([a, b, c, c]);
+    const root = merkleRoot(buildMerkleLevels([a, b, c]));
+    expect(hex(merkleRoot(padded))).toBe(hex(root)); // the ambiguity is real
+    const ghost = buildMerkleProof(padded, 3);
+    expect(verifyMerkleProof({ leaf: c, index: 3, leafCount: 3, proof: ghost, root })).toBe(false);
+    expect(
+      verifyMerkleProof({ leaf: c, index: 2, leafCount: 3, proof: buildMerkleProof(padded, 2), root }),
+    ).toBe(true);
+  });
+
+  it('rejects a flipped side, a changed sibling, a malformed step and impossible counts', () => {
+    const leaves = leavesOf(4);
+    const levels = buildMerkleLevels(leaves);
+    const root = merkleRoot(levels);
+    const target = at(leaves, 1);
+    const [first, ...rest] = buildMerkleProof(levels, 1) as [MerkleProofNode, ...MerkleProofNode[]];
+    const check = (proof: MerkleProofNode[], leafCount = 4) =>
+      verifyMerkleProof({ leaf: target, index: 1, leafCount, proof, root });
+    expect(check([first, ...rest])).toBe(true);
+    expect(check([{ ...first, position: 'right' }, ...rest])).toBe(false);
+    expect(check([{ ...first, sibling: hex(leaf(50)) }, ...rest])).toBe(false);
+    expect(check([{ ...first, sibling: 'zz' }, ...rest])).toBe(false);
+    expect(check([first, ...rest], 0)).toBe(false);
+    expect(check([first, ...rest], 1.5)).toBe(false);
+    expect(() => rootFromProof(new Uint8Array(31), rest)).toThrow('31 bytes');
   });
 
   it('refuses an empty tree, a leaf of the wrong size and an index out of bounds', () => {
     expect(() => buildMerkleLevels([])).toThrow('at least one leaf');
     expect(() => buildMerkleLevels([new Uint8Array(20)])).toThrow('20 bytes');
     expect(() => buildMerkleProof(buildMerkleLevels(leavesOf(2)), 2)).toThrow(RangeError);
+    expect([1, 2, 3, 4, 5, 8, 9].map(merkleDepth)).toEqual([0, 1, 2, 2, 3, 3, 4]);
   });
 });

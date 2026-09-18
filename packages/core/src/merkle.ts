@@ -81,13 +81,38 @@ export function rootFromProof(leaf: Uint8Array, proof: MerkleProofNode[]): Uint8
   }, Uint8Array.from(leaf));
 }
 
+/** Number of proof steps for any leaf of a tree with `leafCount` leaves. */
+export function merkleDepth(leafCount: number): number {
+  let depth = 0;
+  for (let width = leafCount; width > 1; width = Math.ceil(width / 2)) depth += 1;
+  return depth;
+}
+
 /**
- * True when the leaf belongs to the tree with this root. A malformed proof is simply not a proof.
- * The scheme has no leaf/node domain separation, so callers must also bound the tree: a version
- * manifest states its entry count, and a registry rejects duplicate entries, which rules out the
- * "repeat the last leaf" ambiguity of self-paired odd nodes.
+ * True when `leaf` is leaf number `index` of the tree of `leafCount` leaves with this root.
+ *
+ * The pair-hash scheme has no leaf/node domain separation and pairs an odd node with itself, so a bare
+ * "does this fold to the root" check would also accept an inner node presented as a leaf (with a shorter
+ * proof) and a repeated last leaf (at an index past the end). Binding the proof to the signed leaf count
+ * closes both: the proof must have exactly the depth of the tree, its sides must spell out `index`, and
+ * `index` must be below `leafCount`. A malformed proof is simply not a proof.
  */
-export function verifyMerkleProof(leaf: Uint8Array, proof: MerkleProofNode[], root: Uint8Array): boolean {
+export function verifyMerkleProof(options: {
+  leaf: Uint8Array;
+  index: number;
+  leafCount: number;
+  proof: MerkleProofNode[];
+  root: Uint8Array;
+}): boolean {
+  const { leaf, index, leafCount, proof, root } = options;
+  if (!Number.isInteger(leafCount) || leafCount < 1) return false;
+  if (!Number.isInteger(index) || index < 0 || index >= leafCount) return false;
+  if (proof.length !== merkleDepth(leafCount)) return false;
+  // At each level the sibling sits on the left exactly when the node's own index is odd.
+  if (
+    !proof.every((step, level) => (step.position === 'left') === (Math.floor(index / 2 ** level) % 2 === 1))
+  )
+    return false;
   try {
     return Buffer.from(rootFromProof(leaf, proof)).equals(Buffer.from(root));
   } catch {

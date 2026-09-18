@@ -31,6 +31,7 @@ export {
   buildMerkleLevels,
   buildMerkleProof,
   type MerkleProofNode,
+  merkleDepth,
   merkleRoot,
   rootFromProof,
   verifyMerkleProof,
@@ -44,13 +45,18 @@ export {
   type Manifest,
   manifestSchema,
   manifestSigningBytes,
+  parsePin,
+  pinIssues,
   proveEntry,
+  revocationIssues,
+  revokedIds,
   signManifest,
   type UnsignedManifest,
   verifyContent,
   verifyLog,
   verifyManifestSignature,
   type VersionContent,
+  type VersionPin,
 } from './version.js';
 export {
   type EntryVerification,
@@ -61,4 +67,5 @@ export {
   readTrustedPublishers,
   verifyEntry,
   verifyLatestVersion,
+  type VerifyOptions,
 } from './version-store.js';

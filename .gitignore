@@ -3,3 +3,16 @@
 /AGENTS.md
 /CLAUDE.md
 /.claude/
+
+# сборка и зависимости
+node_modules/
+dist/
+*.tsbuildinfo
+target/
+.anchor/
+test-ledger/
+
+# ключи
+*-keypair.json
+*.keypair.json
+.env*

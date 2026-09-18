@@ -1,0 +1,17 @@
+{
+  "name": "@epochnotes/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "epochnotes": "dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@epochnotes/core": "0.0.0",
+    "commander": "^15.0.0"
+  }
+}

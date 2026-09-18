@@ -1,0 +1,13 @@
+[toolchain]
+package_manager = "npm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+registry = "Diad4BcYWeB3Epgma7RZFNWspm5gpdtTLnwoj3UWEcdy"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"

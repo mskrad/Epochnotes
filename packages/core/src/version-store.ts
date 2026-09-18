@@ -185,7 +185,21 @@ export async function publishVersion(options: {
   const key = await loadPublisherKey(options.keyFile);
 
   let previous: { manifest: Manifest; entries: Entry[] } | undefined;
-  if (readRawLog(options.versionsDir).length > 0) {
+  const rawLog = readRawLog(options.versionsDir);
+  const owner = (rawLog[0] as { publisher?: unknown } | undefined)?.publisher;
+  if (typeof owner === 'string' && owner !== key.address) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: 'publisher',
+          message: `The log belongs to ${owner}, but the key is ${key.address}`,
+          hint: 'A log has one publisher: sign with its key, or publish into another versions directory.',
+        },
+      ],
+    };
+  }
+  if (rawLog.length > 0) {
     const latest = await verifyLatestVersion({
       versionsDir: options.versionsDir,
       trustedPublishers: [key.address],

@@ -113,6 +113,22 @@ describe('publishing', () => {
   });
 });
 
+describe('a log has one publisher', () => {
+  it('refuses to extend a log with another key, and says whose log it is', async () => {
+    await publish();
+    const other = writeTestKey(join(dir, 'other.json'));
+    const result = await publishVersion({
+      entriesDir: entries,
+      versionsDir: versions,
+      keyFile: other,
+      uri: 'x',
+      published: '2026-09-18',
+    });
+    expect(messages(result)).toContain(`The log belongs to ${publisher}`);
+    expect(readRawLog(versions)).toHaveLength(1);
+  });
+});
+
 describe('revision rules', () => {
   beforeEach(async () => void (await publish()));
 

@@ -55,7 +55,7 @@ detect:
   - rule: kit-below-8
     kind: lockfile-version
     confidence: check
-    summary: '@solana/kit older than 8.0.0 still has the compute-unit-limit helpers that 8.0.0 removed for version 1.'
+    summary: 'Upgrading @solana/kit to 8.0.0 removes three compute-unit-limit helpers; code that calls them stops compiling.'
     package:
       ecosystem: npm
       name: '@solana/kit'
@@ -71,7 +71,7 @@ detect:
 fix:
   - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock.
     for_rules: [rpc-max-version-zero, rpc-max-version-dynamic, rpc-reads-v1-transaction]
-  - summary: Upgrade @solana/kit to 8.0.0 or later and replace compute-unit-limit helpers with the resource-limit helpers.
+  - summary: When moving to @solana/kit 8.0.0 or later, replace the compute-unit-limit helpers with the resource-limit helpers named in the release notes.
     for_rules: [kit-below-8]
     links:
       - https://github.com/anza-xyz/kit/releases/tag/v8.0.0
@@ -89,7 +89,7 @@ sources:
     retrieved: '2026-09-18'
     note: >-
       With transactionDetails full: parameter omitted or 0 returns -32015; parameter 1 returns 1139
-      transactions, 98 of them version 1. transactionDetails accounts with parameter 0 also returns -32015;
+      transactions, 98 of them version 1. transactionDetails accounts returns -32015 with the parameter omitted or 0;
       signatures and none succeed without the parameter.
   - kind: rpc-observation
     ref: mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5

@@ -42,12 +42,13 @@
 
 Движок читает аккаунт каждого gate из `applies.gates` на выбранном кластере в момент проверки. Три состояния, а не два:
 
-| Состояние                                                                                                                    | Признак в сети                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `absent`                                                                                                                     | аккаунта gate нет — активация не запланирована                                    |
-| `pending`                                                                                                                    | аккаунт есть (владелец `Feature111…`), `activated_at = None` — ждёт границы эпохи |
-| `active{slot}`                                                                                                               | `activated_at = Some(slot)`                                                       |
-| Отчёт всегда называет кластер и слот запроса. Для записи с несколькими gate статус — по каждому gate («шаг 2 из 5 активен»). |
+| Состояние      | Признак в сети                                                                    |
+| -------------- | --------------------------------------------------------------------------------- |
+| `absent`       | аккаунта gate нет — активация не запланирована                                    |
+| `pending`      | аккаунт есть (владелец `Feature111…`), `activated_at = None` — ждёт границы эпохи |
+| `active{slot}` | `activated_at = Some(slot)`                                                       |
+
+Отчёт всегда называет кластер и слот запроса. Для записи с несколькими gate статус — по каждому gate («шаг 2 из 5 активен»).
 
 ## 4. Каноническая форма и хеш листа
 
@@ -72,23 +73,25 @@
 - эталон `tx-v1` — **OK**; ссылочная целостность `evidence` / `for_rules` — OK;
 - отклонены 7 испорченных вариантов: нет `sources`; пустой `sources`; пустой `applies`; `applies.gates: []`; поле `status` в корне; `activated_slot` внутри gate; `rev: 1.5`;
 - хеш листа `4a63cca8…450abf` совпал при обратном порядке ключей.
-  Исполняемая команда в репозитории (`epochnotes registry validate`) появляется в UR-003.
+
+Исполняемая команда в репозитории (`epochnotes registry validate`) появляется в UR-003.
 
 ## 7. Факты из сети, полученные при подготовке эталона (2026-09-18)
 
 Адреса — `anza-xyz/agave` `feature-set/src/lib.rs` @ `583d4560e7d1`; статус — `getMultipleAccounts` на публичных RPC; даты — `getBlockTime` слота активации.
 
-| Gate                                                                    | Адрес                                          | mainnet-beta                                | devnet           | testnet          |
-| ----------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------- | ---------------- | ---------------- |
-| `enable_tx_v1` (SIMD-0385)                                              | `txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL`  | active 447120000 (2026-09-15 01:04 UTC)     | active 492480000 | active 437276256 |
-| `alpenglow` (SIMD-0326)                                                 | `A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS` | absent                                      | absent           | absent           |
-| rent → 6333 (SIMD-0437-1)                                               | `4a6f7o7iTcA8hRDCrPLkSatnt5Ykxiu36wo5p1Tt12wC` | active 444096000 (09-03)                    | active           | active           |
-| rent → 5080 (SIMD-0437-2)                                               | `61BtM7BkDEE8Yq5fskEVAQT9mYA8qCejJWoLe5apqg81` | active 446256000 (09-11)                    | active           | active           |
-| rent → 2575 / 1322 / 696                                                | `rntCigrT…`, `rntD7inv…`, `rntTjNZ9…`          | absent                                      | absent           | absent           |
-| slot 350 / 300 мс (SIMD-0525)                                           | `iBRL5RuW…`, `iBRLL3k1…`                       | active (300 мс — 08-26)                     | active           | active           |
-| slot 250 мс                                                             | `iBRLMc81UjRa8fn8A6eE8bJTnRbgQoPTynM51akENCV`  | **active 447552000 (2026-09-16 15:03 UTC)** | active           | active           |
-| slot 200 мс                                                             | `iBRLjhJnkmDZgNoZRDMW11d8ZV7HvsL3vAyRjZB5npW`  | absent                                      | active 487296000 | active 429068256 |
-| Срез на слотах: mainnet 448063613, devnet 500303946, testnet 441761909. |
+| Gate                          | Адрес                                          | mainnet-beta                                | devnet           | testnet          |
+| ----------------------------- | ---------------------------------------------- | ------------------------------------------- | ---------------- | ---------------- |
+| `enable_tx_v1` (SIMD-0385)    | `txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL`  | active 447120000 (2026-09-15 01:04 UTC)     | active 492480000 | active 437276256 |
+| `alpenglow` (SIMD-0326)       | `A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS` | absent                                      | absent           | absent           |
+| rent → 6333 (SIMD-0437-1)     | `4a6f7o7iTcA8hRDCrPLkSatnt5Ykxiu36wo5p1Tt12wC` | active 444096000 (09-03)                    | active           | active           |
+| rent → 5080 (SIMD-0437-2)     | `61BtM7BkDEE8Yq5fskEVAQT9mYA8qCejJWoLe5apqg81` | active 446256000 (09-11)                    | active           | active           |
+| rent → 2575 / 1322 / 696      | `rntCigrT…`, `rntD7inv…`, `rntTjNZ9…`          | absent                                      | absent           | absent           |
+| slot 350 / 300 мс (SIMD-0525) | `iBRL5RuW…`, `iBRLL3k1…`                       | active (300 мс — 08-26)                     | active           | active           |
+| slot 250 мс                   | `iBRLMc81UjRa8fn8A6eE8bJTnRbgQoPTynM51akENCV`  | **active 447552000 (2026-09-16 15:03 UTC)** | active           | active           |
+| slot 200 мс                   | `iBRLjhJnkmDZgNoZRDMW11d8ZV7HvsL3vAyRjZB5npW`  | absent                                      | active 487296000 | active 429068256 |
+
+Срез на слотах: mainnet 448063613, devnet 500303946, testnet 441761909.
 
 Что это меняет:
 

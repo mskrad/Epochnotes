@@ -10,7 +10,7 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-const PINNED_TX_V1_REV_1 = 'ddde183053ef36c5066f804c1327fc1acdca241291b3767fe39f0c72cf0c439d';
+const PINNED_TX_V1_REV_1 = '3b373bbaf6755c4a7da482a62757f09e8e8828b32c44c7d77b7fce1a944b1db3';
 
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);
@@ -33,8 +33,9 @@ describe('canonical form', () => {
     expect(canonicalize({ b: [2, 1], a: { d: true, c: 'x' } })).toBe('{"a":{"c":"x","d":true},"b":[2,1]}');
   });
 
-  it('gives one leaf for any key order, at every depth', () => {
-    expect(toHex(entryLeafHash(reverseKeys(reference())))).toBe(toHex(entryLeafHash(reference())));
+  it('gives one canonical text for any key order, at every depth', () => {
+    // Compared below the validator, on raw data: zod rebuilds objects in schema order, which would hide a missing sort.
+    expect(canonicalize(reverseKeys(reference()))).toBe(canonicalize(reference()));
   });
 
   it('gives one leaf when top-level keys are reordered in the YAML text itself', () => {
@@ -63,13 +64,13 @@ describe('canonical form', () => {
   });
 
   it('normalizes strings to NFC, so composed and decomposed text hash alike', () => {
-    expect(toHex(entryLeafHash({ title: 'Café' }))).toBe(toHex(entryLeafHash({ title: 'Café' })));
+    expect(canonicalize({ title: 'Café' })).toBe(canonicalize({ title: 'Café' }));
   });
 
   it('treats array order as meaningful', () => {
     const swapped = reference();
     swapped.sources.reverse();
-    expect(toHex(entryLeafHash(swapped))).not.toBe(toHex(entryLeafHash(reference())));
+    expect(canonicalize(swapped)).not.toBe(canonicalize(reference()));
   });
 
   it('rejects floats and null, naming where they are', () => {

@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import type { Entry } from './schema.js';
+
 /** A value the canonical form accepts: no floats, no null, no undefined. */
 export type CanonicalValue = string | number | boolean | CanonicalValue[] | { [key: string]: CanonicalValue };
 
@@ -49,8 +51,12 @@ export function canonicalize(value: unknown, path = ''): string {
   );
 }
 
-/** Merkle leaf of an entry: sha256 over the canonical bytes. Key order of the input does not matter. */
-export function entryLeafHash(entry: unknown): Uint8Array {
+/**
+ * Merkle leaf of an entry: sha256 over the canonical bytes. Key order of the input does not matter.
+ * Takes a validated entry only: validation fills defaults, and hashing raw input would give the same
+ * entry a different leaf depending on whether empty fields were written out.
+ */
+export function entryLeafHash(entry: Entry): Uint8Array {
   return createHash('sha256').update(canonicalize(entry), 'utf8').digest();
 }
 

@@ -5,7 +5,15 @@ import { Command } from 'commander';
 export const EXIT = { ok: 0, findings: 1, environment: 2 } as const;
 
 function printReport(report: RegistryReport): void {
+  const inRegistryTrouble = (id?: string) =>
+    report.registryIssues.some((issue) => issue.path === id || issue.path.startsWith(`${id}.`));
   for (const file of report.files) {
+    if (file.ok && inRegistryTrouble(file.id)) {
+      console.log(
+        `FAIL  ${file.file}  ${file.id}@${file.rev}  (valid on its own; see registry problems below)`,
+      );
+      continue;
+    }
     if (file.ok) {
       console.log(`OK    ${file.file}  ${file.id}@${file.rev}  leaf ${file.leaf}`);
       continue;

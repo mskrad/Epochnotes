@@ -52,11 +52,19 @@ export function validatePath(path: string): RegistryReport {
     // problems that belong to the neighbours alone are left to a directory run.
     const neighbours = entryFiles(dirname(path))
       .filter((file) => resolve(file) !== resolve(path))
-      .map((file) => validateEntryYaml(readFileSync(file, 'utf8')))
-      .flatMap((result) => (result.ok ? [result.entry] : []));
-    registryIssues = validateRegistry([only, ...neighbours]).filter(
-      (issue) => issue.path === only.id || issue.path.startsWith(`${only.id}.`),
-    );
+      .map((file) => ({ file, result: validateEntryYaml(readFileSync(file, 'utf8')) }));
+    const valid = neighbours.flatMap(({ result }) => (result.ok ? [result.entry] : []));
+    const invalid = neighbours.filter(({ result }) => !result.ok).map(({ file }) => file);
+    registryIssues = validateRegistry([only, ...valid])
+      .filter((issue) => issue.path === only.id || issue.path.startsWith(`${only.id}.`))
+      .map((issue) =>
+        invalid.length > 0 && issue.message.startsWith('No entry with id')
+          ? {
+              ...issue,
+              hint: `${issue.hint} Ignored as invalid: ${invalid.join(', ')} — the id may live there.`,
+            }
+          : issue,
+      );
   }
   return { ok: files.every((file) => file.ok) && registryIssues.length === 0, files, registryIssues };
 }

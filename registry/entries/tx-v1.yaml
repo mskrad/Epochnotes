@@ -28,9 +28,10 @@ breaks:
     evidence: [0, 3]
   - surface: sdk
     summary: >-
-      @solana/kit 8.0.0 removed compute-unit-limit helpers and fixed transaction size constants in favour
-      of resource-limit helpers, because version 1 transactions have a larger size limit and carry their
-      own resource configuration.
+      @solana/kit 8.0.0 removed three compute-unit-limit helpers from @solana/kit in favour of resource-limit
+      helpers that also set the loaded accounts data size limit for version 1 transactions, and removed the
+      fixed transaction size constants from @solana/transactions because version 1 transactions have a
+      larger size limit.
     evidence: [4]
   - surface: decoder
     summary: >-
@@ -68,7 +69,7 @@ detect:
       fixture: mainnet-beta:4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
       expect: Result has version 1 and no JSON-RPC error.
 fix:
-  - summary: Pass maxSupportedTransactionVersion 1 in getTransaction, getBlock and block subscriptions.
+  - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock.
     for_rules: [rpc-max-version-zero, rpc-max-version-dynamic, rpc-reads-v1-transaction]
   - summary: Upgrade @solana/kit to 8.0.0 or later and replace compute-unit-limit helpers with the resource-limit helpers.
     for_rules: [kit-below-8]
@@ -76,9 +77,9 @@ fix:
       - https://github.com/anza-xyz/kit/releases/tag/v8.0.0
 sources:
   - kind: simd
-    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0385-transaction-v1.md
+    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md
     retrieved: '2026-09-18'
-    note: Document status at retrieval is Review; front matter has no feature key yet.
+    note: Document status at retrieval is Review; the front matter feature field is still a placeholder.
   - kind: source-code
     ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs
     retrieved: '2026-09-18'

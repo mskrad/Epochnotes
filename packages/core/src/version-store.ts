@@ -1,5 +1,13 @@
-import type { webcrypto } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { randomUUID, type webcrypto } from 'node:crypto';
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 import { createKeyPairFromBytes, getAddressFromPublicKey } from '@solana/kit';
@@ -103,7 +111,7 @@ export async function verifyLatestVersion(options: VerifyOptions): Promise<Verif
     });
     const content = verifyContent(manifest, fetched.bytes);
     if (!content.ok) return content;
-    const reused = revocationIssues(log.manifests.slice(0, -1), content.content);
+    const reused = revocationIssues(log.manifests, content.content);
     if (reused.length > 0) return { ok: false, issues: reused };
     return {
       ok: true,
@@ -175,6 +183,26 @@ export async function verifyEntry(options: VerifyOptions & { entryId: string }):
     contentSource: version.contentSource,
     proof,
   };
+}
+
+/**
+ * Creates `target` with `text`, whole or not at all, and only if it does not exist yet. The text is staged
+ * under a private name and then hard-linked into place: unlike rename, link fails when the target exists,
+ * so the check and the creation are one atomic step.
+ */
+export function writeNewFile(target: string, text: string): void {
+  const staged = `${target}.${process.pid}.${randomUUID()}.tmp`;
+  writeFileSync(staged, text, { flag: 'wx' });
+  try {
+    linkSync(staged, target);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new Error(`${target} already exists: another publish got there first`);
+    }
+    throw error;
+  } finally {
+    unlinkSync(staged);
+  }
 }
 
 export type PublishResult =
@@ -252,13 +280,9 @@ export async function publishVersion(options: {
   if (options.dryRun !== true) {
     mkdirSync(options.versionsDir, { recursive: true });
     writeFileSync(files[0] as string, built.content.bytes);
-    // The manifest goes last, whole or not at all, and never over an existing version: a log never names
-    // content that is not there, and two publishes racing for one number cannot both win.
-    const staged = `${target}.${process.pid}.tmp`;
-    writeFileSync(staged, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' });
-    if (existsSync(target))
-      throw new Error(`Version ${manifest.n} already exists: another publish ran at the same time`);
-    renameSync(staged, target);
+    // The manifest goes last and never over an existing version: a log never names content that is not
+    // there, and of two publishes racing for one number exactly one wins.
+    writeNewFile(target, `${JSON.stringify(manifest, null, 2)}\n`);
   }
   return { ok: true, published: true, dryRun: options.dryRun === true, manifest, files };
 }

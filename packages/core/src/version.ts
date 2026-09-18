@@ -453,7 +453,8 @@ export interface VersionPin {
 
 export function parsePin(value: string): VersionPin | undefined {
   const match = /^(\d+):([0-9a-f]{64})$/.exec(value);
-  return match === null ? undefined : { n: Number(match[1]), merkleRoot: match[2] as string };
+  if (match === null || Number(match[1]) < 1) return undefined;
+  return { n: Number(match[1]), merkleRoot: match[2] as string };
 }
 
 /**

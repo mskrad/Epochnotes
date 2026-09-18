@@ -68,4 +68,5 @@ export {
   verifyEntry,
   verifyLatestVersion,
   type VerifyOptions,
+  writeNewFile,
 } from './version-store.js';

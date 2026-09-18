@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -18,6 +18,7 @@ import {
   verifyEntry,
   verifyLatestVersion,
   verifyLog,
+  writeNewFile,
 } from '../src/index.js';
 import { writeTestKey } from './keys.js';
 
@@ -142,6 +143,14 @@ describe('publisher key', () => {
     expect(String(failure)).not.toContain(secret.slice(0, 8));
   });
 
+  it('creates a file only if it is not there, atomically, and leaves no staging file behind', () => {
+    const target = join(dir, 'exclusive.json');
+    writeNewFile(target, 'first');
+    expect(() => writeNewFile(target, 'second')).toThrow('already exists');
+    expect(readFileSync(target, 'utf8')).toBe('first');
+    expect(readdirSync(dir).filter((name) => name.includes('.tmp'))).toEqual([]);
+  });
+
   it('never overwrites an existing version', async () => {
     await publish();
     const first = readFileSync(manifestPath(1), 'utf8');
@@ -222,6 +231,26 @@ describe('revision rules', () => {
     expect(messages(await verify('alpenglow'))).toContain('reuses an id that its publisher revoked');
   });
 
+  it('a client refuses a version that revokes an id and still carries it', async () => {
+    const key = await loadPublisherKey(keyFile);
+    const before = await verifyLatestVersion({ versionsDir: versions, trustedPublishers: [publisher] });
+    if (!before.ok) throw new Error(messages(before));
+    edit('tx-v1.yaml', 'rev: 1\n', 'rev: 2\n');
+    const live = validatePath(entries).files.flatMap((file) => (file.entry ? [file.entry] : []));
+    const built = buildVersion({
+      entries: live,
+      publisher,
+      uri: join(versions, '{root}.jsonl'),
+      published: '2026-09-18',
+      previous: { manifest: before.manifest, entries: before.content.entries },
+    });
+    if (!built.ok || built.unchanged) throw new Error('expected a new version');
+    writeFileSync(join(versions, `${built.manifest.merkle_root}.jsonl`), built.content.bytes);
+    const selfRevoking = await signManifest({ ...built.manifest, revoked: ['tx-v1'] }, key.privateKey);
+    writeFileSync(manifestPath(2), JSON.stringify(selfRevoking));
+    expect(messages(await verify('tx-v1'))).toContain('reuses an id that its publisher revoked');
+  });
+
   it('refuses to revoke what is still present or was never published', async () => {
     expect(messages(await publish({ revoke: ['tx-v1'] }))).toContain('both revoked and still present');
     expect(messages(await publish({ revoke: ['nope'] }))).toContain('not in the previous version');
@@ -246,12 +275,9 @@ describe('a client trusts nothing it has not checked', () => {
   });
 
   it.each([
-    [
-      'manifest_version',
-      (m: Manifest) => void ((m as { manifest_version: number }).manifest_version = 1.0 + 0),
-    ],
+    ['manifest_version', (m: Manifest) => void ((m as { manifest_version: number }).manifest_version = 2)],
     ['publisher', (m: Manifest) => void (m.publisher = '11111111111111111111111111111111')],
-    ['n', (m: Manifest) => void (m.n = 2)],
+    ['n', (m: Manifest) => void (m.n = 3)],
     ['merkle_root', (m: Manifest) => void (m.merkle_root = 'ab'.repeat(32))],
     ['prev_root', (m: Manifest) => void (m.prev_root = 'cd'.repeat(32))],
     ['entry_count', (m: Manifest) => void (m.entry_count = 3)],
@@ -262,9 +288,7 @@ describe('a client trusts nothing it has not checked', () => {
   ])('rejects a manifest whose %s was changed after signing', async (_field, change) => {
     const before = JSON.stringify(readManifest(2));
     tamper(2, change);
-    // manifest_version has one legal value, so its case only proves the harness leaves the log valid.
-    if (JSON.stringify(readManifest(2)) === before) return expect(await verify()).toMatchObject({ ok: true });
-    expect(messages(await verify())).not.toBe('');
+    expect(JSON.stringify(readManifest(2))).not.toBe(before); // the case really changes the manifest
     expect((await verify()).ok).toBe(false);
   });
 
@@ -396,7 +420,7 @@ describe('content files', () => {
     expect(decode(`${[...lines].reverse().join('\n')}\n`)).toContain('out of order or repeated');
     expect(decode(`${(lines[0] ?? '').replace('{', '{ ')}\n`)).toContain('not in canonical form');
     expect(decode(text.trimEnd())).toContain('must end with a newline');
-    expect(decode(`\uFEFF${text}`)).not.toBe('');
+    expect(decode(`\uFEFF${text}`)).toContain('Not JSON');
     expect(messages(decodeContent(new Uint8Array()) as never)).toContain('Content is empty');
     expect(messages(decodeContent(Uint8Array.from([0xff, 0xfe, 0x0a])) as never)).toContain(
       'not valid UTF-8',

@@ -5,9 +5,10 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "epochnotes": "dist/bin.js"
+    "epochnotes": "bin/epochnotes.js"
   },
   "files": [
+    "bin",
     "dist"
   ],
   "dependencies": {

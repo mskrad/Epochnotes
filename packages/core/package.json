@@ -17,6 +17,7 @@
   ],
   "dependencies": {
     "@solana/addresses": "^8.3.0",
+    "@solana/kit": "^8.3.0",
     "semver": "^7.8.5",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

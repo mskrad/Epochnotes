@@ -8,3 +8,16 @@ export {
   validateEntryYaml,
   validateRegistry,
 } from './validate.js';
+export {
+  type Cluster,
+  CLUSTERS,
+  decodeFeatureAccount,
+  type FeatureAccount,
+  type FeatureAccountSource,
+  featureAccountSourceFromRpc,
+  type FeatureState,
+  type FeatureStatusReport,
+  readFeatureStatus,
+  rpcFeatureAccountSource,
+} from './feature-status.js';
+export { type GateStatus, registryStatus, type StatusReport } from './status.js';

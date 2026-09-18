@@ -1,0 +1,65 @@
+# Incremental rent reduction (SIMD-0437). Each `breaks` item names its evidence as indexes into `sources`.
+# Activation status is not stored here: it is read from the feature gate accounts at check time.
+schema_version: 1
+id: rent-simd-0437
+rev: 1
+axis: protocol
+subject:
+  type: simd
+  name: SIMD-0437
+  title: Incrementally Reduce lamports_per_byte to 696
+applies:
+  gates:
+    - address: 4a6f7o7iTcA8hRDCrPLkSatnt5Ykxiu36wo5p1Tt12wC
+      label: set_lamports_per_byte_to_6333
+      effect: Step 1 of 5. Sets lamports_per_byte to 6333 (from 6960).
+    - address: 61BtM7BkDEE8Yq5fskEVAQT9mYA8qCejJWoLe5apqg81
+      label: set_lamports_per_byte_to_5080
+      effect: Step 2 of 5. Sets lamports_per_byte to 5080.
+    - address: rntCigrTppP5JdZz7K8TyN9sMzLdAcXp8SejYpVpX6D
+      label: set_lamports_per_byte_to_2575
+      effect: Step 3 of 5. Sets lamports_per_byte to 2575.
+    - address: rntD7invRBswCAdKtRsh1G4psKjrPdS3BKqtnA78C7N
+      label: set_lamports_per_byte_to_1322
+      effect: Step 4 of 5. Sets lamports_per_byte to 1322.
+    - address: rntTjNZ9boq8owDxjGVFHPfWNQPDaKiM5JcjxmDGg47
+      label: set_lamports_per_byte_to_696
+      effect: Step 5 of 5. Sets lamports_per_byte to 696.
+breaks:
+  - surface: economics
+    summary: >-
+      The minimum balance of an account is (128 + data size in bytes) * lamports_per_byte, and every step
+      lowers lamports_per_byte. An account funded at an earlier, higher minimum keeps the difference: the
+      SIMD allows reducing the balance to the new minimum, it does not return anything by itself.
+    evidence: [0, 2]
+  - surface: sdk
+    summary: >-
+      A lamports_per_byte value compiled into a client or program goes stale at every step: on activation
+      the value changes in the bank and in the Rent sysvar, while DEFAULT_LAMPORTS_PER_BYTE in the SDKs is
+      updated only after activation.
+    evidence: [0]
+  - surface: program
+    summary: >-
+      The reduction is not guaranteed to be one-way: the SIMD states that rent can be increased back to the
+      legacy value if state grows excessively. A minimum balance fixed at a reduced value can therefore
+      become too low.
+    evidence: [0]
+fix:
+  - summary: >-
+      Take the minimum balance from the cluster at run time (the Rent sysvar in programs,
+      getMinimumBalanceForRentExemption in clients) instead of a compiled-in lamports_per_byte.
+sources:
+  - kind: simd
+    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md
+    retrieved: '2026-09-18'
+    note: Document status at retrieval is Idea; the front matter feature field is still a placeholder.
+  - kind: source-code
+    ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs
+    retrieved: '2026-09-18'
+    note: 'Five modules set_lamports_per_byte_to_*, registered as "SIMD-0437-1" to "SIMD-0437-5", each with its LAMPORTS_PER_BYTE constant.'
+  - kind: rpc-observation
+    ref: mainnet-beta getAccountInfo SysvarRent111111111111111111111111111111111 at slot 448083071
+    retrieved: '2026-09-18'
+    note: >-
+      The sysvar holds 5080; getMinimumBalanceForRentExemption(0) returns 650240, which is 128 * 5080. devnet
+      returned the same values at slot 500335378.

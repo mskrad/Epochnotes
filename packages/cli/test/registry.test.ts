@@ -25,6 +25,25 @@ const dir = mkdtempSync(join(tmpdir(), 'epochnotes-cli-'));
 afterEach(() => vi.restoreAllMocks());
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
+describe('epochnotes status', () => {
+  it('exits 2 and says what to do when the cluster does not answer', async () => {
+    const { code, out } = await run(
+      'status',
+      '--registry',
+      `${root}registry/entries`,
+      '--rpc-url',
+      'http://127.0.0.1:9',
+    );
+    expect(code).toBe(2);
+    expect(out).toContain('did not answer');
+    expect(out).toContain('--rpc-url');
+  });
+
+  it('rejects a cluster name it does not know', async () => {
+    await expect(run('status', '--cluster', 'localnet')).rejects.toThrow();
+  });
+});
+
 describe('epochnotes registry validate', () => {
   it('exits 0 on the reference entry and prints its leaf', async () => {
     const { code, out } = await run('registry', 'validate', `${root}registry/entries/tx-v1.yaml`);

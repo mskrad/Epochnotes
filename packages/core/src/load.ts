@@ -11,6 +11,8 @@ export interface FileReport {
   id?: string;
   rev?: number;
   leaf?: string;
+  /** The validated entry, for callers that go on to use it. */
+  entry?: Entry;
   issues: Issue[];
 }
 
@@ -42,6 +44,7 @@ export function validatePath(path: string): RegistryReport {
       id: result.entry.id,
       rev: result.entry.rev,
       leaf: toHex(entryLeafHash(result.entry)),
+      entry: result.entry,
       issues: [],
     };
   });

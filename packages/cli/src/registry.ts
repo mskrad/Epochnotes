@@ -42,7 +42,9 @@ export function registryCommand(): Command {
         process.exitCode = EXIT.environment;
         return;
       }
-      if (options.json) console.log(JSON.stringify(report, null, 2));
+      // The parsed entries ride along for library callers; the JSON report stays a summary.
+      if (options.json)
+        console.log(JSON.stringify(report, (key, value) => (key === 'entry' ? undefined : value), 2));
       else printReport(report);
       process.exitCode = report.ok ? EXIT.ok : EXIT.findings;
     });

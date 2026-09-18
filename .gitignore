@@ -16,3 +16,4 @@ test-ledger/
 *-keypair.json
 *.keypair.json
 .env*
+!.env.example

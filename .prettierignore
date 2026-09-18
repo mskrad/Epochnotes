@@ -4,8 +4,4 @@ target
 node_modules
 test-ledger
 package-lock.json
-docs
-registry
-corpus
-programs
 Cargo.lock

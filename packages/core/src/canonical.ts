@@ -32,11 +32,16 @@ export function canonicalize(value: unknown, path = ''): string {
     const members = Object.entries(value)
       .filter(([, member]) => member !== undefined)
       .map(([key, member]) => [key.normalize('NFC'), member] as const)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(
-        ([key, member]) => `${JSON.stringify(key)}:${canonicalize(member, path ? `${path}.${key}` : key)}`,
-      );
-    return `{${members.join(',')}}`;
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    members.forEach(([key], index) => {
+      if (index > 0 && members[index - 1]?.[0] === key) {
+        throw new CanonicalizationError(`Keys collide after NFC normalization: ${JSON.stringify(key)}`, path);
+      }
+    });
+    const text = members.map(
+      ([key, member]) => `${JSON.stringify(key)}:${canonicalize(member, path ? `${path}.${key}` : key)}`,
+    );
+    return `{${text.join(',')}}`;
   }
   throw new CanonicalizationError(
     `Unsupported value of type ${value === null ? 'null' : typeof value}`,

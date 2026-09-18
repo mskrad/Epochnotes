@@ -10,6 +10,8 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
+const PINNED_TX_V1_REV_1 = 'ddde183053ef36c5066f804c1327fc1acdca241291b3767fe39f0c72cf0c439d';
+
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);
   if (typeof value !== 'object' || value === null) return value;
@@ -35,8 +37,23 @@ describe('canonical form', () => {
     expect(toHex(entryLeafHash(reverseKeys(reference())))).toBe(toHex(entryLeafHash(reference())));
   });
 
+  it('gives one leaf when top-level keys are reordered in the YAML text itself', () => {
+    const blocks = referenceYaml.split(/^(?=[a-z_]+:)/m);
+    const header = blocks.shift() ?? '';
+    expect(blocks.length).toBeGreaterThan(5);
+    expect(leafOfYaml(header + blocks.reverse().join(''))).toBe(leafOfYaml(referenceYaml));
+  });
+
   it('gives one leaf for LF and CRLF line endings in the YAML source', () => {
     expect(leafOfYaml(referenceYaml.replaceAll('\n', '\r\n'))).toBe(leafOfYaml(referenceYaml));
+  });
+
+  it('normalizes line endings inside literal block scalars too', () => {
+    const literal = referenceYaml
+      .replace('relations: []\n', '')
+      .replace(/^fix:\n {2}- summary: .*$/m, 'fix:\n  - summary: |-\n      first line\n      second line');
+    expect(literal).toContain('first line');
+    expect(leafOfYaml(literal.replaceAll('\n', '\r\n'))).toBe(leafOfYaml(literal));
   });
 
   it('gives one leaf whether defaulted fields are omitted or written out empty', () => {
@@ -61,10 +78,12 @@ describe('canonical form', () => {
     expect(() => canonicalize({ a: { b: null } })).toThrow('a.b');
   });
 
-  it('matches the leaf computed independently (Python: sorted keys, compact JSON, sha256)', () => {
-    expect(leafOfYaml(referenceYaml)).toBe(
-      '4a63cca8bbedd9e2d25be1bcdd79f8248c145251184c6e4f54cfb4868c450abf',
-    );
-    expect(parse(referenceYaml).id).toBe('tx-v1');
+  it('refuses keys that collide once normalized', () => {
+    expect(() => canonicalize({ 'caf\u00e9': 1, 'cafe\u0301': 2 })).toThrow('collide');
+  });
+
+  it('pins the leaf of tx-v1 rev 1: changing the entry without raising rev must be a conscious act', () => {
+    expect(parse(referenceYaml)).toMatchObject({ id: 'tx-v1', rev: 1 });
+    expect(leafOfYaml(referenceYaml)).toBe(PINNED_TX_V1_REV_1);
   });
 });

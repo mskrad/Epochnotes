@@ -24,6 +24,7 @@
     "@types/node": "^22.20.3",
     "@types/semver": "^7.8.0",
     "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^10.10.0",
     "prettier": "^3.9.8",
     "typescript": "~6.0.3",

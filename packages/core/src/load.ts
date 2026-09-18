@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { entryLeafHash, toHex } from './canonical.js';
 import type { Entry } from './schema.js';
@@ -45,8 +45,18 @@ export function validatePath(path: string): RegistryReport {
       issues: [],
     };
   });
-  const single = files.length === 1 && files[0]?.file === path;
-  // A single file is checked on its own: relations to entries outside it cannot be resolved.
-  const registryIssues = single ? [] : validateRegistry(entries);
+  let registryIssues = validateRegistry(entries);
+  const only = entries[0];
+  if (!statSync(path).isDirectory() && only !== undefined) {
+    // A single file is checked in the context of its directory, so its relations still have to resolve;
+    // problems that belong to the neighbours alone are left to a directory run.
+    const neighbours = entryFiles(dirname(path))
+      .filter((file) => resolve(file) !== resolve(path))
+      .map((file) => validateEntryYaml(readFileSync(file, 'utf8')))
+      .flatMap((result) => (result.ok ? [result.entry] : []));
+    registryIssues = validateRegistry([only, ...neighbours]).filter(
+      (issue) => issue.path === only.id || issue.path.startsWith(`${only.id}.`),
+    );
+  }
   return { ok: files.every((file) => file.ok) && registryIssues.length === 0, files, registryIssues };
 }

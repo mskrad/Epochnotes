@@ -14,6 +14,17 @@ export interface Issue {
 
 export type ValidationResult = { ok: true; entry: Entry; issues: [] } | { ok: false; issues: Issue[] };
 
+/** A `YYYY-MM-DD` string that is also a real calendar date. */
+function isCalendarDate(value: string): boolean {
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Cargo separates comparators with commas where npm uses spaces; the comparators themselves agree. */
+function isVersionRange(ecosystem: string, range: string): boolean {
+  return semver.validRange(ecosystem === 'cargo' ? range.replaceAll(',', ' ') : range) !== null;
+}
+
 const STATUS_KEYS = /^(status|state|activated|activated_at|activated_slot|activation|active|is_active)$/i;
 
 function formatPath(path: PropertyKey[]): string {
@@ -43,6 +54,7 @@ function hintFor(issue: z.core.$ZodIssue): string {
     return 'Add applies.gates (feature gate addresses) and/or applies.versions (semver ranges).';
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
+  if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
   if (issue.code === 'invalid_type' && issue.input === undefined) return `Add the required field "${field}".`;
   return 'See registry/schema.json for the expected shape of this field.';
 }
@@ -62,6 +74,7 @@ function semanticIssues(entry: Entry): Issue[] {
     }
     rules.add(rule.rule);
     if (rule.kind === 'code-pattern') {
+      // Patterns are executed by this engine (JavaScript) whatever language they search, so that is the dialect checked.
       try {
         new RegExp(rule.pattern);
       } catch (error) {
@@ -72,7 +85,7 @@ function semanticIssues(entry: Entry): Issue[] {
         });
       }
     }
-    if (rule.kind === 'lockfile-version' && semver.validRange(rule.package.range) === null) {
+    if (rule.kind === 'lockfile-version' && !isVersionRange(rule.package.ecosystem, rule.package.range)) {
       issues.push({
         path: `${at}.package.range`,
         message: `"${rule.package.range}" is not a semver range`,
@@ -91,11 +104,21 @@ function semanticIssues(entry: Entry): Issue[] {
     }
   });
   entry.applies.versions?.forEach((item, index) => {
-    if (semver.validRange(item.range) === null) {
+    if (!isVersionRange(item.ecosystem, item.range)) {
       issues.push({
         path: `applies.versions[${index}].range`,
         message: `"${item.range}" is not a semver range`,
         hint: 'Use a range such as ">=4.2.0".',
+      });
+    }
+  });
+
+  entry.sources.forEach((source, index) => {
+    if (!isCalendarDate(source.retrieved)) {
+      issues.push({
+        path: `sources[${index}].retrieved`,
+        message: `"${source.retrieved}" is not a calendar date`,
+        hint: 'Use the real date the source was read, as YYYY-MM-DD.',
       });
     }
   });
@@ -197,6 +220,7 @@ export function validateRegistry(entries: Entry[]): Issue[] {
       }
     });
   }
+  // Each relation type is its own graph: "a requires b" together with "b supersedes a" is not a cycle.
   for (const type of ['requires', 'supersedes'] as const) {
     const state = new Map<string, 'visiting' | 'done'>();
     const visit = (id: string, trail: string[]): void => {

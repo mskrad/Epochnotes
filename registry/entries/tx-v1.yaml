@@ -32,6 +32,12 @@ breaks:
       of resource-limit helpers, because version 1 transactions have a larger size limit and carry their
       own resource configuration.
     evidence: [4]
+  - surface: decoder
+    summary: >-
+      A version 1 transaction may be up to 4096 bytes; the prior maximum was 1232. Buffers, packet-size
+      constants and size checks that assume 1232 bytes reject or truncate valid version 1 transactions.
+      The larger size has no feature gate of its own: it ships with version 1.
+    evidence: [0, 5, 4]
 detect:
   - rule: rpc-max-version-zero
     kind: code-pattern
@@ -90,3 +96,7 @@ sources:
   - kind: release
     ref: https://github.com/anza-xyz/kit/releases/tag/v8.0.0
     retrieved: '2026-09-18'
+  - kind: simd
+    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md
+    retrieved: '2026-09-18'
+    note: Origin of the 4096-byte transaction size; SIMD-0385 lists it under Transaction Constraints.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { type Entry, validateEntry, validateEntryYaml, validateRegistry } from '../src/index.js';
-import { brokenFixtures, reference, referenceYaml } from './helpers.js';
+import { brokenEntries, reference, referenceYaml } from './helpers.js';
 
 function issuesOf(raw: unknown) {
   const result = validateEntry(raw);
@@ -21,26 +21,12 @@ describe('reference entry', () => {
 });
 
 describe('broken entries are rejected with a place and a fix', () => {
-  const expected: Record<string, { path: string; hint: RegExp }> = {
-    'bad-activated-slot-in-gate.yaml': { path: 'applies.gates[0]', hint: /never stored in an entry/ },
-    'bad-empty-applies.yaml': { path: 'applies', hint: /applies\.gates/ },
-    'bad-empty-gates.yaml': { path: 'applies.gates', hint: /at least one item/ },
-    'bad-empty-sources.yaml': { path: 'sources', hint: /at least one source/ },
-    'bad-float-rev.yaml': { path: 'rev', hint: /whole number/ },
-    'bad-no-sources.yaml': { path: 'sources', hint: /sources list/ },
-    'bad-status-field.yaml': { path: '', hint: /never stored in an entry/ },
-  };
-
-  it('covers every fixture on disk', () => {
-    expect(brokenFixtures.map((fixture) => fixture.name)).toEqual(Object.keys(expected).sort());
-  });
-
-  it.each(brokenFixtures)('$name', ({ name, yaml }) => {
+  it.each(brokenEntries)('$name', ({ yaml, path, hint }) => {
     const result = validateEntryYaml(yaml);
     expect(result.ok).toBe(false);
     expect(result.issues).toHaveLength(1);
-    expect(result.issues[0]?.path).toBe(expected[name]?.path);
-    expect(result.issues[0]?.hint).toMatch(expected[name]?.hint ?? /^$/);
+    expect(result.issues[0]?.path).toBe(path);
+    expect(result.issues[0]?.hint).toMatch(hint);
   });
 });
 
@@ -73,6 +59,12 @@ describe('checks a schema cannot express', () => {
     const raw = reference();
     raw.detect[2].package.range = 'eight-ish';
     expect(issuesOf(raw)).toMatchObject([{ path: 'detect[2].package.range' }]);
+  });
+
+  it('cargo ranges may separate comparators with commas', () => {
+    const raw = reference();
+    raw.applies.versions = [{ ecosystem: 'cargo', name: 'solana-sdk', range: '>=4.2.0, <5.0.0' }];
+    expect(issuesOf(raw)).toEqual([]);
   });
 
   it('gate addresses must decode to 32 bytes', () => {

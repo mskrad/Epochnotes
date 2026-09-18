@@ -29,6 +29,7 @@
     "prettier": "^3.9.8",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.0",
+    "verifiable-outcome-sdk": "^0.9.1",
     "vitest": "^5.0.1"
   }
 }

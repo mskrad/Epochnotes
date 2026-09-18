@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
+import { writeTestKey } from '../../core/test/keys.js';
 import { buildProgram } from '../src/program.js';
 
 const root = new URL('../../../', import.meta.url).pathname;
@@ -24,6 +25,103 @@ const dir = mkdtempSync(join(tmpdir(), 'epochnotes-cli-'));
 
 afterEach(() => vi.restoreAllMocks());
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+describe('epochnotes registry publish / verify', () => {
+  const versions = join(dir, 'versions');
+  const key = writeTestKey(join(dir, 'publisher-key.json'));
+  const publishers = join(dir, 'publishers.json');
+  const entries = `${root}registry/entries`;
+
+  it('publishes a version, then proves an entry against it', async () => {
+    const published = await run(
+      'registry',
+      'publish',
+      '--key',
+      key,
+      '--entries',
+      entries,
+      '--versions',
+      versions,
+      '--uri',
+      join(versions, '{root}.jsonl'),
+      '--json',
+    );
+    expect(published.code).toBe(0);
+    const { manifest } = JSON.parse(published.out) as { manifest: { publisher: string; n: number } };
+    expect(manifest.n).toBe(1);
+    writeFileSync(
+      publishers,
+      JSON.stringify({ publishers: [{ name: 'test', key: manifest.publisher, status: 'active' }] }),
+    );
+
+    const verified = await run(
+      'registry',
+      'verify',
+      'tx-v1',
+      '--versions',
+      versions,
+      '--publishers',
+      publishers,
+    );
+    expect(verified.code).toBe(0);
+    expect(verified.out).toMatch(/^OK {4}tx-v1@1 is in version 1 of /);
+  });
+
+  it('exits 1 for an unknown entry, an untrusted publisher and a tampered manifest', async () => {
+    expect(
+      (await run('registry', 'verify', 'no-such-entry', '--versions', versions, '--publishers', publishers))
+        .code,
+    ).toBe(1);
+
+    const nobody = join(dir, 'nobody.json');
+    writeFileSync(nobody, JSON.stringify({ publishers: [] }));
+    const untrusted = await run(
+      'registry',
+      'verify',
+      'tx-v1',
+      '--versions',
+      versions,
+      '--publishers',
+      nobody,
+    );
+    expect(untrusted.code).toBe(1);
+    expect(untrusted.out).toContain('is not trusted');
+
+    const manifestFile = join(versions, '1.json');
+    writeFileSync(
+      manifestFile,
+      readFileSync(manifestFile, 'utf8').replace('"entry_count": 4', '"entry_count": 5'),
+    );
+    const tampered = await run(
+      'registry',
+      'verify',
+      'tx-v1',
+      '--versions',
+      versions,
+      '--publishers',
+      publishers,
+    );
+    expect(tampered.code).toBe(1);
+    expect(tampered.out).toContain('Signature does not match');
+  });
+
+  it('exits 2 when the key file cannot be read', async () => {
+    expect(
+      (
+        await run(
+          'registry',
+          'publish',
+          '--key',
+          join(dir, 'absent.json'),
+          '--entries',
+          entries,
+          '--versions',
+          versions,
+        )
+      ).code,
+    ).toBe(2);
+  });
+});
 
 describe('epochnotes status', () => {
   it('exits 2 and says what to do when the cluster does not answer', async () => {

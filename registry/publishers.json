@@ -1,0 +1,10 @@
+{
+  "publishers": [
+    {
+      "name": "Epochnotes",
+      "key": "6VGzWhwbqcYjxWZePEonjkqC77PnWkZDrKyTwyZs2gDb",
+      "status": "active",
+      "note": "The only publisher for now. Development key: signs versions that are anchored on devnet only."
+    }
+  ]
+}

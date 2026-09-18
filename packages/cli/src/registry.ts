@@ -1,6 +1,8 @@
 import { type RegistryReport, validatePath } from '@epochnotes/core';
 import { Command } from 'commander';
 
+import { addVersionCommands } from './publish.js';
+
 /** Exit codes shared by all commands: 0 — ok, 1 — findings or invalid input data, 2 — environment error. */
 export const EXIT = { ok: 0, findings: 1, environment: 2 } as const;
 
@@ -56,5 +58,6 @@ export function registryCommand(): Command {
       } else printReport(report);
       process.exitCode = report.ok ? EXIT.ok : EXIT.findings;
     });
+  addVersionCommands(registry);
   return registry;
 }

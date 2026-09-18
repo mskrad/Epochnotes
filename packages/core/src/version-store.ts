@@ -1,13 +1,5 @@
 import { randomUUID, type webcrypto } from 'node:crypto';
-import {
-  existsSync,
-  linkSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createKeyPairFromBytes, getAddressFromPublicKey } from '@solana/kit';
@@ -192,16 +184,21 @@ export async function verifyEntry(options: VerifyOptions & { entryId: string }):
  */
 export function writeNewFile(target: string, text: string): void {
   const staged = `${target}.${process.pid}.${randomUUID()}.tmp`;
-  writeFileSync(staged, text, { flag: 'wx' });
   try {
+    writeFileSync(staged, text, { flag: 'wx' });
     linkSync(staged, target);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      throw new Error(`${target} already exists: another publish got there first`);
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') throw new Error(`${target} already exists: another publish got there first`);
+    if (code === 'EPERM' || code === 'ENOTSUP' || code === 'EMLINK') {
+      throw new Error(
+        `Cannot create ${target}: this file system does not support hard links (${code}); publish on a local disk`,
+      );
     }
     throw error;
   } finally {
-    unlinkSync(staged);
+    // Best effort: a staging file that cannot be removed must not hide the real outcome, and readers ignore it.
+    rmSync(staged, { force: true });
   }
 }
 

@@ -10,6 +10,7 @@ import {
   encodeContent,
   GENESIS_ROOT,
   loadPublisherKey,
+  parsePin,
   type Manifest,
   publishVersion,
   readRawLog,
@@ -149,6 +150,8 @@ describe('publisher key', () => {
     expect(() => writeNewFile(target, 'second')).toThrow('already exists');
     expect(readFileSync(target, 'utf8')).toBe('first');
     expect(readdirSync(dir).filter((name) => name.includes('.tmp'))).toEqual([]);
+    // a target that cannot be created at all: the error is reported and nothing is left behind either
+    expect(() => writeNewFile(join(dir, 'no-such-dir', 'x.json'), 'text')).toThrow();
   });
 
   it('never overwrites an existing version', async () => {
@@ -289,7 +292,11 @@ describe('a client trusts nothing it has not checked', () => {
     const before = JSON.stringify(readManifest(2));
     tamper(2, change);
     expect(JSON.stringify(readManifest(2))).not.toBe(before); // the case really changes the manifest
-    expect((await verify()).ok).toBe(false);
+    const result = await verify();
+    expect(result.ok).toBe(false);
+    // manifest_version has one legal value and is refused by the schema before any signature is looked at;
+    // for every other field the signature check itself must fire, whatever else also notices the change.
+    if (_field !== 'manifest_version') expect(messages(result)).toContain('Signature does not match');
   });
 
   it('rejects a valid signature made by another key over a trusted publisher name', async () => {
@@ -311,6 +318,28 @@ describe('a client trusts nothing it has not checked', () => {
     expect(messages(await verify('tx-v1', [publisher, other.address]))).toContain(
       'Publisher changes within one log',
     );
+  });
+
+  it('ignores staging files a crashed publish may have left behind', async () => {
+    writeFileSync(join(versions, '3.json.4242.deadbeef.tmp'), 'half-written');
+    writeFileSync(join(versions, 'notes.txt'), 'not a manifest');
+    expect(await verify()).toMatchObject({ ok: true, versions: 2 });
+  });
+
+  it('reads a pin strictly', () => {
+    const root = 'ab'.repeat(32);
+    expect(parsePin(`2:${root}`)).toEqual({ n: 2, merkleRoot: root });
+    for (const bad of [
+      `0:${root}`,
+      `02:${root}`,
+      `-1:${root}`,
+      `99999999999999999999:${root}`,
+      `2:${root.toUpperCase()}`,
+      `2:${root}0`,
+      'latest',
+    ]) {
+      expect(parsePin(bad)).toBeUndefined();
+    }
   });
 
   it('reports a manifest that is not JSON as a finding, not a crash', async () => {

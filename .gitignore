@@ -18,7 +18,8 @@ test-ledger/
 # keys and secrets
 *-keypair.json
 *.keypair.json
-*key.json
+key.json
+*-key.json
 *keypair*.json
 .env*
 !.env.example

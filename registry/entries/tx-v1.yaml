@@ -39,6 +39,12 @@ breaks:
       The maximum size of a version 1 transaction is 4096 bytes; the prior maximum was 1232. A buffer or a
       size check fixed at 1232 bytes is too small for a valid version 1 transaction.
     evidence: [0, 5, 4]
+  - surface: sdk
+    summary: >-
+      @solana/web3.js 1.98.4 cannot read a version 1 transaction even when maxSupportedTransactionVersion is 1:
+      getTransaction and getParsedTransaction throw a StructError on the version field, and getBlock fails the
+      same way. 1.99.0 reads all three and returns a MessageV1.
+    evidence: [6]
 detect:
   - rule: rpc-max-version-zero
     kind: code-pattern
@@ -58,6 +64,16 @@ detect:
     summary: Documentation or an AI skill shows maxSupportedTransactionVersion 0; readers and coding assistants copy it.
     languages: [markdown]
     pattern: 'maxSupportedTransactionVersion"?\s*:\s*0\b'
+  - rule: web3js-below-1-99
+    kind: lockfile-version
+    confidence: check
+    summary: >-
+      @solana/web3.js older than 1.99.0 cannot read a version 1 transaction at all: even with
+      maxSupportedTransactionVersion 1 it rejects the response while parsing it.
+    package:
+      ecosystem: npm
+      name: '@solana/web3.js'
+      range: '<1.99.0'
   - rule: kit-below-8
     kind: lockfile-version
     confidence: check
@@ -75,9 +91,15 @@ detect:
       fixture: mainnet-beta:4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
       expect: Result has version 1 and no JSON-RPC error.
 fix:
-  - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock.
+  - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock; with @solana/web3.js this also needs version 1.99.0 or later.
     for_rules:
-      [rpc-max-version-zero, rpc-max-version-dynamic, docs-teach-max-version-zero, rpc-reads-v1-transaction]
+      [
+        rpc-max-version-zero,
+        rpc-max-version-dynamic,
+        docs-teach-max-version-zero,
+        web3js-below-1-99,
+        rpc-reads-v1-transaction,
+      ]
   - summary: When moving to @solana/kit 8.0.0 or later, replace the compute-unit-limit helpers with the resource-limit helpers named in the release notes.
     for_rules: [kit-below-8]
     links:
@@ -109,3 +131,11 @@ sources:
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md
     retrieved: '2026-09-18'
     note: Proposes the 4096-byte transaction size; SIMD-0385 sets the same value in its Transaction Constraints table.
+  - kind: rpc-observation
+    ref: mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5 through @solana/web3.js
+    retrieved: '2026-09-18'
+    note: >-
+      With maxSupportedTransactionVersion 1, web3.js 1.98.4 throws StructError "At path: version -- Expected the
+      value to satisfy a union of `literal | literal`, but received: 1" for getTransaction and
+      getParsedTransaction, and getBlock (slot 448063686) fails the same way; web3.js 1.99.0 returns version 1
+      with a MessageV1. With 0, web3.js 1.99.0 throws SolanaJSONRPCError with code -32015.

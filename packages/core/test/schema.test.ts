@@ -18,7 +18,7 @@ describe('registry/schema.json', () => {
   });
 
   describe('agrees with the validator when used by a standard JSON Schema tool', () => {
-    const ajv = new Ajv2020({ strict: false });
+    const ajv = new Ajv2020();
     addFormats.default(ajv);
     const validate = ajv.compile(committedSchema);
 

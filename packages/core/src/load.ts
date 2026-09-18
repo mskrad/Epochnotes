@@ -58,7 +58,7 @@ export function validatePath(path: string): RegistryReport {
     registryIssues = validateRegistry([only, ...valid])
       .filter((issue) => issue.path === only.id || issue.path.startsWith(`${only.id}.`))
       .map((issue) =>
-        invalid.length > 0 && issue.message.startsWith('No entry with id')
+        invalid.length > 0 && issue.code === 'unresolved-relation'
           ? {
               ...issue,
               hint: `${issue.hint} Ignored as invalid: ${invalid.join(', ')} — the id may live there.`,

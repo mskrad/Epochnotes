@@ -58,6 +58,7 @@ describe('epochnotes registry validate', () => {
 
     writeFileSync(join(dir, 'slot-duration.yaml'), 'id: slot-duration\n');
     const besideInvalid = await run('registry', 'validate', entry);
+    expect(besideInvalid.code).toBe(1);
     expect(besideInvalid.out).toContain('Ignored as invalid');
     expect(besideInvalid.out).toContain('slot-duration.yaml');
 

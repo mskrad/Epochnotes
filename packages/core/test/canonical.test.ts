@@ -10,7 +10,7 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-const PINNED_TX_V1_REV_1 = '3b373bbaf6755c4a7da482a62757f09e8e8828b32c44c7d77b7fce1a944b1db3';
+const PINNED_TX_V1_REV_1 = '4c5c3e165cedff3465f14a07803bb5b1a8545b839e4f6ca7628df779d933591f';
 
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);

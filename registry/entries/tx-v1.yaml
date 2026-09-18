@@ -1,4 +1,4 @@
-# Transaction V1 (SIMD-0385). Every claim is backed by an item in `sources`.
+# Transaction V1 (SIMD-0385). Each `breaks` item names its evidence as indexes into `sources`.
 # Activation status is not stored here: it is read from the feature gate account at check time.
 schema_version: 1
 id: tx-v1
@@ -12,19 +12,20 @@ applies:
   gates:
     - address: txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL
       label: enable_tx_v1
-      effect: Validators accept and process version 1 transactions.
+      effect: 'Feature gate registered in agave as "SIMD-0385: Transaction V1".'
 relations: []
 breaks:
   - surface: rpc
     summary: >-
-      getTransaction and getBlock (with full transaction details) fail with JSON-RPC error -32015
+      getTransaction, and getBlock with transactionDetails full or accounts, fail with JSON-RPC error -32015
       "Transaction version (1) is not supported by the requesting client" when the request omits
       maxSupportedTransactionVersion or sets it to 0 and the result contains a version 1 transaction.
+      getBlock with transactionDetails signatures or none is not affected.
     evidence: [2, 3]
   - surface: decoder
     summary: >-
-      A serialized version 1 transaction starts with byte 0x81 (version prefix 0x80 | 1). Decoders that
-      accept only legacy and version 0 layouts cannot parse it.
+      A serialized version 1 transaction starts with the version byte 129 (0x81). A decoder written for the
+      legacy and version 0 layouts has no branch for that value.
     evidence: [0, 3]
   - surface: sdk
     summary: >-
@@ -35,9 +36,8 @@ breaks:
     evidence: [4]
   - surface: decoder
     summary: >-
-      A version 1 transaction may be up to 4096 bytes; the prior maximum was 1232. Buffers, packet-size
-      constants and size checks that assume 1232 bytes reject or truncate valid version 1 transactions.
-      The larger size has no feature gate of its own: it ships with version 1.
+      The maximum size of a version 1 transaction is 4096 bytes; the prior maximum was 1232. A buffer or a
+      size check fixed at 1232 bytes is too small for a valid version 1 transaction.
     evidence: [0, 5, 4]
 detect:
   - rule: rpc-max-version-zero
@@ -55,7 +55,7 @@ detect:
   - rule: kit-below-8
     kind: lockfile-version
     confidence: check
-    summary: '@solana/kit older than 8.0.0 predates the version 1 resource-limit API.'
+    summary: '@solana/kit older than 8.0.0 still has the compute-unit-limit helpers that 8.0.0 removed for version 1.'
     package:
       ecosystem: npm
       name: '@solana/kit'
@@ -88,8 +88,9 @@ sources:
     ref: mainnet-beta getBlock slot 448063686
     retrieved: '2026-09-18'
     note: >-
-      maxSupportedTransactionVersion 0 returns -32015; with 1 the block returns 1139 transactions,
-      98 of them version 1.
+      With transactionDetails full: parameter omitted or 0 returns -32015; parameter 1 returns 1139
+      transactions, 98 of them version 1. transactionDetails accounts with parameter 0 also returns -32015;
+      signatures and none succeed without the parameter.
   - kind: rpc-observation
     ref: mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
     retrieved: '2026-09-18'
@@ -100,4 +101,4 @@ sources:
   - kind: simd
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md
     retrieved: '2026-09-18'
-    note: Origin of the 4096-byte transaction size; SIMD-0385 lists it under Transaction Constraints.
+    note: Proposes the 4096-byte transaction size; SIMD-0385 sets the same value in its Transaction Constraints table.

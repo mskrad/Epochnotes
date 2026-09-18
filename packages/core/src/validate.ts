@@ -7,6 +7,8 @@ import { type Entry, entrySchema } from './schema.js';
 
 /** One validation problem: where it is, what is wrong, and what to do about it. */
 export interface Issue {
+  /** Stable identifier for problems that code reacts to; absent for plain schema violations. */
+  code?: 'unresolved-relation' | 'duplicate-id' | 'relation-cycle';
   path: string;
   message: string;
   hint: string;
@@ -213,6 +215,7 @@ export function validateRegistry(entries: Entry[]): Issue[] {
     entry.relations.forEach((relation, index) => {
       if (!byId.has(relation.id)) {
         issues.push({
+          code: 'unresolved-relation',
           path: `${entry.id}.relations[${index}].id`,
           message: `No entry with id "${relation.id}"`,
           hint: 'Add the related entry to the registry or fix the id.',

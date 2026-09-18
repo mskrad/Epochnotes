@@ -55,6 +55,14 @@ describe('feature gate state', () => {
     expect(decodeFeatureAccount({ owner: FEATURE_PROGRAM, data: new Uint8Array([1, 0]) })).toMatchObject({
       state: 'unreadable',
     });
+    expect(decodeFeatureAccount({ owner: FEATURE_PROGRAM, data: new Uint8Array(10) })).toMatchObject({
+      state: 'unreadable',
+    });
+    expect(
+      decodeFeatureAccount({ owner: FEATURE_PROGRAM, data: new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0]) }),
+    ).toMatchObject({
+      state: 'unreadable',
+    });
   });
 
   it('asks for each address once and reports a short answer as a failure', async () => {

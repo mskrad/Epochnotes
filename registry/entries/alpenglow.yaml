@@ -19,9 +19,10 @@ relations:
 breaks:
   - surface: stream
     summary: >-
-      Votes stop going on chain: validators broadcast them directly to each other, and a validator admission
-      ticket replaces the vote transaction fees. Anything that reads vote transactions out of blocks loses
-      its input.
+      Votes stop being transactions on chain: validators send them directly to each other. Initially a
+      validator admission ticket reproduces the incentives of today's vote transaction fees. Voting is not
+      invisible afterwards: for rewards, the leader of slot s+8 can post up to two vote aggregates for
+      slot s. Code that reads individual vote transactions out of blocks no longer finds them.
     evidence: [0]
   - surface: rpc
     summary: >-
@@ -30,14 +31,15 @@ breaks:
     evidence: [0]
 fix:
   - summary: >-
-      Do not derive validator activity or throughput from vote transactions in blocks, and review code that
-      treats the optimistically confirmed commitment as a separate stage before finality.
+      Do not derive validator activity from vote transactions in blocks, and review code that relies on
+      optimistic confirmation as something distinct from finality.
 sources:
   - kind: simd
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md
     retrieved: '2026-09-18'
     note: >-
-      Document status at retrieval is Review. Backwards compatibility is stated as Incompatible: Alpenglow
+      Document status at retrieval is Review; the front matter feature field is still a placeholder, the gate
+      address comes from agave. Backwards compatibility is stated as Incompatible: Alpenglow
       replaces the old consensus protocol with all its voting logic.
   - kind: source-code
     ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs

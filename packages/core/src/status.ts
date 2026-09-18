@@ -50,7 +50,11 @@ export async function registryStatus(
     slot: network.slot,
     gates: gates.map((gate) => ({
       ...gate,
-      status: network.states.get(gate.address) ?? { state: 'absent' },
+      // Every asked address has a state; a gap would be a bug here, and must not read as "not scheduled".
+      status: network.states.get(gate.address) ?? {
+        state: 'unreadable',
+        reason: 'no state returned for this gate',
+      },
     })),
     withoutGates: entries.filter((entry) => entry.applies.gates === undefined).map((entry) => entry.id),
   };

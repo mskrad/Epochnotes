@@ -9,6 +9,9 @@ export const CLUSTERS = {
 export type Cluster = keyof typeof CLUSTERS;
 
 const FEATURE_PROGRAM = 'Feature111111111111111111111111111111111111';
+const FEATURE_ACCOUNT_SIZE = 9;
+/** A public endpoint that does not answer must not hang a command. */
+const RPC_TIMEOUT_MS = 20_000;
 
 /**
  * What the network says about one feature gate. It is never stored in a registry entry: it is read at
@@ -42,13 +45,20 @@ export function decodeFeatureAccount(account: FeatureAccount | null): FeatureSta
   if (account.owner !== FEATURE_PROGRAM) {
     return { state: 'unreadable', reason: `owned by ${account.owner}, not by the feature program` };
   }
+  // A feature account is always 9 bytes: the tag and the slot, whether or not the slot is set.
+  if (account.data.length !== FEATURE_ACCOUNT_SIZE) {
+    return {
+      state: 'unreadable',
+      reason: `feature account data is ${account.data.length} bytes, expected 9`,
+    };
+  }
   const [tag] = account.data;
   if (tag === 0) return { state: 'pending' };
-  if (tag === 1 && account.data.length >= 9) {
+  if (tag === 1) {
     const view = new DataView(account.data.buffer, account.data.byteOffset, account.data.byteLength);
     return { state: 'active', activatedAt: view.getBigUint64(1, true) };
   }
-  return { state: 'unreadable', reason: `unexpected feature account data (${account.data.length} bytes)` };
+  return { state: 'unreadable', reason: `unknown feature account tag ${tag}` };
 }
 
 /**
@@ -84,7 +94,7 @@ export function featureAccountSourceFromRpc(rpc: Rpc<GetMultipleAccountsApi>): F
           addresses.map((item) => address(item)),
           { encoding: 'base64' },
         )
-        .send();
+        .send({ abortSignal: AbortSignal.timeout(RPC_TIMEOUT_MS) });
       return {
         slot: response.context.slot,
         accounts: response.value.map((account) =>

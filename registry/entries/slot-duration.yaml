@@ -35,15 +35,17 @@ breaks:
   - surface: sdk
     summary: >-
       SDK constants stay at their 400 ms values at first: static constants for default slot duration, ticks
-      per second, slots per year and slot-to-time conversion keep describing 400 ms while the cluster runs
+      per second, slots per year and slot-to-time conversion may keep describing 400 ms while the cluster runs
       350, 300, 250 or 200 ms banks.
     evidence: [0]
   - surface: economics
     summary: >-
-      Per-slot limits scale down with the slot time so that the wall-clock rate stays the same: the maximum
-      block compute units go from 60,000,000 at 400 ms to 37,500,000 at 250 ms and 30,000,000 at 200 ms, the
-      maximum writable-account compute units from 24,000,000 to 15,000,000 and 12,000,000. Code tuned to the
-      per-block or per-account limit of a 400 ms slot exceeds the new one.
+      Per-slot limits scale down in proportion to the slot time so that the wall-clock rate stays
+      approximately the same. From the 400 ms baseline of 60,000,000 the maximum block compute units become
+      37,500,000 at 250 ms and 30,000,000 at 200 ms; the maximum writable-account compute units go from
+      24,000,000 to 15,000,000 and 12,000,000. The ratios apply to whatever baseline is active: with the
+      100,000,000 block limit of SIMD-0286 the values are 62,500,000 and 50,000,000. Code tuned to the
+      per-block or per-account limit of a 400 ms slot exceeds the scaled one.
     evidence: [0]
   - surface: program
     summary: >-
@@ -59,7 +61,10 @@ sources:
   - kind: simd
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md
     retrieved: '2026-09-18'
-    note: Document status at retrieval is Draft. The front matter lists the four feature gate addresses.
+    note: >-
+      Document status at retrieval is Draft. The front matter lists the four feature gate addresses, while
+      the New Terminology section still calls them placeholders with final IDs to be determined; the same
+      four addresses are declared in agave.
   - kind: source-code
     ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs
     retrieved: '2026-09-18'

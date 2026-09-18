@@ -93,5 +93,13 @@ describe('epochnotes registry validate', () => {
   it('prints machine-readable JSON with --json', async () => {
     const { out } = await run('registry', 'validate', '--json', `${root}registry/entries/tx-v1.yaml`);
     expect(JSON.parse(out)).toMatchObject({ ok: true, files: [{ id: 'tx-v1', rev: 1 }] });
+    expect(Object.keys(JSON.parse(out).files[0]).sort()).toEqual([
+      'file',
+      'id',
+      'issues',
+      'leaf',
+      'ok',
+      'rev',
+    ]);
   });
 });

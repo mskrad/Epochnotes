@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mskrad/Epochnotes/docs/design/UR-001-entry.schema.json",
-  "title": "Registry entry (design draft, schema_version 1)",
-  "description": "Design artifact of UR-001. The implementation schema is generated from zod in UR-003 and must stay equivalent to this file.",
+  "$id": "https://github.com/mskrad/Epochnotes/registry/schema.json",
+  "title": "Registry entry (schema_version 1)",
+  "description": "Format of one registry entry. Activation status is never stored in an entry: it is read from the feature gate account at check time.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "id", "rev", "axis", "subject", "applies", "breaks", "fix", "sources"],

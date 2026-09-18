@@ -11,9 +11,8 @@ Status: early development. Nothing here is ready for use yet.
 | `packages/core`     | Library: entry schema, canonical hashing, validation, on-chain status reads |
 | `packages/cli`      | `epochnotes` command — a thin shell over `core`                             |
 | `programs/registry` | Anchor program: publishers and the version log                              |
-| `registry/`         | Registry entries (YAML) and published versions                              |
+| `registry/`         | Entry schema, registry entries (YAML) and published versions                |
 | `corpus/`           | Before/after code pairs used to evaluate detection rules                    |
-| `docs/design/`      | Architecture and format decisions                                           |
 
 ## Develop
 

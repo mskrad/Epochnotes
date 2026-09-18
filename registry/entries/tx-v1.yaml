@@ -43,7 +43,7 @@ detect:
   - rule: rpc-max-version-zero
     kind: code-pattern
     confidence: breaks
-    summary: RPC read call pins maxSupportedTransactionVersion to the literal 0.
+    summary: RPC read call pins maxSupportedTransactionVersion to the literal 0; it fails as soon as the result contains a version 1 transaction.
     languages: [ts, js]
     pattern: 'maxSupportedTransactionVersion\s*:\s*0\b'
   - rule: rpc-max-version-dynamic
@@ -52,6 +52,12 @@ detect:
     summary: maxSupportedTransactionVersion is set from a non-literal value; verify it resolves to 1 or higher.
     languages: [ts, js]
     pattern: 'maxSupportedTransactionVersion\s*:\s*[A-Za-z_$]'
+  - rule: docs-teach-max-version-zero
+    kind: code-pattern
+    confidence: check
+    summary: Documentation or an AI skill shows maxSupportedTransactionVersion 0; readers and coding assistants copy it.
+    languages: [markdown]
+    pattern: 'maxSupportedTransactionVersion"?\s*:\s*0\b'
   - rule: kit-below-8
     kind: lockfile-version
     confidence: check
@@ -70,7 +76,8 @@ detect:
       expect: Result has version 1 and no JSON-RPC error.
 fix:
   - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock.
-    for_rules: [rpc-max-version-zero, rpc-max-version-dynamic, rpc-reads-v1-transaction]
+    for_rules:
+      [rpc-max-version-zero, rpc-max-version-dynamic, docs-teach-max-version-zero, rpc-reads-v1-transaction]
   - summary: When moving to @solana/kit 8.0.0 or later, replace the compute-unit-limit helpers with the resource-limit helpers named in the release notes.
     for_rules: [kit-below-8]
     links:

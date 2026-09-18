@@ -57,8 +57,9 @@ describe('checks a schema cannot express', () => {
 
   it('version ranges must be semver', () => {
     const raw = reference();
-    raw.detect[2].package.range = 'eight-ish';
-    expect(issuesOf(raw)).toMatchObject([{ path: 'detect[2].package.range' }]);
+    const index = raw.detect.findIndex((rule: { rule: string }) => rule.rule === 'kit-below-8');
+    raw.detect[index].package.range = 'eight-ish';
+    expect(issuesOf(raw)).toMatchObject([{ path: `detect[${index}].package.range` }]);
   });
 
   it('cargo ranges may separate comparators with commas', () => {

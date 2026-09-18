@@ -171,7 +171,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": ["ts", "js", "rust", "python", "go"]
+                  "enum": ["ts", "js", "rust", "python", "go", "markdown"]
                 }
               },
               "pattern": {

@@ -1,6 +1,7 @@
 import { ENTRY_SCHEMA_VERSION } from '@epochnotes/core';
 import { Command } from 'commander';
 
+import { checkCommand } from './check.js';
 import { registryCommand } from './registry.js';
 import { statusCommand } from './status.js';
 
@@ -12,5 +13,6 @@ export function buildProgram(): Command {
     .description('Signed registry of Solana network changes and the checks built on it.')
     .version(`${CLI_VERSION} (entry schema ${ENTRY_SCHEMA_VERSION})`)
     .addCommand(registryCommand())
-    .addCommand(statusCommand());
+    .addCommand(statusCommand())
+    .addCommand(checkCommand());
 }

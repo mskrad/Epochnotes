@@ -31,7 +31,7 @@ const detectRule = z.discriminatedUnion('kind', [
   z.strictObject({
     ...ruleBase,
     kind: z.literal('code-pattern'),
-    languages: z.array(z.enum(['ts', 'js', 'rust', 'python', 'go'])).min(1),
+    languages: z.array(z.enum(['ts', 'js', 'rust', 'python', 'go', 'markdown'])).min(1),
     pattern: text,
   }),
   z.strictObject({

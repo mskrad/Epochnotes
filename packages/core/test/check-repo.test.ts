@@ -131,6 +131,15 @@ describe('check repo', () => {
     ]);
   });
 
+  it('flags a web3.js that cannot parse version 1 responses, and accepts one that can', () => {
+    const lock = (version: string) =>
+      JSON.stringify({ packages: { 'node_modules/@solana/web3.js': { version } } });
+    expect(check(repo('web3-old', { 'package-lock.json': lock('1.98.4') })).findings).toMatchObject([
+      { rule: 'web3js-below-1-99', excerpt: '@solana/web3.js@1.98.4' },
+    ]);
+    expect(check(repo('web3-new', { 'package-lock.json': lock('1.99.0') })).findings).toEqual([]);
+  });
+
   it('says which rules it could not run', () => {
     expect(check(repo('empty', { 'a.ts': 'export {};\n' })).notRun).toMatchObject([
       { entry: 'tx-v1', rule: 'rpc-reads-v1-transaction' },

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -81,16 +82,28 @@ describe('check repo', () => {
     ]);
   });
 
-  it('skips dependencies, build output and files of other languages', () => {
+  it('outside git, skips dependencies and other languages, but not a directory merely named build', () => {
     const report = check(
       repo('skipped', {
         'node_modules/x/index.ts': before,
-        'dist/reader.js': before,
         '.git/hooks/x.ts': before,
         'notes.txt': before,
+        'skills/build/debug.md': 'Use `maxSupportedTransactionVersion: 0`.\n',
       }),
     );
-    expect(report.findings).toEqual([]);
+    expect(report.findings.map((finding) => finding.file)).toEqual(['skills/build/debug.md']);
+  });
+
+  it('inside git, checks tracked files only', () => {
+    const dir = repo('tracked', { 'src/a.ts': before, 'dist/a.js': before, '.gitignore': 'dist/\n' });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
+        stdio: 'ignore',
+      });
+    git('init', '-q');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'init');
+    expect(check(dir).findings.map((finding) => finding.file)).toEqual(['src/a.ts']);
   });
 
   it.each([

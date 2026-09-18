@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 
@@ -18,17 +19,8 @@ const EXTENSIONS: Record<Language, string[]> = {
   go: ['.go'],
   markdown: ['.md', '.mdx'],
 };
-const SKIPPED_DIRECTORIES = new Set([
-  '.git',
-  'node_modules',
-  'dist',
-  'build',
-  'out',
-  'target',
-  'vendor',
-  '.next',
-  'coverage',
-]);
+/** Used only when the directory is not a git work tree: names that are dependencies or VCS data everywhere. */
+const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
 const LOCKFILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Cargo.lock']);
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -60,16 +52,45 @@ export type CheckReport =
 function* walk(root: string, directory = root): Generator<string> {
   for (const name of readdirSync(directory).sort()) {
     const path = join(directory, name);
+    if (SKIPPED_DIRECTORIES.has(name)) continue;
     let stats;
     try {
       stats = statSync(path);
     } catch {
       continue; // a dangling symlink
     }
-    if (stats.isDirectory()) {
-      if (!SKIPPED_DIRECTORIES.has(name)) yield* walk(root, path);
-    } else if (stats.isFile() && stats.size <= MAX_FILE_BYTES) yield path;
+    if (stats.isDirectory()) yield* walk(root, path);
+    else if (stats.isFile()) yield path;
   }
+}
+
+/**
+ * The files to check. In a git work tree these are the tracked files: that leaves out dependencies and
+ * build output without guessing directory names — a guess such as "build" once hid `skills/build/...`.
+ */
+function sourceFiles(root: string): string[] {
+  let files: string[];
+  try {
+    const listed = execFileSync('git', ['-C', root, 'ls-files', '-z'], {
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    files = listed
+      .split('\0')
+      .filter(Boolean)
+      .map((file) => join(root, file));
+  } catch {
+    files = [...walk(root)];
+  }
+  return files.sort().filter((path) => {
+    try {
+      const stats = statSync(path);
+      return stats.isFile() && stats.size <= MAX_FILE_BYTES;
+    } catch {
+      return false; // tracked but deleted in the work tree
+    }
+  });
 }
 
 /** Versions of one package as the lockfile pins them. Best effort across the common lockfile formats. */
@@ -134,7 +155,7 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
       .map((fix) => fix.summary);
 
   let filesScanned = 0;
-  for (const path of walk(root)) {
+  for (const path of sourceFiles(root)) {
     const file = relative(root, path);
     const matching = patterns.filter((item) => item.extensions.has(extname(path)));
     const locking = LOCKFILES.has(basename(path)) ? lockRules : [];

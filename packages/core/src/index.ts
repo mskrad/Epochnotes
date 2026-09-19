@@ -80,7 +80,7 @@ export {
   writeNewFile,
 } from './version-store.js';
 export {
-  assertNotMainnet,
+  assertWritable,
   type Cluster as OnchainCluster,
   compareLogWithChain,
   configAddress,
@@ -92,7 +92,7 @@ export {
   fetchVersion,
   initializeInstruction,
   loadSigner,
-  MAINNET_GENESIS_HASH,
+  GENESIS as CLUSTER_GENESIS,
   type OnchainPublisher,
   type OnchainRevocation,
   type OnchainVersion,
@@ -107,4 +107,6 @@ export {
   versionAddress,
   type VersionArgs,
   versionArgsOf,
+  redactUrl,
+  writeRefusal,
 } from './onchain.js';

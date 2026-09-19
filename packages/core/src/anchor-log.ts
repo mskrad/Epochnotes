@@ -1,7 +1,7 @@
 import type { Address } from '@solana/kit';
 
 import {
-  assertNotMainnet,
+  assertWritable,
   type Cluster,
   compareLogWithChain,
   configAddress,
@@ -42,7 +42,7 @@ export async function anchorLog(options: {
   keyFile: string;
   cluster: Cluster;
 }): Promise<AnchorResult> {
-  await assertNotMainnet(options.cluster);
+  await assertWritable(options.cluster);
   const signer = await loadSigner(options.keyFile);
   const log = await verifyLog(readRawLog(options.versionsDir), [signer.address]);
   if (!log.ok) return log;
@@ -108,7 +108,7 @@ export async function admitPublisher(options: {
   name: string;
   cluster: Cluster;
 }): Promise<AdmitResult> {
-  await assertNotMainnet(options.cluster);
+  await assertWritable(options.cluster);
   const admin = await loadSigner(options.adminKeyFile);
   const config = await configAddress(options.cluster.programId);
   const signatures: string[] = [];
@@ -147,7 +147,7 @@ export async function revokeEntryOnChain(options: {
   entryId: string;
   cluster: Cluster;
 }): Promise<{ address: Address; signature: string }> {
-  await assertNotMainnet(options.cluster);
+  await assertWritable(options.cluster);
   const signer = await loadSigner(options.keyFile);
   const instruction = await revokeEntryInstruction(
     signer.address,

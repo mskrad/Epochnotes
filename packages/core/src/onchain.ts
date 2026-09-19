@@ -321,6 +321,9 @@ export async function sendInstructions(
   instructions: Instruction[],
 ): Promise<string> {
   const rpc = createSolanaRpc(cluster.rpcUrl);
+  // The one gate every write passes through, whichever function built the instructions.
+  const refusal = writeRefusal(cluster.rpcUrl, await rpc.getGenesisHash().send());
+  if (refusal !== undefined) throw new Error(refusal);
   const rpcSubscriptions = createSolanaRpcSubscriptions(cluster.wsUrl);
   const { value: blockhash } = await rpc.getLatestBlockhash().send();
   const message = pipe(
@@ -361,17 +364,47 @@ export async function fetchVersion(
   return data === undefined ? undefined : decodeVersion(at, data);
 }
 
-/** Solana mainnet-beta, by genesis hash: the name a user passes says nothing about where an endpoint leads. */
-export const MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
+/** Clusters by genesis hash: the name a user passes says nothing about where an endpoint leads. */
+export const GENESIS = {
+  'mainnet-beta': '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+  testnet: '4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY',
+  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
+} as const;
 
-/** Throws unless the endpoint is something other than mainnet. Writing there is a decision for the project owner. */
-export async function assertNotMainnet(cluster: Cluster): Promise<void> {
-  const genesis = await createSolanaRpc(cluster.rpcUrl).getGenesisHash().send();
-  if (genesis === MAINNET_GENESIS_HASH) {
-    throw new Error(
-      `${cluster.rpcUrl} is mainnet-beta (genesis ${genesis}); this tool writes to devnet and localnet only`,
-    );
+/** An endpoint URL that is safe to print: provider API keys usually travel in the path tail or the query. */
+export function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname.length > 1 || parsed.search ? '/<redacted>' : ''}`;
+  } catch {
+    return '<endpoint>';
   }
+}
+
+/**
+ * Why this endpoint must not be written to, or undefined when writing is allowed. Allowed: devnet by its
+ * genesis hash, and a validator on this machine. Everything else — mainnet, testnet, an unknown network
+ * behind a remote URL — is refused; lifting that is a decision for the project owner.
+ */
+export function writeRefusal(rpcUrl: string, genesisHash: string): string | undefined {
+  if (genesisHash === GENESIS.devnet) return undefined;
+  const known = Object.entries(GENESIS).find(([, hash]) => hash === genesisHash)?.[0];
+  if (known !== undefined)
+    return `${redactUrl(rpcUrl)} is ${known} (genesis ${genesisHash}); this tool writes to devnet and localnet only`;
+  let host = '';
+  try {
+    host = new URL(rpcUrl).hostname;
+  } catch {
+    // an unparsable URL is not local
+  }
+  if (host === '127.0.0.1' || host === 'localhost' || host === '[::1]') return undefined;
+  return `${redactUrl(rpcUrl)} is an unknown network (genesis ${genesisHash}); this tool writes to devnet and localnet only`;
+}
+
+/** Refuses early, with the real reason, before anything is read or signed; `sendInstructions` checks again. */
+export async function assertWritable(cluster: Cluster): Promise<void> {
+  const refusal = writeRefusal(cluster.rpcUrl, await createSolanaRpc(cluster.rpcUrl).getGenesisHash().send());
+  if (refusal !== undefined) throw new Error(refusal);
 }
 
 export interface OnchainRevocation {

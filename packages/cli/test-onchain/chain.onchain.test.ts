@@ -212,6 +212,19 @@ describe('epochnotes registry anchor / verify --onchain', () => {
     writeFileSync(join(versions, '2.json'), second);
 
     // the log is intact and anchored, and the entry is still withdrawn: a revocation is its own record on chain
+    const unconfirmed = await run(
+      'registry',
+      'revoke',
+      '--key',
+      publisherKey,
+      '--entry',
+      'tx-v1',
+      '--cluster',
+      'localnet',
+    );
+    expect(unconfirmed.code).toBe(2);
+    expect(unconfirmed.out).toContain('--yes');
+    expect((await verify('--onchain')).code).toBe(0); // nothing was revoked
     const revoked = await run(
       'registry',
       'revoke',
@@ -221,6 +234,7 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       'tx-v1',
       '--cluster',
       'localnet',
+      '--yes',
     );
     expect(revoked.code).toBe(0);
     const afterRevocation = await verify('--onchain');

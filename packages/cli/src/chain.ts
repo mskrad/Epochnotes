@@ -3,6 +3,7 @@ import {
   anchorLog,
   CLUSTERS,
   type OnchainCluster,
+  redactUrl,
   revokeEntryOnChain,
 } from '@epochnotes/core';
 import { type Command, Option } from 'commander';
@@ -36,7 +37,9 @@ function fail(error: unknown, what: string): void {
   const reasons: string[] = [];
   for (let at: unknown = error; at instanceof Error && reasons.length < 5; at = at.cause)
     reasons.push(at.message);
-  console.error(`Cannot ${what}: ${reasons.join(' <- ')}`);
+  // Transport errors quote the endpoint, and provider API keys travel in its path or query.
+  const text = reasons.join(' <- ').replace(/https?:\/\/[^\s'"]+/g, (url) => redactUrl(url));
+  console.error(`Cannot ${what}: ${text}`);
   process.exitCode = EXIT.environment;
 }
 
@@ -95,24 +98,34 @@ export function addChainCommands(registry: Command): void {
     .description('Record on chain that the publisher withdrew an entry. It cannot be undone.')
     .requiredOption('--key <file>', 'publisher keypair; it signs and pays')
     .requiredOption('--entry <id>', 'id of the entry to withdraw')
+    .option('--yes', 'confirm: a revocation is permanent')
     .addOption(clusterOption())
     .option('--rpc-url <url>', 'JSON-RPC endpoint instead of the public one')
-    .action(async (options: { key: string; entry: string; cluster: string; rpcUrl?: string }) => {
-      if (refuseWrites(options.cluster)) return;
-      try {
-        const result = await revokeEntryOnChain({
-          keyFile: options.key,
-          entryId: options.entry,
-          cluster: clusterOf(options),
-        });
-        console.log(
-          `Revoked ${options.entry} on ${options.cluster}\n  account   ${result.address}\n  signature ${result.signature}`,
-        );
-        process.exitCode = EXIT.ok;
-      } catch (error) {
-        fail(error, 'revoke the entry');
-      }
-    });
+    .action(
+      async (options: { key: string; entry: string; cluster: string; rpcUrl?: string; yes?: boolean }) => {
+        if (options.yes !== true) {
+          console.error(
+            `Revoking ${options.entry} is permanent: the id can never be published again. Re-run with --yes to confirm.`,
+          );
+          process.exitCode = EXIT.environment;
+          return;
+        }
+        if (refuseWrites(options.cluster)) return;
+        try {
+          const result = await revokeEntryOnChain({
+            keyFile: options.key,
+            entryId: options.entry,
+            cluster: clusterOf(options),
+          });
+          console.log(
+            `Revoked ${options.entry} on ${options.cluster}\n  account   ${result.address}\n  signature ${result.signature}`,
+          );
+          process.exitCode = EXIT.ok;
+        } catch (error) {
+          fail(error, 'revoke the entry');
+        }
+      },
+    );
 
   registry
     .command('admit')

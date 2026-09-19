@@ -57,6 +57,9 @@ const ACCOUNT_IN_USE = /Custom program error: #0\b/;
 /** Anchor's ConstraintSeeds (2006), ConstraintHasOne (2001), or this program's NotPublisher (6001). */
 const SEEDS_OR_OWNER = /Custom program error: #(2006|2001|6001)\b/;
 
+/** Exactly this custom program error, as kit words it; a bare number could match an address or a slot. */
+const programError = (code: number) => new RegExp(`Custom program error: #${code}\\b`);
+
 async function failure(run: Promise<unknown>): Promise<string> {
   const error = await run.then(
     () => undefined,
@@ -120,7 +123,9 @@ describe('registry program', () => {
     const attempt = sendInstructions(cluster, outsider, [
       await registerPublisherInstruction(outsider.address, outsider.address, 'self-admitted'),
     ]);
-    expect(await failure(attempt)).toContain(String(ERROR.NotAdmin));
+    expect(await failure(attempt)).toMatch(programError(ERROR.NotAdmin));
+    // the refused transaction left nothing behind: `init` runs before the admin check, but the transaction is atomic
+    expect(await fetchPublisher(cluster, outsider.address)).toBeUndefined();
   });
 
   it('appends versions that continue the chain', async () => {
@@ -147,7 +152,7 @@ describe('registry program', () => {
     const attempt = sendInstructions(cluster, publisher, [
       await publishVersionInstruction(publisher.address, version(3n, root('a3'), root('ff'))),
     ]);
-    expect(await failure(attempt)).toContain(String(ERROR.BrokenChain));
+    expect(await failure(attempt)).toMatch(programError(ERROR.BrokenChain));
   });
 
   it('refuses a repeated and a skipped version number', async () => {
@@ -159,7 +164,7 @@ describe('registry program', () => {
     const skipped = sendInstructions(cluster, publisher, [
       await publishVersionInstruction(publisher.address, version(4n, root('a4'), root('a2'))),
     ]);
-    expect(await failure(skipped)).toContain(String(ERROR.VersionOutOfOrder));
+    expect(await failure(skipped)).toMatch(programError(ERROR.VersionOutOfOrder));
     expect(await fetchPublisher(cluster, publisher.address)).toMatchObject({
       versionCount: 2n,
       latestRoot: root('a2'),
@@ -255,7 +260,7 @@ describe('registry program', () => {
     const byOutsider = sendInstructions(cluster, outsider, [
       await setPublisherActiveInstruction(outsider.address, publisher.address, false),
     ]);
-    expect(await failure(byOutsider)).toContain(String(ERROR.NotAdmin));
+    expect(await failure(byOutsider)).toMatch(programError(ERROR.NotAdmin));
 
     await sendInstructions(cluster, admin, [
       await setPublisherActiveInstruction(admin.address, publisher.address, false),
@@ -268,11 +273,11 @@ describe('registry program', () => {
     const publishing = sendInstructions(cluster, publisher, [
       await publishVersionInstruction(publisher.address, version(3n, root('a3'), root('a2'))),
     ]);
-    expect(await failure(publishing)).toContain(String(ERROR.PublisherNotActive));
+    expect(await failure(publishing)).toMatch(programError(ERROR.PublisherNotActive));
     const revoking = sendInstructions(cluster, publisher, [
       await revokeEntryInstruction(publisher.address, 'alpenglow'),
     ]);
-    expect(await failure(revoking)).toContain(String(ERROR.PublisherNotActive));
+    expect(await failure(revoking)).toMatch(programError(ERROR.PublisherNotActive));
 
     const manifest = {
       manifest_version: 1,

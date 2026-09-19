@@ -27,6 +27,16 @@ function check(dir: string) {
   return report;
 }
 
+const canLink = (() => {
+  try {
+    symlinkSync(root, join(root, 'probe-link'));
+    rmSync(join(root, 'probe-link'));
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
 const before = `const tx = await connection.getTransaction(signature, {\n  commitment: 'confirmed',\n  maxSupportedTransactionVersion: 0,\n});\n`;
 const after = before.replace('maxSupportedTransactionVersion: 0', 'maxSupportedTransactionVersion: 1');
 
@@ -140,7 +150,8 @@ describe('check repo', () => {
     expect(check(repo('web3-new', { 'package-lock.json': lock('1.99.0') })).findings).toEqual([]);
   });
 
-  describe('symbolic links', () => {
+  // Creating a link needs a privilege on some systems; without it these tests say so instead of failing.
+  describe.skipIf(!canLink)('symbolic links (skipped where this user cannot create them)', () => {
     const MARKER = 'OUTSIDE_THE_ROOT_MARKER';
     // A line that the tx-v1 rule matches, so that reading the file would show in the findings.
     const secret = `getTransaction(sig, { maxSupportedTransactionVersion: 0 }); // ${MARKER}\n`;
@@ -199,6 +210,62 @@ describe('check repo', () => {
       const report = check(join(root, 'link-root'));
       expect(report.findings.map((finding) => finding.file)).toEqual(['reader.ts']);
       expect(report.skipped).toEqual([]);
+    });
+
+    it('inside git, a link does not widen the scan to an ignored or untracked file of the repository', () => {
+      const dir = repo('link-ignored', { '.gitignore': '.env.ts\n', 'own.ts': after });
+      const git = (...args: string[]) =>
+        execFileSync('git', ['-C', dir, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args]);
+      git('init', '-q');
+      writeFileSync(join(dir, '.env.ts'), secret);
+      writeFileSync(join(dir, 'scratch.ts'), secret);
+      symlinkSync(join(dir, '.env.ts'), join(dir, 'env-alias.ts'));
+      symlinkSync(join(dir, 'scratch.ts'), join(dir, 'scratch-alias.ts'));
+      git('add', '.gitignore', 'own.ts', 'env-alias.ts', 'scratch-alias.ts');
+      git('commit', '-q', '-m', 'init');
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([
+        { file: 'env-alias.ts', reason: 'symlink-target-not-scanned' },
+        { file: 'scratch-alias.ts', reason: 'symlink-target-not-scanned' },
+      ]);
+    });
+
+    it('outside git, a link does not lead into a directory that is left out by name', () => {
+      const dir = repo('link-dependencies', { 'own.ts': after, 'node_modules/pkg/x.ts': secret });
+      symlinkSync(join(dir, 'node_modules', 'pkg', 'x.ts'), join(dir, 'file-alias.ts'));
+      symlinkSync(join(dir, 'node_modules', 'pkg'), join(dir, 'dir-alias'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([
+        { file: 'dir-alias', reason: 'symlink-target-not-scanned' },
+        { file: 'file-alias.ts', reason: 'symlink-target-not-scanned' },
+      ]);
+    });
+
+    it('resolves a link whatever it is called: one named node_modules that leaves the root is reported', () => {
+      const dir = repo('link-named-dependencies', { 'own.ts': after });
+      symlinkSync(join(outside, 'dir'), join(dir, 'node_modules'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([{ file: 'node_modules', reason: 'symlink-outside-root' }]);
+    });
+
+    it('does not confuse a sibling directory whose name starts with the name of the root', () => {
+      const dir = repo('prefix', { 'own.ts': after });
+      const sibling = repo('prefix-secrets', { 'file.ts': secret });
+      symlinkSync(join(sibling, 'file.ts'), join(dir, 'sibling.ts'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([{ file: 'sibling.ts', reason: 'symlink-outside-root' }]);
+    });
+
+    it('names the link in the report, never the place it points to', () => {
+      const dir = repo('link-target-name', { 'own.ts': after });
+      symlinkSync(join(outside, 'secret.ts'), join(dir, 'external.ts'));
+      const listed = everywhere(check(dir).skipped);
+      expect(listed).not.toContain('secret.ts');
+      expect(listed).not.toContain(outside);
     });
 
     it('reports a dangling link instead of dropping it in silence', () => {

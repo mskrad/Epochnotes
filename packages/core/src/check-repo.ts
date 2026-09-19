@@ -42,7 +42,7 @@ export interface Finding {
 export interface Skipped {
   /** Path relative to the scanned directory, as it is named there. */
   file: string;
-  reason: 'symlink-outside-root' | 'broken-symlink';
+  reason: 'symlink-outside-root' | 'broken-symlink' | 'symlink-target-not-scanned' | 'unreadable';
 }
 
 export type CheckReport =
@@ -62,13 +62,28 @@ export type CheckReport =
  * decided in one place, `sourceFiles`, and a directory inside the root is reached under its real name anyway —
  * which also ends every cycle of links.
  */
-function* walk(directory: string): Generator<string> {
-  for (const name of readdirSync(directory).sort()) {
-    if (SKIPPED_DIRECTORIES.has(name)) continue;
+function* walk(root: string, skipped: Skipped[], directory = root): Generator<string> {
+  let names: string[];
+  try {
+    names = readdirSync(directory).sort();
+  } catch {
+    skipped.push({ file: relative(root, directory), reason: 'unreadable' });
+    return;
+  }
+  for (const name of names) {
     const path = join(directory, name);
-    const stats = lstatSync(path);
-    if (stats.isDirectory()) yield* walk(path);
-    else if (stats.isFile() || stats.isSymbolicLink()) yield path;
+    let stats;
+    try {
+      stats = lstatSync(path);
+    } catch {
+      skipped.push({ file: relative(root, path), reason: 'unreadable' });
+      continue;
+    }
+    // A link is resolved whatever its name: one called node_modules can point anywhere.
+    if (stats.isSymbolicLink()) yield path;
+    else if (SKIPPED_DIRECTORIES.has(name)) continue;
+    else if (stats.isDirectory()) yield* walk(root, skipped, path);
+    else if (stats.isFile()) yield path;
   }
 }
 
@@ -81,10 +96,20 @@ function* walk(directory: string): Generator<string> {
  * or a tracked path that runs through a linked directory — may point at any file this process can open, and a
  * line of that file would end up in a finding. Every path is resolved first; a path that resolves outside the
  * root is reported as skipped, and a file reached twice is read once, under its real name.
+ *
+ * A link does not widen what is checked inside the root either: its target is read only if it is a file the
+ * scan covers anyway (tracked, or outside the directories skipped by name). A link to an ignored `.env.ts` is
+ * reported as skipped, not read.
+ *
+ * Not covered: hard links, which cannot be told from the file itself, and a path swapped between resolving and
+ * reading. The scanner is not a sandbox; run it with the rights you would give the repository's own scripts.
  */
 function sourceFiles(root: string): { realRoot: string; files: string[]; skipped: Skipped[] } {
   const realRoot = realpathSync(root);
+  const prefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+  const skipped: Skipped[] = [];
   let candidates: string[];
+  let tracked = true;
   try {
     const listed = execFileSync('git', ['-C', realRoot, 'ls-files', '-z'], {
       encoding: 'utf8',
@@ -96,17 +121,19 @@ function sourceFiles(root: string): { realRoot: string; files: string[]; skipped
       .filter(Boolean)
       .map((file) => join(realRoot, file));
   } catch {
-    candidates = [...walk(realRoot)];
+    tracked = false;
+    candidates = [...walk(realRoot, skipped)];
   }
   const files = new Set<string>();
-  const skipped: Skipped[] = [];
+  const aliases: { file: string; real: string }[] = [];
   for (const path of candidates.sort()) {
     const file = relative(realRoot, path);
     let real: string;
     try {
       real = realpathSync(path);
-    } catch {
-      // A link to nothing is worth a word; a tracked file deleted from the work tree is not.
+    } catch (error) {
+      // A tracked file deleted from the work tree is not worth a word; anything else that cannot be resolved is.
+      const code = (error as NodeJS.ErrnoException).code;
       let link = false;
       try {
         link = lstatSync(path).isSymbolicLink();
@@ -114,15 +141,42 @@ function sourceFiles(root: string): { realRoot: string; files: string[]; skipped
         link = false;
       }
       if (link) skipped.push({ file, reason: 'broken-symlink' });
+      else if (code !== 'ENOENT') skipped.push({ file, reason: 'unreadable' });
       continue;
     }
-    if (real !== realRoot && !real.startsWith(realRoot + sep)) {
+    if (real !== realRoot && !real.startsWith(prefix)) {
       skipped.push({ file, reason: 'symlink-outside-root' });
       continue;
     }
-    // A link to a directory inside the root: its files are candidates under their real names already.
-    const stats = statSync(real);
+    if (real !== path) {
+      aliases.push({ file, real });
+      continue;
+    }
+    let stats;
+    try {
+      stats = statSync(real);
+    } catch {
+      skipped.push({ file, reason: 'unreadable' });
+      continue;
+    }
     if (stats.isFile() && stats.size <= MAX_FILE_BYTES) files.add(real);
+  }
+  // A path reached through a link inside the root: fine when the scan covers its target anyway, which includes
+  // every link to a directory. Otherwise the link would widen the scan, so it is reported instead.
+  for (const { file, real } of aliases) {
+    let directory = false;
+    try {
+      directory = statSync(real).isDirectory();
+    } catch {
+      directory = false;
+    }
+    // Outside git a directory is left out by its name, so a link into one leads nowhere the scan goes.
+    const leftOut =
+      !tracked &&
+      relative(realRoot, real)
+        .split(sep)
+        .some((part) => SKIPPED_DIRECTORIES.has(part));
+    if (directory ? leftOut : !files.has(real)) skipped.push({ file, reason: 'symlink-target-not-scanned' });
   }
   return { realRoot, files: [...files].sort(), skipped };
 }

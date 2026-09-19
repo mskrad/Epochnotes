@@ -17,6 +17,19 @@ describe('epochnotes rent scan', () => {
     }
   });
 
+  it('refuses --sample with --wallet, an empty --offset and a mistyped address: usage problems, exit 2', async () => {
+    const cases: [string[], string][] = [
+      [['--wallet', program, '--sample'], '--sample works with --program only'],
+      [['--program', program, '--sample', '--offset', ''], '--offset and --seed must be whole numbers'],
+      [['--program', 'not-an-address'], 'not a valid base58 public key'],
+    ];
+    for (const [args, reason] of cases) {
+      const result = await run('rent', 'scan', ...args, '--working-copy', entries);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain(reason);
+    }
+  });
+
   it('refuses a sample of fewer than two groups', async () => {
     const result = await run(
       ...['rent', 'scan', '--program', program, '--sample', '--groups', '1'],

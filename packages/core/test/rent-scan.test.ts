@@ -54,14 +54,28 @@ function fake(accounts: (params: unknown[]) => unknown, rate = 500n) {
 }
 
 describe('the table of known programs', () => {
-  it('derives the discriminators that the on-chain IDLs list', () => {
-    // Values as printed in the IDL accounts of the three programs on mainnet-beta.
+  it('derives the three discriminators checked by hand against the on-chain IDLs', () => {
+    // marginfi lists discriminators in its IDL; for OpenBook v2 and Drift the value is confirmed by live scans
+    // filling the bucket of that type.
     expect(anchorDiscriminator('OpenOrdersAccount')).toBe('ffc24e7b1069d0a5');
     expect(anchorDiscriminator('MarginfiAccount')).toBe('43b2826d7e721c2a');
     expect(anchorDiscriminator('User')).toBe('9f755fe3ef973aec');
   });
 
-  it('gives a close instruction to every type it calls closable, and none to the rest', () => {
+  it('does not call Drift UserStats closable: deleteUser closes User only', () => {
+    const drift = KNOWN_PROGRAMS.find((program) => program.name === 'Drift');
+    const byName = Object.fromEntries((drift?.types ?? []).map((type) => [type.name, type]));
+    expect(byName.UserStats).toMatchObject({ closableBy: 'nobody', ownerOffset: 8 });
+    expect(byName.UserStats?.closeInstruction).toBeUndefined();
+    expect(byName.User).toMatchObject({ closableBy: 'owner' });
+  });
+
+  it('names, for every program, the source tree its close constraints were read in', () => {
+    for (const program of KNOWN_PROGRAMS)
+      expect(program.source).toMatch(/^github\.com\/[\w-]+\/[\w.-]+ @ [0-9a-f]{12}$/);
+  });
+
+  it('is internally consistent: a close instruction for every closable type, none for the rest', () => {
     for (const program of KNOWN_PROGRAMS)
       for (const type of program.types)
         expect(type.closeInstruction === undefined, `${program.name} ${type.name}`).toBe(
@@ -126,6 +140,23 @@ describe('scanning a program', () => {
     expect(report.notes.join(' ')).toContain('holds 777, which is not a rate of test');
   });
 
+  it('refuses an endpoint that does not return account sizes instead of computing every minimum for 128 bytes', async () => {
+    const sizeless = {
+      pubkey: 'x',
+      account: { lamports: 200_000, data: account('Market', 0, 0).account.data },
+    };
+    const { options } = fake(() => ({ context: { slot: 11 }, value: [sizeless] }));
+    await expect(scanProgram(OPENBOOK, options)).rejects.toThrow('does not return the size of accounts');
+  });
+
+  it('states the assumption behind the later-step figures and where closability was read', async () => {
+    const { options } = fake(() => ({ context: { slot: 11 }, value: accounts }));
+    const notes = (await scanProgram(OPENBOOK, options)).notes.join(' ');
+    expect(notes).toContain('assumed to have been made at that rate');
+    expect(notes).toContain('github.com/openbook-dex/openbook-v2 @ ');
+    expect(notes).toContain('not a market size');
+  });
+
   it('fails with the RPC error when the program is too large for one request', async () => {
     const rpc: RentRpc = async (method) =>
       method === 'getAccountInfo'
@@ -155,6 +186,23 @@ describe('sampling a program', () => {
     expect(again.calls.map((call) => JSON.stringify(call.params))).toEqual(
       calls.map((call) => JSON.stringify(call.params)),
     );
+  });
+
+  it('judges every account type on its own: a good total does not vouch for a rare type', async () => {
+    // OpenOrdersAccount occurs evenly; Market occurs in one group only.
+    let group = 0;
+    const { options } = fake(() => {
+      group += 1;
+      const even = Array.from({ length: 10 }, () => account('OpenOrdersAccount', 200_000, 72));
+      return group === 1 ? [...even, account('Market', 200_000, 72)] : even;
+    });
+    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
+    const byType = Object.fromEntries(report.buckets.map((bucket) => [bucket.type, bucket]));
+    expect(report.reliability).toBe('estimate');
+    expect(byType.OpenOrdersAccount).toMatchObject({ unreliable: false, standardError: 0n });
+    expect(byType.Market?.unreliable).toBe(true);
+    expect(byType.Market?.standardError).toBeGreaterThan(0n);
+    expect(report.notes.join(' ')).toContain('missing from the report, not zero');
   });
 
   it('shows a large standard error when the groups are uneven', async () => {

@@ -14,5 +14,8 @@
   "dependencies": {
     "@epochnotes/core": "0.0.0",
     "commander": "^15.0.0"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. packages/cli/test"
   }
 }

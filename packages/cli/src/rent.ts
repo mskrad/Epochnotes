@@ -1,4 +1,5 @@
 import {
+  isValidAddress,
   readRegistry,
   type RentBucket,
   rentRpc,
@@ -15,10 +16,10 @@ import { clusterOption, EXIT, rpcUrlOf, rpcUrlOption } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
 import { provenanceLine, sourceOf, type SourceOptions, withSource } from './read.js';
 
+/** Lamports as SOL, rounded to three decimals. */
 const sol = (lamports: bigint): string => {
-  const whole = lamports / 1_000_000_000n;
-  const fraction = ((lamports % 1_000_000_000n) / 1_000_000n).toString().padStart(3, '0');
-  return `${whole}.${fraction} SOL`;
+  const thousandths = (lamports + 500_000n) / 1_000_000n;
+  return `${thousandths / 1000n}.${(thousandths % 1000n).toString().padStart(3, '0')} SOL`;
 };
 
 function line(bucket: RentBucket): string {
@@ -33,7 +34,7 @@ function line(bucket: RentBucket): string {
   return [
     `${bucket.type}${who}`,
     `    accounts ${bucket.accounts}, at an earlier minimum ${bucket.fundedAtEarlierRate}`,
-    `    excess now ${sol(bucket.excessNow)}; other balance above the minimum (upper bound, not rent) ${sol(bucket.aboveMinimumUpperBound)}`,
+    `    excess now ${sol(bucket.excessNow)}${bucket.standardError === undefined ? '' : ` ±${sol(bucket.standardError)}${bucket.unreliable ? ' UNRELIABLE' : ''}`}; other balance above the minimum (upper bound, not rent) ${sol(bucket.aboveMinimumUpperBound)}`,
     `    if later steps activate — ${later === '' ? 'none left' : later}`,
   ].join('\n');
 }
@@ -104,14 +105,22 @@ export function rentCommand(): Command {
         reportError(options.json, 'scan', new Error('pass exactly one of --program and --wallet'));
         return;
       }
-      const numbers = [options.offset, options.groups, options.seed].map(Number);
-      const [offset, groups, seed] = numbers as [number, number, number];
-      if (numbers.some((value) => !Number.isInteger(value) || value < 0) || groups < 2 || groups > 256) {
+      if (options.sample && options.program === undefined) {
+        reportError(options.json, 'scan', new Error('--sample works with --program only'));
+        return;
+      }
+      const texts = [options.offset, options.groups, options.seed];
+      const [offset, groups, seed] = texts.map(Number) as [number, number, number];
+      if (texts.some((text) => !/^\d+$/.test(text)) || groups < 2 || groups > 256) {
         reportError(
           options.json,
           'scan',
           new Error('--offset and --seed must be whole numbers, --groups between 2 and 256'),
         );
+        return;
+      }
+      if (!isValidAddress(options.program ?? options.wallet ?? '')) {
+        reportError(options.json, 'scan', new Error('the address is not a valid base58 public key'));
         return;
       }
       try {

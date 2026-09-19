@@ -1,4 +1,4 @@
-import { address } from '@solana/addresses';
+import { address, isAddress } from '@solana/addresses';
 
 import { type FeatureAccountSource, type FeatureState, readFeatureStatus } from './feature-status.js';
 import { redactUrl } from './onchain.js';
@@ -16,6 +16,15 @@ const RENT_SYSVAR = 'SysvarRent111111111111111111111111111111111';
 interface RpcAccount {
   pubkey: string;
   account: { lamports: number; space?: number; data: [string, string] };
+}
+
+function spaceOf(account: RpcAccount): bigint {
+  // Without the size every minimum would be computed for 128 bytes, silently.
+  if (account.account.space === undefined)
+    throw new Error(
+      'the endpoint does not return the size of accounts (no "space" field); use another endpoint',
+    );
+  return BigInt(account.account.space);
 }
 type RpcAnswer = { result?: unknown; error?: { code?: number; message?: string } };
 export type RentRpc = (method: string, params: unknown[]) => Promise<RpcAnswer>;
@@ -66,6 +75,9 @@ export interface RentBucket {
   aboveMinimumUpperBound: bigint;
   /** Estimate, in lamports, per future rate: the rent part above that minimum if the step activates. */
   afterStep: Record<string, bigint>;
+  /** Sampled scans only: one standard error of this bucket's `excessNow`, and whether it is too large to quote. */
+  standardError?: bigint;
+  unreliable?: boolean;
 }
 
 export interface RentScanReport {
@@ -111,7 +123,7 @@ function add(
   weight = 1n,
 ): void {
   const rent = accountRent(
-    { lamports: BigInt(account.account.lamports), space: BigInt(account.account.space ?? 0) },
+    { lamports: BigInt(account.account.lamports), space: spaceOf(account) },
     schedule,
     rate,
   );
@@ -183,6 +195,7 @@ async function context(rpc: RentRpc, gates: FeatureAccountSource, schedule: Rent
     );
   notes.push(
     'Figures for later steps are what would sit above the minimum if that step activates. A gate that is absent is not scheduled; the SIMD makes every later step conditional.',
+    `For an account whose balance is above the minimum at the rate of ${schedule.legacyRate}, the later-step figures count a deposit assumed to have been made at that rate; the rest of its balance is not rent. This is an estimate even in a full scan.`,
     'excessNow counts only accounts whose balance is exactly an earlier minimum. aboveMinimumUpperBound may include reserves, liquidity or fees and is not a rent figure.',
     'These are estimates of deposits held above the minimum, not a market size: most of them can be returned only by whoever may close or shrink the account.',
   );
@@ -215,7 +228,7 @@ function classify(program: KnownProgram | undefined, schedule: RentSchedule, rat
 const splitNote = (program: KnownProgram | undefined): string =>
   program === undefined
     ? 'Account types are not split: this program is not in the table of known programs.'
-    : `Account types are told apart by the first 8 bytes of the data (Anchor discriminator). Who can close a type is read from the ${program.idl.name} ${program.idl.version} IDL fetched from mainnet-beta on ${program.idl.retrieved}: an instruction that closes the account, signed by its owner or by an admin. Closing can have preconditions.`;
+    : `Account types are told apart by the first 8 bytes of the data (Anchor discriminator). A type is closable when the program source (${program.source}) gives it a "close =" constraint; who signs is read from the ${program.idl.name} ${program.idl.version} IDL fetched from mainnet-beta on ${program.idl.retrieved}. The source may be ahead of the deployed program, and closing can have preconditions.`;
 
 export interface ScanOptions {
   rpc: RentRpc;
@@ -294,6 +307,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
   const known = knownProgram(program);
   const chosen = pick(mulberry32(options.seed), options.buckets);
   const perGroup: bigint[] = [];
+  const perGroupByType = new Map<string, bigint[]>();
   const split = classify(known, options.schedule, rate);
   for (const value of chosen) {
     // memcmp takes base58; one byte padded to a key would not match, so the byte is encoded on its own.
@@ -308,21 +322,34 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       split.add(account);
     }
     perGroup.push(sum('group', group.buckets()).excessNow);
+    for (const bucket of group.buckets()) {
+      const series = perGroupByType.get(bucket.type) ?? [];
+      series[perGroup.length - 1] = bucket.excessNow;
+      perGroupByType.set(bucket.type, series);
+    }
   }
   const scale = (value: bigint) => (value * 256n) / BigInt(chosen.length);
-  const buckets = split.buckets().map((bucket) => ({
-    ...bucket,
-    accounts: Math.round((bucket.accounts * 256) / chosen.length),
-    fundedAtEarlierRate: Math.round((bucket.fundedAtEarlierRate * 256) / chosen.length),
-    excessNow: scale(bucket.excessNow),
-    aboveMinimumUpperBound: scale(bucket.aboveMinimumUpperBound),
-    afterStep: Object.fromEntries(
-      Object.entries(bucket.afterStep).map(([step, value]) => [step, scale(value)]),
-    ),
-  }));
+  const tooWide = (error: bigint, estimate: bigint) => error * 4n > estimate;
+  const buckets = split.buckets().map((bucket) => {
+    // Groups in which the type did not occur count as zero.
+    const series = chosen.map((_, index) => perGroupByType.get(bucket.type)?.[index] ?? 0n);
+    const error = standardError(series);
+    return {
+      ...bucket,
+      accounts: Math.round((bucket.accounts * 256) / chosen.length),
+      fundedAtEarlierRate: Math.round((bucket.fundedAtEarlierRate * 256) / chosen.length),
+      excessNow: scale(bucket.excessNow),
+      aboveMinimumUpperBound: scale(bucket.aboveMinimumUpperBound),
+      afterStep: Object.fromEntries(
+        Object.entries(bucket.afterStep).map(([step, value]) => [step, scale(value)]),
+      ),
+      standardError: error,
+      unreliable: tooWide(error, scale(bucket.excessNow)),
+    };
+  });
   const total = sum('total', buckets);
   const error = standardError(perGroup);
-  const unreliable = error * 4n > total.excessNow;
+  const unreliable = tooWide(error, total.excessNow);
   return {
     target: { kind: 'program', program, ...(known === undefined ? {} : { name: known.name }) },
     endpoint: redactUrl(options.endpoint),
@@ -345,6 +372,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
           ]
         : []),
       splitNote(known),
+      'A sample can be good for the total and useless for a small account type: each bucket carries its own standard error, and a type that occurs in none of the groups read is missing from the report, not zero.',
       'The byte must be spread evenly over accounts (a byte of a stored key). A byte of a flag or a counter gives empty groups and a useless estimate: check that the standard error is small next to excessNow.',
       ...notes,
     ],
@@ -428,3 +456,6 @@ export async function scanWallet(wallet: string, options: ScanOptions): Promise<
     ],
   };
 }
+
+/** Whether the text is a base58 public key; lets a caller refuse a typo before any request is made. */
+export const isValidAddress = (text: string): boolean => isAddress(text);

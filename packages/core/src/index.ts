@@ -139,6 +139,7 @@ export {
   knownProgram,
 } from './rent-programs.js';
 export {
+  isValidAddress,
   type RentBucket,
   type RentRpc,
   rentRpc,

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -138,6 +138,74 @@ describe('check repo', () => {
       { rule: 'web3js-below-1-99', excerpt: '@solana/web3.js@1.98.4' },
     ]);
     expect(check(repo('web3-new', { 'package-lock.json': lock('1.99.0') })).findings).toEqual([]);
+  });
+
+  describe('symbolic links', () => {
+    const MARKER = 'OUTSIDE_THE_ROOT_MARKER';
+    // A line that the tx-v1 rule matches, so that reading the file would show in the findings.
+    const secret = `getTransaction(sig, { maxSupportedTransactionVersion: 0 }); // ${MARKER}\n`;
+    const outside = repo('outside', { 'secret.ts': secret, 'dir/nested.ts': secret });
+    const everywhere = (report: unknown) => JSON.stringify(report);
+
+    it('outside git, never reads a file that a link points to outside the root, and says it skipped it', () => {
+      const dir = repo('link-file', { 'own.ts': after });
+      symlinkSync(join(outside, 'secret.ts'), join(dir, 'external.ts'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.findings).toEqual([]);
+      expect(report.skipped).toEqual([{ file: 'external.ts', reason: 'symlink-outside-root' }]);
+    });
+
+    it('inside git, where the link is a tracked file, the same', () => {
+      const dir = repo('link-file-git', { 'own.ts': after });
+      symlinkSync(join(outside, 'secret.ts'), join(dir, 'external.ts'));
+      const git = (...args: string[]) =>
+        execFileSync('git', ['-C', dir, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args]);
+      git('init', '-q');
+      git('add', '-A');
+      git('commit', '-q', '-m', 'init');
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([{ file: 'external.ts', reason: 'symlink-outside-root' }]);
+    });
+
+    it('does not walk into a directory that a link points to outside the root', () => {
+      const dir = repo('link-dir', { 'own.ts': after });
+      symlinkSync(join(outside, 'dir'), join(dir, 'vendor'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toEqual([{ file: 'vendor', reason: 'symlink-outside-root' }]);
+    });
+
+    it('ends on a cycle of directory links, and reads each real file once', () => {
+      const dir = repo('link-cycle', { 'src/reader.ts': before });
+      symlinkSync(dir, join(dir, 'src', 'loop'));
+      symlinkSync(join(dir, 'src'), join(dir, 'again'));
+      const report = check(dir);
+      expect(report.findings.map((finding) => finding.file)).toEqual(['src/reader.ts']);
+    });
+
+    it('reads a link that stays inside the root once, under the real path', () => {
+      const dir = repo('link-inside', { 'src/reader.ts': before });
+      symlinkSync(join(dir, 'src', 'reader.ts'), join(dir, 'alias.ts'));
+      const report = check(dir);
+      expect(report.findings.map((finding) => finding.file)).toEqual(['src/reader.ts']);
+      expect(report.skipped).toEqual([]);
+    });
+
+    it('works when the root itself is reached through a link', () => {
+      const dir = repo('link-root-target', { 'reader.ts': before });
+      symlinkSync(dir, join(root, 'link-root'));
+      const report = check(join(root, 'link-root'));
+      expect(report.findings.map((finding) => finding.file)).toEqual(['reader.ts']);
+      expect(report.skipped).toEqual([]);
+    });
+
+    it('reports a dangling link instead of dropping it in silence', () => {
+      const dir = repo('link-dangling', { 'own.ts': after });
+      symlinkSync(join(dir, 'gone.ts'), join(dir, 'dangling.ts'));
+      expect(check(dir).skipped).toEqual([{ file: 'dangling.ts', reason: 'broken-symlink' }]);
+    });
   });
 
   it('says which rules it could not run', () => {

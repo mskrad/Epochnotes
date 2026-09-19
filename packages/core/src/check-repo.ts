@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, extname, join, relative } from 'node:path';
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { basename, extname, join, relative, sep } from 'node:path';
 
 import semver from 'semver';
 
@@ -39,58 +39,92 @@ export interface Finding {
   fix: string[];
 }
 
+export interface Skipped {
+  /** Path relative to the scanned directory, as it is named there. */
+  file: string;
+  reason: 'symlink-outside-root' | 'broken-symlink';
+}
+
 export type CheckReport =
   | {
       ok: true;
       root: string;
       filesScanned: number;
       findings: Finding[];
+      /** Paths that were not read, and why. A path missing from both the findings and this list was checked. */
+      skipped: Skipped[];
       notRun: { entry: string; rule: string; reason: string }[];
     }
   | { ok: false; issues: Issue[] };
 
-function* walk(root: string, directory = root): Generator<string> {
+/**
+ * Candidate paths outside git. A link is yielded as a path and never descended into: what it points to is
+ * decided in one place, `sourceFiles`, and a directory inside the root is reached under its real name anyway —
+ * which also ends every cycle of links.
+ */
+function* walk(directory: string): Generator<string> {
   for (const name of readdirSync(directory).sort()) {
-    const path = join(directory, name);
     if (SKIPPED_DIRECTORIES.has(name)) continue;
-    let stats;
-    try {
-      stats = statSync(path);
-    } catch {
-      continue; // a dangling symlink
-    }
-    if (stats.isDirectory()) yield* walk(root, path);
-    else if (stats.isFile()) yield path;
+    const path = join(directory, name);
+    const stats = lstatSync(path);
+    if (stats.isDirectory()) yield* walk(path);
+    else if (stats.isFile() || stats.isSymbolicLink()) yield path;
   }
 }
 
 /**
- * The files to check. In a git work tree these are the tracked files: that leaves out dependencies and
- * build output without guessing directory names — a guess such as "build" once hid `skills/build/...`.
+ * The files to check, by their real paths. In a git work tree these are the tracked files: that leaves out
+ * dependencies and build output without guessing directory names — a guess such as "build" once hid
+ * `skills/build/...`.
+ *
+ * Nothing outside the root is ever read. A repository is somebody else's data: a link in it — a tracked link,
+ * or a tracked path that runs through a linked directory — may point at any file this process can open, and a
+ * line of that file would end up in a finding. Every path is resolved first; a path that resolves outside the
+ * root is reported as skipped, and a file reached twice is read once, under its real name.
  */
-function sourceFiles(root: string): string[] {
-  let files: string[];
+function sourceFiles(root: string): { realRoot: string; files: string[]; skipped: Skipped[] } {
+  const realRoot = realpathSync(root);
+  let candidates: string[];
   try {
-    const listed = execFileSync('git', ['-C', root, 'ls-files', '-z'], {
+    const listed = execFileSync('git', ['-C', realRoot, 'ls-files', '-z'], {
       encoding: 'utf8',
       maxBuffer: 256 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    files = listed
+    candidates = listed
       .split('\0')
       .filter(Boolean)
-      .map((file) => join(root, file));
+      .map((file) => join(realRoot, file));
   } catch {
-    files = [...walk(root)];
+    candidates = [...walk(realRoot)];
   }
-  return files.sort().filter((path) => {
+  const files = new Set<string>();
+  const skipped: Skipped[] = [];
+  for (const path of candidates.sort()) {
+    const file = relative(realRoot, path);
+    let real: string;
     try {
-      const stats = statSync(path);
-      return stats.isFile() && stats.size <= MAX_FILE_BYTES;
+      real = realpathSync(path);
     } catch {
-      return false; // tracked but deleted in the work tree
+      // A link to nothing is worth a word; a tracked file deleted from the work tree is not.
+      let link = false;
+      try {
+        link = lstatSync(path).isSymbolicLink();
+      } catch {
+        link = false;
+      }
+      if (link) skipped.push({ file, reason: 'broken-symlink' });
+      continue;
     }
-  });
+    if (real !== realRoot && !real.startsWith(realRoot + sep)) {
+      skipped.push({ file, reason: 'symlink-outside-root' });
+      continue;
+    }
+    // A link to a directory inside the root: its files are candidates under their real names already.
+    const stats = statSync(real);
+    if (stats.isFile() && stats.size <= MAX_FILE_BYTES) files.add(real);
+  }
+  return { realRoot, files: [...files].sort(), skipped };
 }
 
 /** Versions of one package as the lockfile pins them. Best effort across the common lockfile formats. */
@@ -155,8 +189,9 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
       .map((fix) => fix.summary);
 
   let filesScanned = 0;
-  for (const path of sourceFiles(root)) {
-    const file = relative(root, path);
+  const { realRoot, files, skipped } = sourceFiles(root);
+  for (const path of files) {
+    const file = relative(realRoot, path);
     const matching = patterns.filter((item) => item.extensions.has(extname(path)));
     const locking = LOCKFILES.has(basename(path)) ? lockRules : [];
     if (matching.length === 0 && locking.length === 0) continue;
@@ -208,7 +243,7 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
       }
     }
   }
-  return { ok: true, root, filesScanned, findings, notRun };
+  return { ok: true, root, filesScanned, findings, skipped, notRun };
 }
 
 /** Checks a repository against every entry of a registry directory. */

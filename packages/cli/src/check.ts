@@ -38,6 +38,7 @@ function print(report: Extract<CheckReport, { ok: true }>): void {
   console.log(
     `${report.findings.length} finding(s), ${breaking} of them certain to break, in ${report.filesScanned} file(s) checked.`,
   );
+  for (const item of report.skipped) console.log(`skipped: ${item.file} — ${item.reason}`);
   for (const rule of report.notRun) console.log(`not run: ${rule.entry} ${rule.rule} — ${rule.reason}`);
 }
 

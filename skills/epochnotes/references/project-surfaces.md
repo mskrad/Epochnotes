@@ -29,6 +29,9 @@ anything, and show it to the person: they will know what you missed.
 | Reading code the rules do not cover, guided by the entry's `breaks` | **by reading, not by rule** | the entry names a surface and no `detect` rule covers it                            |
 | Nothing available                                                   | **cannot verify** and why   | closed third-party service, no credentials, no fixture on that cluster              |
 
+The repository check lists under `skipped` every path it did not read, with the reason (a link that leaves
+the repository, a broken link). Carry that list into your report: a skipped path was not checked.
+
 The probe reports observations (`calls`) and quotes what the entry expects (`expect`). Compare them yourself
 and say what you concluded. The command exits with success even when `observed` is zero: read that field, not the exit code. A `fixture-missing` or `not-applicable` verdict means the behaviour was **not**
 observed; it is not a pass.

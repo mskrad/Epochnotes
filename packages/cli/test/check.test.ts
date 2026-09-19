@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -31,5 +31,25 @@ describe('epochnotes check repo', () => {
     const report = await run('check', 'repo', join(dir, 'repo-broken'), '--registry', entries, '--json');
     expect(JSON.parse(report.out)).toMatchObject({ ok: true, findings: [{ file: 'a.ts', line: 1 }] });
     expect((await run('check', 'repo', join(dir, 'absent'), '--registry', entries)).code).toBe(2);
+  });
+
+  it('prints nothing of a file that a link points to outside the repository, in either output form, and says it skipped it', async () => {
+    const marker = 'OUTSIDE_THE_ROOT_MARKER';
+    const outside = join(dir, 'outside.ts');
+    writeFileSync(outside, `getTransaction(sig, { maxSupportedTransactionVersion: 0 }); // ${marker}\n`);
+    const repo = join(dir, 'repo-link');
+    mkdirSync(repo);
+    symlinkSync(outside, join(repo, 'external.ts'));
+
+    const json = await run('check', 'repo', repo, '--registry', entries, '--json');
+    expect(json.code).toBe(0);
+    expect(json.out).not.toContain(marker);
+    expect(JSON.parse(json.stdout)).toMatchObject({
+      findings: [],
+      skipped: [{ file: 'external.ts', reason: 'symlink-outside-root' }],
+    });
+    const prose = await run('check', 'repo', repo, '--registry', entries);
+    expect(prose.out).not.toContain(marker);
+    expect(prose.stdout).toContain('skipped: external.ts — symlink-outside-root');
   });
 });

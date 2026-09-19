@@ -13,7 +13,7 @@ import { type Command, Option } from 'commander';
 import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
 
-interface SourceOptions {
+export interface SourceOptions {
   versions: string;
   publishers: string;
   mirror?: string[];
@@ -23,7 +23,7 @@ interface SourceOptions {
 }
 
 /** The options that say where entries come from: the signed log by default, unsigned files only when asked. */
-function withSource(command: Command): Command {
+export function withSource(command: Command): Command {
   return command
     .addOption(
       new Option(
@@ -46,7 +46,7 @@ function withSource(command: Command): Command {
     );
 }
 
-function sourceOf(options: SourceOptions): Pick<ReadOptions, 'log' | 'workingCopy'> | undefined {
+export function sourceOf(options: SourceOptions): Pick<ReadOptions, 'log' | 'workingCopy'> | undefined {
   if (options.workingCopy !== undefined) return { workingCopy: options.workingCopy };
   const pin = options.pin === undefined ? undefined : parsePin(options.pin);
   if (options.pin !== undefined && pin === undefined) {
@@ -67,7 +67,7 @@ function sourceOf(options: SourceOptions): Pick<ReadOptions, 'log' | 'workingCop
   };
 }
 
-function provenanceLine(reading: Extract<RegistryReading, { ok: true }>): string {
+export function provenanceLine(reading: Extract<RegistryReading, { ok: true }>): string {
   const from = reading.provenance;
   if (!from.verified) return `UNVERIFIED working copy ${from.workingCopy}: ${from.warning}`;
   const chain = from.chain === 'matches' ? 'log matches the chain' : 'chain not checked';

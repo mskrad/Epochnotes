@@ -143,7 +143,9 @@ try {
   step('treats an unreadable path as 2', ['check', 'repo', join(work, 'absent')], 2, has('Cannot check'));
 
   if (process.env.E2E_OFFLINE === '1')
-    console.log('SKIP     status on devnet (E2E_OFFLINE=1): this run does not cover the network step');
+    console.log(
+      'SKIP     status on devnet and rent scan on mainnet (E2E_OFFLINE=1): this run does not cover the network steps',
+    );
   else {
     step(
       'reads the status of every gate from devnet, as JSON',
@@ -156,6 +158,27 @@ try {
         return report.gates.length >= 11 && report.gates.every((gate) => gate.address && gate.status?.state)
           ? undefined
           : 'gates are missing a status';
+      },
+    );
+    step(
+      'measures rent held above the minimum by a program on mainnet, from the verified version',
+      [
+        ...['rent', 'scan', '--program', 'opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb'],
+        ...['--versions', versions, '--publishers', publishers, '--json'],
+      ],
+      0,
+      (_all, stdout) => {
+        const report = JSON.parse(stdout);
+        if (report.provenance?.verified !== true) return 'the schedule did not come from a verified version';
+        if (!/^\d+$/.test(report.slot) || !/^\d+$/.test(report.currentRate))
+          return 'no slot or rate in the report';
+        const closable = new Set(report.buckets.map((bucket) => bucket.closableBy));
+        if (!closable.has('owner') || !closable.has('admin'))
+          return 'account types are not split by who can close them';
+        const sum = report.buckets.reduce((total, bucket) => total + BigInt(bucket.excessNow), 0n);
+        return sum === BigInt(report.total.excessNow) && report.total.accounts > 1000
+          ? undefined
+          : 'the buckets do not add up to the total';
       },
     );
   }

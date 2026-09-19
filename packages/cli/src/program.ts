@@ -5,6 +5,7 @@ import { Command } from 'commander';
 
 import { checkCommand } from './check.js';
 import { registryCommand } from './registry.js';
+import { rentCommand } from './rent.js';
 import { statusCommand } from './status.js';
 
 /** The version lives in package.json only. */
@@ -25,6 +26,7 @@ export function buildProgram(): Command {
       .version(`${CLI_VERSION} (entry schema ${ENTRY_SCHEMA_VERSION})`)
       .addCommand(registryCommand())
       .addCommand(statusCommand())
-      .addCommand(checkCommand()),
+      .addCommand(checkCommand())
+      .addCommand(rentCommand()),
   );
 }

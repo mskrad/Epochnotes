@@ -37,6 +37,18 @@ epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does 
 
 `--versions` and `--publishers` default to the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. `--working-copy <dir>` reads unsigned entry files, and the output says so.
 
+## Rent held above the minimum
+
+The staged rent reduction lowers the minimum balance of every account, and returns nothing by itself. `rent scan` measures, read-only, what is left above the minimum:
+
+```bash
+epochnotes rent scan --program <address>            # every account of a program, split by account type
+epochnotes rent scan --program <address> --sample   # a program too large for one request: seeded random sample, with a standard error
+epochnotes rent scan --wallet <address>             # accounts of known programs that the wallet owns
+```
+
+The rates come from the registry entry, the rate in force from the Rent sysvar, the state of every step from its feature gate. For OpenBook v2, marginfi v2 and Drift the report says who can close each account type — its owner, a program admin, or nobody — as read from the program's on-chain IDL. `excessNow` counts only accounts whose balance is exactly an earlier minimum; everything else above the minimum is reported apart, as an upper bound that may be reserves. The figures are estimates of deposits, not a market size.
+
 ## What the signed log proves, and what it does not
 
 A registry version is a Merkle root over all entries, linked to the previous version and signed by its publisher. `epochnotes registry verify` checks the signatures, the chain of versions and the content hash without trusting the server. `--onchain` also compares the log with the registry program on Solana, which is what catches a log that was truncated, or re-signed with different content by the holder of the publisher key, and an entry its publisher has revoked.

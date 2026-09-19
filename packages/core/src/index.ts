@@ -122,3 +122,30 @@ export {
   readRegistry,
   type RegistryReading,
 } from './read-registry.js';
+export {
+  type AccountRent,
+  accountRent,
+  minimumBalance,
+  rentAfter,
+  type RentSchedule,
+  rentScheduleFromEntry,
+} from './rent.js';
+export {
+  type AccountType,
+  anchorDiscriminator,
+  type ClosableBy,
+  KNOWN_PROGRAMS,
+  type KnownProgram,
+  knownProgram,
+} from './rent-programs.js';
+export {
+  type RentBucket,
+  type RentRpc,
+  rentRpc,
+  type RentScanReport,
+  sampleProgram,
+  type SampleOptions,
+  type ScanOptions,
+  scanProgram,
+  scanWallet,
+} from './rent-scan.js';

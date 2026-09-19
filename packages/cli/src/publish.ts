@@ -158,9 +158,12 @@ export function addVersionCommands(registry: Command): void {
           );
           console.log(`  chain     ${chain}`);
           console.log(`  pin       ${manifest.n}:${manifest.merkle_root}`);
-          console.log(
-            '  note      signatures prove the log is consistent, not complete: pass --pin next time to detect a rollback.',
-          );
+          // The chain already answers what a pin is for: whether the log is complete and unforked.
+          if (!options.onchain) {
+            console.log(
+              '  note      signatures prove the log is consistent, not complete: pass --pin next time to detect a rollback.',
+            );
+          }
         }
         process.exitCode = EXIT.ok;
       },

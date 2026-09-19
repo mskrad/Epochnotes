@@ -22,6 +22,7 @@ describe('epochnotes rent scan', () => {
       [['--wallet', program, '--sample'], '--sample works with --program only'],
       [['--program', program, '--sample', '--offset', ''], '--offset and --seed must be whole numbers'],
       [['--program', 'not-an-address'], 'not a valid base58 public key'],
+      [['--program', program, '--offset', '5'], '--offset has a meaning with --sample only'],
     ];
     for (const [args, reason] of cases) {
       const result = await run('rent', 'scan', ...args, '--working-copy', entries);

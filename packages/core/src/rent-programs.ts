@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 
-/** Who can close an account of this type and get its lamports back, according to the program's IDL. */
+/** Who can close an account of this type, according to the `close =` constraints of the program source. */
 export type ClosableBy = 'owner' | 'admin' | 'nobody';
 
 export interface AccountType {
   name: string;
   closableBy: ClosableBy;
-  /** The instruction of the IDL that closes it, and who signs. Absent when the IDL has none. */
+  /** The instruction that closes it, and who signs. Absent when nothing in the source closes the type. */
   closeInstruction?: string;
   /** Where the 32-byte key of the owning user sits in the account data; makes the type searchable by wallet. */
   ownerOffset?: number;
@@ -74,7 +74,8 @@ export const KNOWN_PROGRAMS: KnownProgram[] = [
       {
         name: 'Order',
         closableBy: 'owner',
-        closeInstruction: 'marginfi_account_close_order (signer: authority; lamports go to fee_recipient)',
+        closeInstruction:
+          'marginfi_account_close_order (signer: authority); a keeper can close it too, and the lamports go to fee_recipient, not necessarily to the owner',
       },
       { name: 'Bank', closableBy: 'admin', closeInstruction: 'lending_pool_close_bank (signer: admin)' },
       { name: 'MarginfiGroup', closableBy: 'nobody' },
@@ -96,7 +97,7 @@ export const KNOWN_PROGRAMS: KnownProgram[] = [
         ownerOffset: 8,
       },
       {
-        // deleteUser closes User only; on mainnet UserStats accounts outlive all their users.
+        // deleteUser, forceDeleteUser and reclaimRent take user_stats as mutable, without a close constraint.
         name: 'UserStats',
         closableBy: 'nobody',
         ownerOffset: 8,

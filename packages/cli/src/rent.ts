@@ -100,13 +100,20 @@ export function rentCommand(): Command {
     .addOption(clusterOption('mainnet-beta'))
     .addOption(rpcUrlOption())
     .option('--json', 'print the report as JSON')
-    .action(async (options: ScanCommandOptions) => {
+    .action(async (options: ScanCommandOptions, command: Command) => {
       if ((options.program === undefined) === (options.wallet === undefined)) {
         reportError(options.json, 'scan', new Error('pass exactly one of --program and --wallet'));
         return;
       }
       if (options.sample && options.program === undefined) {
         reportError(options.json, 'scan', new Error('--sample works with --program only'));
+        return;
+      }
+      const given = ['offset', 'groups', 'seed'].filter(
+        (name) => command.getOptionValueSource(name) === 'cli',
+      );
+      if (!options.sample && given.length > 0) {
+        reportError(options.json, 'scan', new Error(`--${given[0]} has a meaning with --sample only`));
         return;
       }
       const texts = [options.offset, options.groups, options.seed];

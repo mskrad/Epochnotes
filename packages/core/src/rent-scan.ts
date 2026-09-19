@@ -308,6 +308,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
   const chosen = pick(mulberry32(options.seed), options.buckets);
   const perGroup: bigint[] = [];
   const perGroupByType = new Map<string, bigint[]>();
+  const countsByType = new Map<string, bigint[]>();
   const split = classify(known, options.schedule, rate);
   for (const value of chosen) {
     // memcmp takes base58; one byte padded to a key would not match, so the byte is encoded on its own.
@@ -326,14 +327,21 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       const series = perGroupByType.get(bucket.type) ?? [];
       series[perGroup.length - 1] = bucket.excessNow;
       perGroupByType.set(bucket.type, series);
+      const counts = countsByType.get(bucket.type) ?? [];
+      counts[perGroup.length - 1] = BigInt(bucket.accounts);
+      countsByType.set(bucket.type, counts);
     }
   }
   const scale = (value: bigint) => (value * 256n) / BigInt(chosen.length);
-  const tooWide = (error: bigint, estimate: bigint) => error * 4n > estimate;
+  const tooWide = (error: bigint, estimate: bigint) => error > 0n && error * 4n > estimate;
   const buckets = split.buckets().map((bucket) => {
     // Groups in which the type did not occur count as zero.
     const series = chosen.map((_, index) => perGroupByType.get(bucket.type)?.[index] ?? 0n);
+    const counts = chosen.map((_, index) => countsByType.get(bucket.type)?.[index] ?? 0n);
     const error = standardError(series);
+    const scaledAccounts = (BigInt(bucket.accounts) * 256n) / BigInt(chosen.length);
+    // A type whose very count is uncertain cannot have a trustworthy sum, even when that sum came out as zero.
+    const rare = tooWide(standardError(counts), scaledAccounts);
     return {
       ...bucket,
       accounts: Math.round((bucket.accounts * 256) / chosen.length),
@@ -344,12 +352,12 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
         Object.entries(bucket.afterStep).map(([step, value]) => [step, scale(value)]),
       ),
       standardError: error,
-      unreliable: tooWide(error, scale(bucket.excessNow)),
+      unreliable: rare || tooWide(error, scale(bucket.excessNow)),
     };
   });
   const total = sum('total', buckets);
   const error = standardError(perGroup);
-  const unreliable = tooWide(error, total.excessNow);
+  const unreliable = total.accounts === 0 || tooWide(error, total.excessNow);
   return {
     target: { kind: 'program', program, ...(known === undefined ? {} : { name: known.name }) },
     endpoint: redactUrl(options.endpoint),
@@ -368,7 +376,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
     notes: [
       ...(unreliable
         ? [
-            `UNRELIABLE: the standard error is more than a quarter of the estimate, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
+            `UNRELIABLE: ${total.accounts === 0 ? 'the groups read hold no accounts' : 'the standard error is more than a quarter of the estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
           ]
         : []),
       splitNote(known),
@@ -452,6 +460,7 @@ export async function scanWallet(wallet: string, options: ScanOptions): Promise<
     total: sum('total', buckets),
     notes: [
       `Searched: ${searched.join('; ')}. Token accounts and any other program are not covered.`,
+      `Who can close a type comes from "close =" constraints in the program sources (${KNOWN_PROGRAMS.map((program) => program.source).join('; ')}), which may be ahead of the deployed programs; closing can have preconditions.`,
       ...notes,
     ],
   };

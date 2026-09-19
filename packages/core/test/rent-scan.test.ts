@@ -205,6 +205,24 @@ describe('sampling a program', () => {
     expect(report.notes.join(' ')).toContain('missing from the report, not zero');
   });
 
+  it('does not trust a zero: a rare type with no excess in the groups read, and a sample that found nothing', async () => {
+    let group = 0;
+    const { options } = fake(() => {
+      group += 1;
+      const even = Array.from({ length: 10 }, () => account('OpenOrdersAccount', 200_000, 72));
+      // One Market at today's minimum: its excess is zero here, and says nothing about the other 255 groups.
+      return group === 1 ? [...even, account('Market', 100_000, 72)] : even;
+    });
+    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
+    const market = report.buckets.find((bucket) => bucket.type === 'Market');
+    expect(market).toMatchObject({ excessNow: 0n, unreliable: true });
+
+    const empty = fake(() => []);
+    const nothing = await sampleProgram(OPENBOOK, { ...empty.options, offset: 8, buckets: 4, seed: 7 });
+    expect(nothing.reliability).toBe('unreliable');
+    expect(nothing.notes[0]).toContain('the groups read hold no accounts');
+  });
+
   it('shows a large standard error when the groups are uneven', async () => {
     let group = 0;
     const { options } = fake(() => {
@@ -237,6 +255,7 @@ describe('scanning a wallet', () => {
       excessNow: 100_000n,
     });
     expect(report.notes[0]).toContain('Token accounts and any other program are not covered');
+    expect(report.notes[1]).toContain('github.com/drift-labs/protocol-v2 @ ');
   });
 
   it('refuses an invalid address before any request', async () => {

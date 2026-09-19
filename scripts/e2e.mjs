@@ -2,7 +2,16 @@
 // Talks to devnet for the status step; set E2E_OFFLINE=1 to skip that one step.
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -95,6 +104,21 @@ try {
   writeFileSync(manifest, original.replace('"entry_count": 4', '"entry_count": 5'));
   step('refuses a manifest altered after signing', verifyArgs, 1, has('Signature does not match'));
   writeFileSync(manifest, original);
+
+  const readArgs = ['registry', 'read', 'tx-v1', '--versions', versions, '--publishers', publishers];
+  step('reads an entry of the verified version for a consumer', [...readArgs, '--json'], 0, (_all, stdout) =>
+    JSON.parse(stdout).provenance.verified === true ? undefined : 'the reading is not marked verified',
+  );
+  const content = join(
+    versions,
+    readdirSync(versions).find((name) => name.endsWith('.jsonl')),
+  );
+  const signedContent = readFileSync(content, 'utf8');
+  writeFileSync(content, signedContent.replace('-32015', '-32016'));
+  step('gives a consumer nothing from tampered content', [...readArgs, '--json'], 1, (_all, stdout) =>
+    stdout.includes('"entries"') ? 'entries were printed from content that failed verification' : undefined,
+  );
+  writeFileSync(content, signedContent);
 
   const broken = join(work, 'repo-before');
   const fixed = join(work, 'repo-after');

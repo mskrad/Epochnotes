@@ -1,8 +1,23 @@
-import { type CheckReport, checkRepository } from '@epochnotes/core';
-import { Command } from 'commander';
+import {
+  type CheckReport,
+  checkDirectory,
+  checkRepository,
+  type Provenance,
+  readRegistry,
+  readTrustedPublishers,
+} from '@epochnotes/core';
+import { Command, Option } from 'commander';
 
 import { EXIT } from './cluster.js';
-import { reportError } from './output.js';
+import { reportError, reportIssues } from './output.js';
+import { addRpcCheckCommand } from './read.js';
+
+interface RepoOptions {
+  registry: string;
+  versions?: string;
+  publishers: string;
+  json?: boolean;
+}
 
 const LABEL = { breaks: 'BREAKS', check: 'CHECK ', 'likely-ok': 'OK?   ' } as const;
 
@@ -26,12 +41,38 @@ export function checkCommand(): Command {
     .command('repo')
     .description('Find, in a repository, what the network changes in the registry will break.')
     .argument('<path>', 'directory of the repository')
-    .option('--registry <path>', 'directory of registry entries', 'registry/entries')
+    .option('--registry <path>', 'directory of unsigned registry entries', 'registry/entries')
+    .addOption(
+      new Option(
+        '--versions <dir-or-url>',
+        'take the rules from the latest verified version of this log instead of --registry',
+      ).env('EPOCHNOTES_VERSIONS'),
+    )
+    .addOption(
+      new Option('--publishers <file>', 'trusted publishers, with --versions')
+        .default('registry/publishers.json')
+        .env('EPOCHNOTES_PUBLISHERS'),
+    )
     .option('--json', 'print the report as JSON')
-    .action((path: string, options: { registry: string; json?: boolean }) => {
+    .action(async (path: string, options: RepoOptions) => {
       let report: CheckReport;
+      let provenance: Provenance | undefined;
       try {
-        report = checkRepository(path, options.registry);
+        if (options.versions === undefined) report = checkRepository(path, options.registry);
+        else {
+          const reading = await readRegistry({
+            log: {
+              versionsDir: options.versions,
+              trustedPublishers: readTrustedPublishers(options.publishers),
+            },
+          });
+          if (!reading.ok) return reportIssues(options.json, reading.issues);
+          provenance = reading.provenance;
+          report = checkDirectory(
+            path,
+            reading.entries.map(({ entry }) => entry),
+          );
+        }
       } catch (error) {
         reportError(options.json, `check ${path}`, error);
         return;
@@ -44,11 +85,17 @@ export function checkCommand(): Command {
         );
         return;
       }
-      if (options.json) console.log(JSON.stringify(report, null, 2));
-      else print(report);
+      if (options.json)
+        console.log(JSON.stringify(provenance === undefined ? report : { provenance, ...report }, null, 2));
+      else {
+        if (provenance?.verified)
+          console.log(`rules from verified version ${provenance.version} of ${provenance.publisher}`);
+        print(report);
+      }
       process.exitCode = report.findings.some((finding) => finding.confidence === 'breaks')
         ? EXIT.findings
         : EXIT.ok;
     });
+  addRpcCheckCommand(check);
   return check;
 }

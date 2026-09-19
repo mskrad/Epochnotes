@@ -12,6 +12,7 @@ Status: early development. Nothing here is ready for use yet.
 | `packages/cli`      | `epochnotes` command — a thin shell over `core`                             |
 | `programs/registry` | Anchor program: publishers and the version log                              |
 | `registry/`         | Entry schema, registry entries (YAML) and published versions                |
+| `skills/epochnotes` | Claude skill: answers from the verified registry, checks a whole project    |
 | `corpus/`           | Before/after code pairs used to evaluate detection rules                    |
 
 ## Develop
@@ -23,6 +24,18 @@ npm ci
 npm run verify        # build + tests + lint
 npm run build:program # anchor build
 ```
+
+## For AI assistants
+
+`skills/epochnotes` is a Claude skill (copy the directory into `.claude/skills/`). It holds no facts about any change: it reads entries from the latest verified version, reads the activation status from the network, and refuses to answer when verification fails. The commands it uses work for any consumer:
+
+```bash
+epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, gate status with cluster and slot
+epochnotes check repo <path> --versions <dir-or-url>    # detection rules taken from the verified version
+epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does this provider behave as the entry says
+```
+
+`--versions` and `--publishers` default to the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. `--working-copy <dir>` reads unsigned entry files, and the output says so.
 
 ## What the signed log proves, and what it does not
 

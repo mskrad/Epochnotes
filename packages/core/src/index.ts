@@ -113,3 +113,12 @@ export {
   redactUrl,
   writeRefusal,
 } from './onchain.js';
+export { type ProbeCall, type ProbeResult, probeRpc, type RpcProbeReport } from './probe-rpc.js';
+export {
+  type EntryReading,
+  type GateReading,
+  type Provenance,
+  type ReadOptions,
+  readRegistry,
+  type RegistryReading,
+} from './read-registry.js';

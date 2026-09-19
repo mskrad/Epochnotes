@@ -5,6 +5,7 @@ import { addChainCommands } from './chain.js';
 import { EXIT } from './cluster.js';
 import { reportError } from './output.js';
 import { addVersionCommands } from './publish.js';
+import { addReadCommand } from './read.js';
 
 function printReport(report: RegistryReport): void {
   const inRegistryTrouble = (id?: string) =>
@@ -58,6 +59,7 @@ export function registryCommand(): Command {
       process.exitCode = report.ok ? EXIT.ok : EXIT.findings;
     });
   addVersionCommands(registry);
+  addReadCommand(registry);
   addChainCommands(registry);
   return registry;
 }

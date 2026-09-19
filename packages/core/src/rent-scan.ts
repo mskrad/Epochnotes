@@ -20,18 +20,31 @@ interface RpcAccount {
 type RpcAnswer = { result?: unknown; error?: { code?: number; message?: string } };
 export type RentRpc = (method: string, params: unknown[]) => Promise<RpcAnswer>;
 
-/** Program scans return tens of megabytes: the timeout is generous, and the endpoint never appears in an error. */
-export function rentRpc(rpcUrl: string, timeoutMs = 300_000): RentRpc {
+/**
+ * Program scans return tens of megabytes, so the timeout is generous. A public endpoint answers 429 when asked
+ * too often: the request is repeated after a growing pause, a few times. The endpoint never appears in an error.
+ */
+export function rentRpc(
+  rpcUrl: string,
+  { timeoutMs = 300_000, retryDelayMs = 2_000, retries = 4 } = {},
+): RentRpc {
   return async (method, params) => {
     try {
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      if (!response.ok) throw new Error(`${method}: HTTP ${response.status}`);
-      return (await response.json()) as RpcAnswer;
+      for (let attempt = 0; ; attempt += 1) {
+        const response = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (response.status === 429 && attempt < retries) {
+          await response.body?.cancel();
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs * 2 ** attempt));
+          continue;
+        }
+        if (!response.ok) throw new Error(`${method}: HTTP ${response.status}`);
+        return (await response.json()) as RpcAnswer;
+      }
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
       throw new Error(`${redactUrl(rpcUrl)} ${text.split(rpcUrl).join('<endpoint>')}`);
@@ -66,7 +79,8 @@ export interface RentScanReport {
     steps: { rate: bigint; label: string; gate: string; status: FeatureState }[];
   };
   method: string;
-  reliability: 'exact' | 'estimate';
+  /** `unreliable`: a sample whose standard error is more than a quarter of the estimate. Do not quote it. */
+  reliability: 'exact' | 'estimate' | 'unreliable';
   /** One standard error of `excessNow`, in lamports; zero for a full scan. */
   standardError: bigint;
   buckets: RentBucket[];
@@ -306,6 +320,9 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       Object.entries(bucket.afterStep).map(([step, value]) => [step, scale(value)]),
     ),
   }));
+  const total = sum('total', buckets);
+  const error = standardError(perGroup);
+  const unreliable = error * 4n > total.excessNow;
   return {
     target: { kind: 'program', program, ...(known === undefined ? {} : { name: known.name }) },
     endpoint: redactUrl(options.endpoint),
@@ -317,11 +334,16 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       steps,
     },
     method: `sample: ${chosen.length} of 256 groups by the byte at offset ${options.offset}, seed ${options.seed}; sums scaled by 256/${chosen.length}`,
-    reliability: 'estimate',
-    standardError: standardError(perGroup),
+    reliability: unreliable ? 'unreliable' : 'estimate',
+    standardError: error,
     buckets,
-    total: sum('total', buckets),
+    total,
     notes: [
+      ...(unreliable
+        ? [
+            `UNRELIABLE: the standard error is more than a quarter of the estimate, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
+          ]
+        : []),
       splitNote(known),
       'The byte must be spread evenly over accounts (a byte of a stored key). A byte of a flag or a counter gives empty groups and a useless estimate: check that the standard error is small next to excessNow.',
       ...notes,

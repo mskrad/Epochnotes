@@ -1,3 +1,6 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,6 +8,7 @@ import {
   type FeatureAccountSource,
   KNOWN_PROGRAMS,
   type RentRpc,
+  rentRpc,
   type RentSchedule,
   sampleProgram,
   scanProgram,
@@ -161,6 +165,8 @@ describe('sampling a program', () => {
     });
     const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
     expect(report.standardError).toBeGreaterThan(report.total.excessNow / 2n);
+    expect(report.reliability).toBe('unreliable');
+    expect(report.notes[0]).toMatch(/^UNRELIABLE: /);
   });
 });
 
@@ -189,5 +195,29 @@ describe('scanning a wallet', () => {
     const { options, calls } = fake(() => []);
     await expect(scanWallet('not-an-address', options)).rejects.toThrow();
     expect(calls).toEqual([]);
+  });
+});
+
+describe('the transport', () => {
+  it('repeats a request the endpoint answered with 429, and gives up after the allowed retries', async () => {
+    let asked = 0;
+    const server = createServer((_request, response) => {
+      asked += 1;
+      if (asked <= 2) response.writeHead(429).end();
+      else response.writeHead(200, { 'content-type': 'application/json' }).end('{"result":"ok"}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/?api-key=secret`;
+    try {
+      expect(await rentRpc(url, { retryDelayMs: 1 })('getSlot', [])).toEqual({ result: 'ok' });
+      expect(asked).toBe(3);
+      asked = -10;
+      await expect(rentRpc(url, { retryDelayMs: 1, retries: 2 })('getSlot', [])).rejects.toThrow(/HTTP 429/);
+      await expect(rentRpc(url, { retryDelayMs: 1, retries: 0 })('getSlot', [])).rejects.not.toThrow(
+        /secret/,
+      );
+    } finally {
+      server.close();
+    }
   });
 });

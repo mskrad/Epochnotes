@@ -50,7 +50,7 @@ function print(report: RentScanReport): void {
   for (const step of report.schedule.steps) console.log(`  ${step.label}: ${step.status.state}`);
   console.log(`method: ${report.method}`);
   console.log(
-    `reliability: ${report.reliability}${report.reliability === 'estimate' ? `, one standard error of excess now ${sol(report.standardError)}` : ''}\n`,
+    `reliability: ${report.reliability}${report.reliability !== 'exact' ? `, one standard error of excess now ${sol(report.standardError)}` : ''}\n`,
   );
   for (const bucket of report.buckets) console.log(line(bucket));
   if (report.buckets.length === 0) console.log('no accounts found');

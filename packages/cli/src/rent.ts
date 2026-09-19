@@ -1,5 +1,6 @@
 import {
   isValidAddress,
+  planClose,
   readRegistry,
   type RentBucket,
   rentRpc,
@@ -9,6 +10,8 @@ import {
   sampleProgram,
   scanProgram,
   scanWallet,
+  simulateClose,
+  withdrawExcessTemplate,
 } from '@epochnotes/core';
 import { Command } from 'commander';
 
@@ -191,6 +194,94 @@ export function rentCommand(): Command {
         process.exitCode = EXIT.ok;
       } catch (error) {
         reportError(options.json, 'scan', error);
+      }
+    });
+  rent
+    .command('close')
+    .description(
+      'Build, without signing, the transaction that returns the rent deposit of one account to its owner, and ask the cluster what it would do. Nothing is sent.',
+    )
+    .requiredOption('--account <address>', 'the account to close, or to reclaim the excess from')
+    .option('--no-simulate', 'only build the transaction')
+    .addOption(clusterOption('mainnet-beta'))
+    .addOption(rpcUrlOption())
+    .option('--json', 'print the plan and the simulation as JSON')
+    .action(
+      async (options: {
+        account: string;
+        simulate: boolean;
+        cluster: string;
+        rpcUrl?: string;
+        json?: boolean;
+      }) => {
+        if (!isValidAddress(options.account)) {
+          reportError(
+            options.json,
+            'plan the close',
+            new Error('the address is not a valid base58 public key'),
+          );
+          return;
+        }
+        try {
+          const rpcUrl = rpcUrlOf(options);
+          const plan = await planClose(rpcUrl, options.account);
+          if (!plan.ok) {
+            reportIssues(options.json, [
+              {
+                path: options.account,
+                message: plan.reason,
+                hint: 'Run `epochnotes rent scan` to see which account types can be closed, and by whom.',
+              },
+            ]);
+            return;
+          }
+          const simulation = options.simulate ? await simulateClose(rpcUrl, plan) : undefined;
+          if (options.json)
+            console.log(
+              JSON.stringify(
+                { ...plan, ...(simulation === undefined ? {} : { simulation }) },
+                (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
+                2,
+              ),
+            );
+          else {
+            console.log(
+              `${plan.program.name} ${plan.type} ${plan.account}: ${plan.lamports} lamports, ${plan.space} bytes`,
+            );
+            console.log(
+              `${plan.action} with ${plan.instruction}; signer and destination: the owner ${plan.owner}`,
+            );
+            for (const condition of plan.preconditions) console.log(`  the program requires: ${condition}`);
+            if (simulation !== undefined) {
+              console.log(
+                simulation.ok
+                  ? `simulation on ${simulation.endpoint} at slot ${simulation.slot}: would succeed, the owner would receive ${simulation.returned} lamports net of the fee`
+                  : `simulation on ${simulation.endpoint} at slot ${simulation.slot}: would FAIL — ${simulation.error}`,
+              );
+              for (const entry of simulation.logs) console.log(`  ${entry}`);
+            }
+            console.log(
+              `\nunsigned transaction (base64; sign it in the owner's wallet — this tool holds no keys and sends nothing):\n${plan.transaction}`,
+            );
+          }
+          process.exitCode = simulation !== undefined && !simulation.ok ? EXIT.findings : EXIT.ok;
+        } catch (error) {
+          reportError(options.json, 'plan the close', error);
+        }
+      },
+    );
+  rent
+    .command('template')
+    .description(
+      'Print an Anchor instruction, withdraw_excess, that lets the authority of a program-owned account take out what it holds above the rent-exempt minimum.',
+    )
+    .option('--account-type <Name>', 'the account type of your program', 'Vault')
+    .option('--authority-field <name>', 'the field of that type which holds the authority', 'authority')
+    .action((options: { accountType: string; authorityField: string }) => {
+      try {
+        process.stdout.write(withdrawExcessTemplate(options));
+      } catch (error) {
+        reportError(false, 'fill the template', error);
       }
     });
   return rent;

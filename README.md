@@ -49,6 +49,15 @@ epochnotes rent scan --program <address> --sample   # a program too large for on
 epochnotes rent scan --wallet <address>             # accounts of known programs that the wallet owns
 ```
 
+Getting it back:
+
+```bash
+epochnotes rent close --account <address>   # builds the unsigned transaction for the owner, and simulates it; sends nothing
+epochnotes rent template --account-type Position --authority-field owner   # an Anchor instruction for your own program
+```
+
+`rent close` has adapters for OpenBook v2 open-orders accounts and marginfi v2 accounts. It reads the owner out of the account, builds the close transaction with that owner as the only signer and as the destination, and asks the cluster what the transaction would do (`simulateTransaction`, signature checks off). It holds no keys and never sends. A program's IDL is not proof that an instruction runs: Drift's IDL lists `deleteUser` and `reclaimRent`, and the deployed program rejects both, which only the simulation showed. `rent template` prints `withdraw_excess`: authority-gated, with the minimum read from the cluster at run time. With the default names it is the file `programs/rent-example/src/withdraw_excess.rs`, which is tested on a local validator.
+
 The rates come from the registry entry, the rate in force from the Rent sysvar, the state of every step from its feature gate. For OpenBook v2, marginfi v2 and Drift the report says who can close each account type — its owner, a program admin, or nobody — as read from the program's on-chain IDL. `excessNow` counts only accounts whose balance is exactly an earlier minimum; everything else above the minimum is reported apart, as an upper bound that may be reserves. The figures are estimates of deposits, not a market size.
 
 ## What the signed log proves, and what it does not

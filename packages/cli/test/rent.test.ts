@@ -75,3 +75,31 @@ describe('epochnotes rent scan', () => {
     expect(result.stderr).toContain('is not named after a lamports_per_byte value');
   });
 });
+
+describe('epochnotes rent close / template', () => {
+  it('refuses a mistyped account before any request: exit 2', async () => {
+    const result = await run('rent', 'close', '--account', 'not-an-address', '--json');
+    expect(result.code).toBe(2);
+    expect((JSON.parse(result.stdout) as { error: string }).error).toContain('not a valid base58 public key');
+  });
+
+  it('exits 2 when the endpoint does not answer, and prints no transaction', async () => {
+    const result = await run('rent', 'close', '--account', program, '--rpc-url', nowhere, '--json');
+    expect(result.code).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Cannot plan the close'),
+    });
+    expect(result.stdout).not.toContain('"transaction"');
+  });
+
+  it('prints the template filled with the names given, and refuses names that are not Rust identifiers', async () => {
+    const filled = await run('rent', 'template', '--account-type', 'Position', '--authority-field', 'owner');
+    expect(filled.code).toBe(0);
+    expect(filled.stdout).toContain("pub account: Account<'info, Position>,");
+    expect(filled.stdout).toContain('Rent::get()?.minimum_balance(account.data_len())');
+    const refused = await run('rent', 'template', '--account-type', 'not a type');
+    expect(refused.code).toBe(2);
+    expect(refused.stderr).toContain('is not a Rust type name');
+  });
+});

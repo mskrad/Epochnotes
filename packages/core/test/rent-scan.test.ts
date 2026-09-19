@@ -62,12 +62,16 @@ describe('the table of known programs', () => {
     expect(anchorDiscriminator('User')).toBe('9f755fe3ef973aec');
   });
 
-  it('does not call Drift UserStats closable: deleteUser closes User only', () => {
+  it('calls no Drift account closable while the deployed program rejects its close instructions, and says why', () => {
     const drift = KNOWN_PROGRAMS.find((program) => program.name === 'Drift');
-    const byName = Object.fromEntries((drift?.types ?? []).map((type) => [type.name, type]));
-    expect(byName.UserStats).toMatchObject({ closableBy: 'nobody', ownerOffset: 8 });
-    expect(byName.UserStats?.closeInstruction).toBeUndefined();
-    expect(byName.User).toMatchObject({ closableBy: 'owner' });
+    expect(drift?.types.length).toBeGreaterThan(0);
+    expect(drift?.types.every((type) => type.closableBy === 'nobody')).toBe(true);
+    expect(drift?.note).toContain('InstructionFallbackNotFound');
+    // Still searchable by wallet: a person should see the deposit even though nobody can return it today.
+    expect(drift?.types.filter((type) => type.ownerOffset === 8).map((type) => type.name)).toEqual([
+      'User',
+      'UserStats',
+    ]);
   });
 
   it('names, for every program, the source tree its close constraints were read in', () => {

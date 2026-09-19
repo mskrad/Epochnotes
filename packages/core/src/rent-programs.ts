@@ -19,6 +19,8 @@ export interface KnownProgram {
   idl: { name: string; version: string; retrieved: string };
   /** The source tree in which the `close =` constraints were read. It may be ahead of the deployed program. */
   source: string;
+  /** Something a reader of the report must know about this program, shown with every scan of it. */
+  note?: string;
   types: AccountType[];
 }
 
@@ -89,34 +91,18 @@ export const KNOWN_PROGRAMS: KnownProgram[] = [
     name: 'Drift',
     idl: { name: 'drift', version: '2.150.0', retrieved: '2026-09-19' },
     source: 'github.com/drift-labs/protocol-v2 @ 13e8e9b8d614',
+    // The source declares close constraints (User and SignedMsgUserOrders to their authority, markets to the
+    // admin), and the on-chain IDL lists deleteUser and reclaimRent. But in this source tree the entry points of
+    // the program are commented out, and the deployed program answers InstructionFallbackNotFound to
+    // delete_user and reclaim_rent (simulated on mainnet-beta on the day below). What an IDL lists is not what
+    // a program runs: only a simulation tells.
+    note: 'As simulated on mainnet-beta on 2026-09-19, the deployed program rejects delete_user and reclaim_rent (InstructionFallbackNotFound): no account of this program can be closed today, whatever its IDL lists.',
     types: [
-      {
-        name: 'User',
-        closableBy: 'owner',
-        closeInstruction: 'deleteUser (signer: authority); reclaimRent returns the excess without closing',
-        ownerOffset: 8,
-      },
-      {
-        // deleteUser, forceDeleteUser and reclaimRent take user_stats as mutable, without a close constraint.
-        name: 'UserStats',
-        closableBy: 'nobody',
-        ownerOffset: 8,
-      },
-      {
-        name: 'SignedMsgUserOrders',
-        closableBy: 'owner',
-        closeInstruction: 'deleteSignedMsgUserOrders (signer: authority)',
-      },
-      {
-        name: 'SpotMarket',
-        closableBy: 'admin',
-        closeInstruction: 'deleteInitializedSpotMarket (signer: admin)',
-      },
-      {
-        name: 'PerpMarket',
-        closableBy: 'admin',
-        closeInstruction: 'deleteInitializedPerpMarket (signer: admin)',
-      },
+      { name: 'User', closableBy: 'nobody', ownerOffset: 8 },
+      { name: 'UserStats', closableBy: 'nobody', ownerOffset: 8 },
+      { name: 'SignedMsgUserOrders', closableBy: 'nobody' },
+      { name: 'SpotMarket', closableBy: 'nobody' },
+      { name: 'PerpMarket', closableBy: 'nobody' },
       { name: 'State', closableBy: 'nobody' },
     ],
   },

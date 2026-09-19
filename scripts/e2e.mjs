@@ -27,8 +27,11 @@ function step(name, args, expectedCode, check) {
   steps += 1;
   const result = spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' });
   const output = `${result.stdout}${result.stderr}`;
-  let problem =
-    result.status === expectedCode ? undefined : `exit ${result.status}, expected ${expectedCode}`;
+  let problem = (
+    Array.isArray(expectedCode) ? expectedCode.includes(result.status) : result.status === expectedCode
+  )
+    ? undefined
+    : `exit ${result.status}, expected ${expectedCode}`;
   if (problem === undefined && check !== undefined) {
     try {
       problem = check(output, result.stdout);
@@ -158,6 +161,25 @@ try {
         return report.gates.length >= 11 && report.gates.every((gate) => gate.address && gate.status?.state)
           ? undefined
           : 'gates are missing a status';
+      },
+    );
+    step(
+      'plans the close of a real OpenBook v2 account on mainnet and asks the cluster what it would do, sending nothing',
+      ['rent', 'close', '--account', '12uqkw7gJ4JAMQqKHQxMiF187Xj1taEUBb6icoiacYgG', '--json'],
+      // The account belongs to somebody else and may fill up or disappear: both outcomes of the simulation are
+      // accepted, as long as the program itself was reached and answered.
+      [0, 1],
+      (_all, stdout) => {
+        const report = JSON.parse(stdout);
+        if (report.ok === false)
+          return /no such account/.test(JSON.stringify(report))
+            ? undefined
+            : 'refused for another reason than a missing account';
+        if (typeof report.transaction !== 'string' || report.owner !== report.destination)
+          return 'no unsigned transaction for the owner';
+        return report.simulation.logs.some((line) => line.includes('Instruction: CloseOpenOrdersAccount'))
+          ? undefined
+          : 'the simulation did not reach the close instruction';
       },
     );
     step(

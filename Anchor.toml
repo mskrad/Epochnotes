@@ -8,6 +8,7 @@ skip-lint = false
 
 [programs.localnet]
 registry = "Diad4BcYWeB3Epgma7RZFNWspm5gpdtTLnwoj3UWEcdy"
+rent_example = "HFoLn9V9XRzMUEi6SnLSunsq7XS32tfwt2k8EoN8GuXq"
 
 [provider]
 cluster = "localnet"
@@ -15,3 +16,8 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "npx vitest run --config vitest.onchain.config.ts --reporter=verbose"
+
+# The example program is loaded at its declared address, so that no key of it has to exist anywhere.
+[[test.genesis]]
+address = "HFoLn9V9XRzMUEi6SnLSunsq7XS32tfwt2k8EoN8GuXq"
+program = "target/deploy/rent_example.so"

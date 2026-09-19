@@ -158,3 +158,11 @@ export {
   scanProgram,
   scanWallet,
 } from './rent-scan.js';
+export {
+  type ClosePlan,
+  type CloseRefusal,
+  planClose,
+  simulateClose,
+  type SimulationResult,
+} from './rent-close.js';
+export { type WithdrawExcessOptions, withdrawExcessTemplate } from './rent-template.js';

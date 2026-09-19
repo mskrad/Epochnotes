@@ -264,7 +264,7 @@ export async function scanProgram(program: string, options: ScanOptions): Promis
     standardError: 0n,
     buckets,
     total: sum('total', buckets),
-    notes: [splitNote(known), ...notes],
+    notes: [...(known?.note === undefined ? [] : [known.note]), splitNote(known), ...notes],
   };
 }
 
@@ -379,6 +379,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
             `UNRELIABLE: ${total.accounts === 0 ? 'the groups read hold no accounts' : 'the standard error is more than a quarter of the estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
           ]
         : []),
+      ...(known?.note === undefined ? [] : [known.note]),
       splitNote(known),
       'A sample can be good for the total and useless for a small account type: each bucket carries its own standard error, and a type that occurs in none of the groups read is missing from the report, not zero.',
       'The byte must be spread evenly over accounts (a byte of a stored key). A byte of a flag or a counter gives empty groups and a useless estimate: check that the standard error is small next to excessNow.',

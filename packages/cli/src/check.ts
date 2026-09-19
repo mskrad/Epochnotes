@@ -19,6 +19,9 @@ interface RepoOptions {
   json?: boolean;
 }
 
+const UNSIGNED =
+  'These rules were read from files that nobody signed. Pass --versions to take them from a verified version.';
+
 const LABEL = { breaks: 'BREAKS', check: 'CHECK ', 'likely-ok': 'OK?   ' } as const;
 
 function print(report: Extract<CheckReport, { ok: true }>): void {
@@ -58,8 +61,10 @@ export function checkCommand(): Command {
       let report: CheckReport;
       let provenance: Provenance | undefined;
       try {
-        if (options.versions === undefined) report = checkRepository(path, options.registry);
-        else {
+        if (options.versions === undefined) {
+          report = checkRepository(path, options.registry);
+          provenance = { verified: false, workingCopy: options.registry, warning: UNSIGNED };
+        } else {
           const reading = await readRegistry({
             log: {
               versionsDir: options.versions,
@@ -85,11 +90,13 @@ export function checkCommand(): Command {
         );
         return;
       }
-      if (options.json)
-        console.log(JSON.stringify(provenance === undefined ? report : { provenance, ...report }, null, 2));
+      if (options.json) console.log(JSON.stringify({ provenance, ...report }, null, 2));
       else {
-        if (provenance?.verified)
-          console.log(`rules from verified version ${provenance.version} of ${provenance.publisher}`);
+        console.log(
+          provenance?.verified
+            ? `rules from verified version ${provenance.version} of ${provenance.publisher}`
+            : `UNVERIFIED rules from the unsigned files in ${options.registry}; pass --versions to use a signed version`,
+        );
         print(report);
       }
       process.exitCode = report.findings.some((finding) => finding.confidence === 'breaks')

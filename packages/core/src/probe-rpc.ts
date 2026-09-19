@@ -22,7 +22,18 @@ export interface ProbeResult {
 export interface RpcProbeReport {
   endpoint: string;
   cluster: string;
+  /** How many probes actually saw the endpoint behave. Zero means nothing was learned: that is not a pass. */
+  observed: number;
   probes: ProbeResult[];
+}
+
+/** Transport errors quote the endpoint, credentials included: keep the reason, drop the URL. */
+function reason(error: unknown, rpcUrl: string): string {
+  const text = error instanceof Error ? error.message : String(error);
+  return text
+    .split(rpcUrl)
+    .join(redactUrl(rpcUrl))
+    .replace(/https?:\/\/[^\s'"]+/g, (url) => redactUrl(url));
 }
 
 type Rpc = (
@@ -59,10 +70,11 @@ export async function probeRpc(
   try {
     genesis = String((await rpc('getGenesisHash', [])).result);
   } catch (error) {
-    const explanation = `The endpoint did not answer: ${error instanceof Error ? error.message : String(error)}`;
+    const explanation = `The endpoint did not answer: ${reason(error, rpcUrl)}`;
     return {
       endpoint,
       cluster: 'unknown',
+      observed: 0,
       probes: [
         { entry: '-', rule: '-', fixture: '-', expect: '-', verdict: 'unreachable', explanation, calls: [] },
       ],
@@ -122,7 +134,7 @@ export async function probeRpc(
         probes.push({
           ...base,
           verdict: 'unreachable',
-          explanation: `The endpoint stopped answering: ${error instanceof Error ? error.message : String(error)}`,
+          explanation: `The endpoint stopped answering: ${reason(error, rpcUrl)}`,
           calls,
         });
         continue;
@@ -141,5 +153,8 @@ export async function probeRpc(
       });
     }
   }
-  return { endpoint, cluster, probes };
+  const observed = probes.filter(
+    (probe) => probe.verdict === 'reads' || probe.verdict === 'cannot-read',
+  ).length;
+  return { endpoint, cluster, observed, probes };
 }

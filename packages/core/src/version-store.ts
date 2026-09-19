@@ -144,6 +144,9 @@ export interface VerifyOptions {
  * and root it commits to, then the rule that only the whole log can show: a revoked id never returns.
  */
 export async function verifyLatestVersion(options: VerifyOptions): Promise<VerifiedVersion> {
+  // A path that does not exist is a mistake in the environment, not a log that failed verification.
+  if (!isUrl(options.versionsDir) && !existsSync(options.versionsDir))
+    throw new Error(`there is no version log at "${options.versionsDir}"`);
   const log = await verifyLog(await readRawLogFrom(options.versionsDir), options.trustedPublishers);
   if (!log.ok) return log;
   if (options.pin !== undefined) {

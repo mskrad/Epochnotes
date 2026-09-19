@@ -40,21 +40,25 @@ describe('the skill carries no facts about changes', () => {
       ).toEqual([]);
   });
 
-  it('repeats no identifier, address, package or number from the registry entries', () => {
+  it('repeats nothing the entries name: ids, subjects, titles, gates, packages, rules, code identifiers, numbers', () => {
     const report = validatePath(`${root}registry/entries`);
     const literals = new Set<string>();
     for (const { entry } of report.files) {
       if (entry === undefined) throw new Error('the registry must be valid for this test to mean anything');
-      literals.add(entry.id).add(entry.subject.name);
+      literals.add(entry.id).add(entry.subject.name).add(entry.subject.title);
       for (const gate of entry.applies.gates ?? []) literals.add(gate.address).add(gate.label);
       for (const range of entry.applies.versions ?? []) literals.add(range.name);
       for (const rule of entry.detect) literals.add(rule.rule);
-      for (const number of JSON.stringify(entry).match(/\d{3,}/g) ?? []) literals.add(number);
+      const everything = JSON.stringify(entry);
+      for (const number of everything.match(/\d{3,}/g) ?? []) literals.add(number);
+      // Code identifiers the entries quote: camelCase and snake_case names, scoped packages.
+      const identifiers = /\b[a-z]+(?:[A-Z][a-z0-9]+)+\b|\b[a-z]+(?:_[a-z0-9]+)+\b|@[\w-]+\/[\w.-]+/g;
+      for (const name of everything.match(identifiers) ?? []) literals.add(name);
     }
-    expect(literals.size).toBeGreaterThan(30);
+    expect(literals.size).toBeGreaterThan(60);
     for (const { file, text } of skill)
       expect(
-        [...literals].filter((literal) => text.includes(literal)),
+        [...literals].filter((literal) => text.toLowerCase().includes(literal.toLowerCase())),
         file,
       ).toEqual([]);
   });

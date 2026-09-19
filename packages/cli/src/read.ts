@@ -180,7 +180,9 @@ export function addRpcCheckCommand(check: Command): void {
         if (options.json) console.log(JSON.stringify({ provenance: reading.provenance, ...report }, null, 2));
         else {
           console.log(provenanceLine(reading));
-          console.log(`endpoint ${report.endpoint} serves ${report.cluster}`);
+          console.log(
+            `endpoint ${report.endpoint} serves ${report.cluster}; ${report.observed} probe(s) observed its behaviour`,
+          );
           for (const probe of report.probes) {
             console.log(
               `\n${probe.verdict}  ${probe.entry} ${probe.rule}\n  expects: ${probe.expect}\n  ${probe.explanation}`,

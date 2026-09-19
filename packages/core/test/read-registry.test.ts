@@ -80,6 +80,12 @@ describe('reading the registry for a consumer', () => {
     ).rejects.toThrow('cluster testnet did not answer: fetch failed');
   });
 
+  it('treats a log that is not there as a broken environment, not as a failed verification', async () => {
+    await expect(
+      readRegistry({ log: { versionsDir: join(dir, 'absent'), trustedPublishers: [publisher] } }),
+    ).rejects.toThrow('there is no version log at');
+  });
+
   it('labels unsigned files as unverified', async () => {
     const reading = await readRegistry({ workingCopy: entries });
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));

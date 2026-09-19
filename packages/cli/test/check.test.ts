@@ -16,7 +16,10 @@ describe('epochnotes check repo', () => {
     writeFileSync(join(broken, 'a.ts'), 'getTransaction(sig, { maxSupportedTransactionVersion: 0 });\n');
     const found = await run('check', 'repo', broken, '--registry', entries);
     expect(found.code).toBe(1);
-    expect(found.out).toMatch(/^BREAKS a\.ts:1 {2}\[tx-v1@1 rpc-max-version-zero\]/);
+    // The first line says the rules were unsigned files; the findings follow.
+    expect(found.out).toMatch(
+      /^UNVERIFIED rules from the unsigned files in [^\n]+\nBREAKS a\.ts:1 {2}\[tx-v1@1 rpc-max-version-zero\]/,
+    );
 
     const clean = join(dir, 'repo-clean');
     mkdirSync(clean);

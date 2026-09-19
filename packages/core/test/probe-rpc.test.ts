@@ -71,6 +71,25 @@ describe('probing an RPC endpoint', () => {
     expect(new Set(asked)).toEqual(new Set(['getGenesisHash', 'getTransaction']));
   });
 
+  it('keeps credentials out of the report when the transport quotes the endpoint in its error', async () => {
+    // The real transport: fetch refuses a URL with credentials and repeats it in the message.
+    const report = await probeRpc('http://user:hunter2@127.0.0.1:1/', entries);
+    expect(report.probes[0]?.verdict).toBe('unreachable');
+    expect(JSON.stringify(report)).not.toContain('hunter2');
+    const unparsable = await probeRpc('not a url hunter2', entries);
+    expect(unparsable.probes[0]?.verdict).toBe('unreachable');
+    expect(JSON.stringify(unparsable)).not.toContain('hunter2');
+  });
+
+  it('counts the probes that observed something, so that nothing observed does not read as a pass', async () => {
+    const live = endpoint(GENESIS['mainnet-beta'], refusesBelowOne);
+    expect((await probeRpc('https://rpc.example', entries, live.rpc)).observed).toBe(1);
+    const elsewhere = endpoint(GENESIS.devnet, refusesBelowOne);
+    expect((await probeRpc('https://rpc.example', entries, elsewhere.rpc)).observed).toBe(0);
+    const pruned = endpoint(GENESIS['mainnet-beta'], () => ({ result: null }));
+    expect((await probeRpc('https://rpc.example', entries, pruned.rpc)).observed).toBe(0);
+  });
+
   it('reports an endpoint that does not answer as unreachable', async () => {
     const report = await probeRpc('https://rpc.example', entries, () =>
       Promise.reject(new Error('fetch failed')),

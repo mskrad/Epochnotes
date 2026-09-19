@@ -100,6 +100,23 @@ describe('epochnotes registry read / check rpc', () => {
     });
   });
 
+  it('labels a repository check that used unsigned rules, in both output forms', async () => {
+    const repo = join(dir, 'repo');
+    const json = await run('check', 'repo', repo, '--registry', entries, '--json');
+    expect(json.code).toBe(1);
+    expect(JSON.parse(json.stdout)).toMatchObject({ provenance: { verified: false, workingCopy: entries } });
+    const prose = await run('check', 'repo', repo, '--registry', entries);
+    expect(prose.stdout).toMatch(/^UNVERIFIED rules from the unsigned files in /);
+  });
+
+  it('exits 2, not 1, when the log path does not exist or is empty', async () => {
+    for (const where of [join(dir, 'absent'), '']) {
+      const read = await run('registry', 'read', '--versions', where, '--publishers', publishers, '--json');
+      expect(read.code).toBe(2);
+      expect((JSON.parse(read.stdout) as { error: string }).error).toContain('there is no version log at');
+    }
+  });
+
   it('takes the log and the publishers from the environment when no option names them', async () => {
     vi.stubEnv('EPOCHNOTES_VERSIONS', versions);
     vi.stubEnv('EPOCHNOTES_PUBLISHERS', publishers);

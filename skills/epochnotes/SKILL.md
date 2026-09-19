@@ -72,6 +72,9 @@ epochnotes check repo <path> --versions <dir-or-url> --publishers <file> --json
 epochnotes check rpc --rpc-url <endpoint> --json
 ```
 
+In the probe report, `observed` counts the probes that actually saw the endpoint behave. Zero means nothing
+was learned about that endpoint, even though the command exits with success: report it as "cannot verify".
+
 ## 5. Hard limits
 
 - Read-only. Never send a transaction, never sign, never open or ask for a key file, never write to an

@@ -30,7 +30,7 @@ anything, and show it to the person: they will know what you missed.
 | Nothing available                                                   | **cannot verify** and why   | closed third-party service, no credentials, no fixture on that cluster              |
 
 The probe reports observations (`calls`) and quotes what the entry expects (`expect`). Compare them yourself
-and say what you concluded. A `fixture-missing` or `not-applicable` verdict means the behaviour was **not**
+and say what you concluded. The command exits with success even when `observed` is zero: read that field, not the exit code. A `fixture-missing` or `not-applicable` verdict means the behaviour was **not**
 observed; it is not a pass.
 
 For a third-party API that only the provider can fix, the useful output is the question to send them. Draft

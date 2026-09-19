@@ -115,6 +115,12 @@ describe('epochnotes registry read / check rpc', () => {
       expect(read.code).toBe(2);
       expect((JSON.parse(read.stdout) as { error: string }).error).toContain('there is no version log at');
     }
+    const verified = await run(
+      ...['registry', 'verify', 'tx-v1', '--versions', join(dir, 'absent')],
+      ...['--publishers', publishers, '--json'],
+    );
+    expect(verified.code).toBe(2);
+    expect((JSON.parse(verified.stdout) as { error: string }).error).toContain('there is no version log at');
   });
 
   it('takes the log and the publishers from the environment when no option names them', async () => {

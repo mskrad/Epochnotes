@@ -22,8 +22,12 @@ const factShapes: [string, RegExp][] = [
   ['a SIMD number', /SIMD-?\s?\d+/i],
   ['a slot, an error code or another long number', /\d{3,}/],
   ['an address', /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/],
+  ['a hexadecimal value', /\b0x[0-9a-f]+\b/i],
+  ['a month', /\b(january|february|march|april|june|july|august|september|october|november|december)\b/i],
 ];
 
+// What this cannot catch: a fact written as plain prose ("votes move off chain"). Shapes and the registry's own
+// vocabulary are checked here; prose is checked by reading the skill in review.
 describe('the skill carries no facts about changes', () => {
   it('has files to check', () => {
     expect(skill.map(({ file }) => file.slice(root.length)).sort()).toEqual([
@@ -54,6 +58,10 @@ describe('the skill carries no facts about changes', () => {
       // Code identifiers the entries quote: camelCase and snake_case names, scoped packages.
       const identifiers = /\b[a-z]+(?:[A-Z][a-z0-9]+)+\b|\b[a-z]+(?:_[a-z0-9]+)+\b|@[\w-]+\/[\w.-]+/g;
       for (const name of everything.match(identifiers) ?? []) literals.add(name);
+      // Type names (PascalCase with an inner capital) and package names without their scope.
+      for (const name of everything.match(/\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b/g) ?? []) literals.add(name);
+      for (const name of everything.match(/@[\w-]+\/[\w.-]+/g) ?? [])
+        literals.add(name.slice(name.indexOf('/') + 1));
     }
     expect(literals.size).toBeGreaterThan(60);
     for (const { file, text } of skill)

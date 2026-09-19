@@ -121,6 +121,11 @@ export interface SimulationResult {
   ok: boolean;
   /** The program's own error when the simulation failed. */
   error?: string;
+  /**
+   * Set when the cluster could not run the simulation at all: the transaction was not judged. The usual cause is
+   * an owner wallet that does not exist on chain or holds no lamports, so it cannot be the fee payer.
+   */
+  notSimulated?: string;
   logs: string[];
   /** Lamports of the destination and of the account, before and after, as the simulation reports them. */
   destination: { before: bigint; after: bigint | null };
@@ -202,7 +207,7 @@ export async function simulateClose(
 ): Promise<SimulationResult> {
   const rpc = rpcOf(rpcUrl, transport);
   const destination = address(plan.destination);
-  const before = await rpc.getBalance(destination).send();
+  const before = await rpc.getBalance(destination, { commitment: 'confirmed' }).send();
   const { context, value } = await rpc
     .simulateTransaction(plan.transaction as Parameters<typeof rpc.simulateTransaction>[0], {
       encoding: 'base64',
@@ -227,6 +232,12 @@ export async function simulateClose(
           error: JSON.stringify(value.err, (_key, item) =>
             typeof item === 'bigint' ? item.toString() : item,
           ),
+        }),
+    ...(ok || value.logs?.length
+      ? {}
+      : {
+          notSimulated:
+            'The cluster did not run the transaction. The fee payer is the owner: a wallet that does not exist on chain, holds no lamports or is not a system account cannot be simulated as one. This says nothing about whether the close would succeed.',
         }),
     logs: [...(value.logs ?? [])],
     destination: { before: before.value, after },

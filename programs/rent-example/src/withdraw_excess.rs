@@ -2,7 +2,12 @@
 //
 // The staged rent reduction lowers the minimum balance of every account and returns nothing by itself: an
 // account funded at an earlier, higher rate keeps the difference. This instruction lets the authority of the
-// account take that difference out, and nothing more.
+// account take that difference out.
+//
+// WARNING: it takes EVERYTHING the account holds above the rent-exempt minimum. Use it as it is only for
+// accounts whose lamports are a rent deposit and nothing else. If the account also keeps lamports that belong
+// to somebody (a vault, an escrow, collected fees), subtract what is owed before computing the excess, or this
+// instruction hands those lamports to the authority.
 
 use anchor_lang::prelude::*;
 

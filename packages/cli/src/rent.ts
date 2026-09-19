@@ -202,6 +202,8 @@ export function rentCommand(): Command {
       'Build, without signing, the transaction that returns the rent deposit of one account to its owner, and ask the cluster what it would do. Nothing is sent.',
     )
     .requiredOption('--account <address>', 'the account to close, or to reclaim the excess from')
+    // With both forms declared the default has to be spelled out, or neither flag means "do not simulate".
+    .option('--simulate', 'ask the cluster what the transaction would do (the default)', true)
     .option('--no-simulate', 'only build the transaction')
     .addOption(clusterOption('mainnet-beta'))
     .addOption(rpcUrlOption())
@@ -239,7 +241,8 @@ export function rentCommand(): Command {
           if (options.json)
             console.log(
               JSON.stringify(
-                { ...plan, ...(simulation === undefined ? {} : { simulation }) },
+                // One `ok` for the whole answer: a caller that reads only it must not see a failed simulation as success.
+                { ...plan, ok: simulation?.ok ?? true, ...(simulation === undefined ? {} : { simulation }) },
                 (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
                 2,
               ),
@@ -256,15 +259,25 @@ export function rentCommand(): Command {
               console.log(
                 simulation.ok
                   ? `simulation on ${simulation.endpoint} at slot ${simulation.slot}: would succeed, the owner would receive ${simulation.returned} lamports net of the fee`
-                  : `simulation on ${simulation.endpoint} at slot ${simulation.slot}: would FAIL — ${simulation.error}`,
+                  : simulation.notSimulated === undefined
+                    ? `simulation on ${simulation.endpoint} at slot ${simulation.slot}: would FAIL — ${simulation.error}`
+                    : `simulation on ${simulation.endpoint} at slot ${simulation.slot}: NOT RUN — ${simulation.error}. ${simulation.notSimulated}`,
               );
               for (const entry of simulation.logs) console.log(`  ${entry}`);
             }
-            console.log(
-              `\nunsigned transaction (base64; sign it in the owner's wallet — this tool holds no keys and sends nothing):\n${plan.transaction}`,
-            );
+            // A transaction the program would refuse is not offered for signing.
+            if (simulation === undefined || simulation.ok || simulation.notSimulated !== undefined)
+              console.log(
+                `\nunsigned transaction (base64; sign it in the owner's wallet — this tool holds no keys and sends nothing):\n${plan.transaction}`,
+              );
           }
-          process.exitCode = simulation !== undefined && !simulation.ok ? EXIT.findings : EXIT.ok;
+          // Refused by the program: a finding. Not run at all: the environment could not answer.
+          process.exitCode =
+            simulation === undefined || simulation.ok
+              ? EXIT.ok
+              : simulation.notSimulated === undefined
+                ? EXIT.findings
+                : EXIT.environment;
         } catch (error) {
           reportError(options.json, 'plan the close', error);
         }

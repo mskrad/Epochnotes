@@ -29,6 +29,11 @@ describe('withdraw_excess template', () => {
     expect(back).toBe(tested);
   });
 
+  it('warns, in the text a developer copies, that it takes everything above the minimum', () => {
+    expect(tested).toContain('WARNING: it takes EVERYTHING the account holds above the rent-exempt minimum');
+    expect(tested).not.toContain('and nothing more');
+  });
+
   it('asks the cluster for the minimum at run time and carries no rate', () => {
     expect(tested).toContain('Rent::get()?.minimum_balance(account.data_len())');
     expect(tested).not.toMatch(/\d{3,}/);
@@ -37,5 +42,11 @@ describe('withdraw_excess template', () => {
   it('refuses options that are not Rust identifiers: the text goes into a source file', () => {
     expect(() => withdrawExcessTemplate({ accountType: 'Vault>; evil' })).toThrow('is not a Rust type name');
     expect(() => withdrawExcessTemplate({ authorityField: 'Owner' })).toThrow('is not a Rust field name');
+    for (const options of [
+      { authorityField: 'account' },
+      { authorityField: 'type' },
+      { accountType: 'Self' },
+    ])
+      expect(() => withdrawExcessTemplate(options)).toThrow('Rust keyword or is used by the template itself');
   });
 });

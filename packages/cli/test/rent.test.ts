@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildProgram } from '../src/program.js';
 import { root, run } from './run.js';
 
 const entries = `${root}registry/entries`;
@@ -81,6 +82,16 @@ describe('epochnotes rent close / template', () => {
     const result = await run('rent', 'close', '--account', 'not-an-address', '--json');
     expect(result.code).toBe(2);
     expect((JSON.parse(result.stdout) as { error: string }).error).toContain('not a valid base58 public key');
+  });
+
+  it('simulates unless told not to: the option defaults to true although both of its forms are declared', () => {
+    const close = buildProgram()
+      .commands.find((command) => command.name() === 'rent')
+      ?.commands.find((command) => command.name() === 'close');
+    expect(close?.opts()).toMatchObject({ simulate: true });
+    expect(close?.options.map((option) => option.long)).toEqual(
+      expect.arrayContaining(['--simulate', '--no-simulate']),
+    );
   });
 
   it('exits 2 when the endpoint does not answer, and prints no transaction', async () => {

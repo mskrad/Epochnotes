@@ -195,4 +195,25 @@ describe('simulating it', () => {
     expect(result.error).toContain('6043');
     expect(result.logs.join(' ')).toContain('cannot be closed');
   });
+
+  it('tells a simulation the cluster did not run from a refusal by the program', async () => {
+    const { transport } = cluster(null, {
+      err: 'AccountNotFound',
+      logs: [],
+      accounts: null,
+      unitsConsumed: 0,
+    });
+    const result = await simulateClose('https://rpc.example', await planned(), transport);
+    expect(result).toMatchObject({ ok: false, returned: null });
+    expect(result.error).toContain('AccountNotFound');
+    expect(result.notSimulated).toContain('This says nothing about whether the close would succeed');
+    const refused = cluster(null, {
+      err: { InstructionError: [0, { Custom: 6043 }] },
+      logs: ['Program log: no'],
+      accounts: null,
+    });
+    expect(
+      (await simulateClose('https://rpc.example', await planned(), refused.transport)).notSimulated,
+    ).toBeUndefined();
+  });
 });

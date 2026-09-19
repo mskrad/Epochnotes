@@ -8,13 +8,16 @@ import {
 } from '@epochnotes/core';
 import { Command, Option } from 'commander';
 
-import { EXIT } from './cluster.js';
+import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
 import { addRpcCheckCommand } from './read.js';
 
 interface RepoOptions {
   registry: string;
   versions?: string;
+  onchain?: boolean;
+  cluster: string;
+  rpcUrl?: string;
   publishers: string;
   json?: boolean;
 }
@@ -56,10 +59,25 @@ export function checkCommand(): Command {
         .default('registry/publishers.json')
         .env('EPOCHNOTES_PUBLISHERS'),
     )
+    .option(
+      '--onchain',
+      'with --versions: also compare the log with the chain and skip entries revoked there',
+    )
+    .addOption(clusterOption('devnet'))
+    .addOption(rpcUrlOption())
     .option('--json', 'print the report as JSON')
     .action(async (path: string, options: RepoOptions) => {
       let report: CheckReport;
       let provenance: Provenance | undefined;
+      let revoked: { id: string; atVersion: number; address: string }[] = [];
+      if (options.onchain && options.versions === undefined) {
+        reportError(
+          options.json,
+          `check ${path}`,
+          new Error('--onchain needs --versions: unsigned files have no publisher to ask the chain about'),
+        );
+        return;
+      }
       try {
         if (options.versions === undefined) {
           report = checkRepository(path, options.registry);
@@ -70,9 +88,11 @@ export function checkCommand(): Command {
               versionsDir: options.versions,
               trustedPublishers: readTrustedPublishers(options.publishers),
             },
+            ...(options.onchain ? { onchain: clusterOf(options) } : {}),
           });
           if (!reading.ok) return reportIssues(options.json, reading.issues);
           provenance = reading.provenance;
+          revoked = reading.revoked;
           report = checkDirectory(
             path,
             reading.entries.map(({ entry }) => entry),
@@ -90,13 +110,17 @@ export function checkCommand(): Command {
         );
         return;
       }
-      if (options.json) console.log(JSON.stringify({ provenance, ...report }, null, 2));
+      if (options.json) console.log(JSON.stringify({ provenance, revoked, ...report }, null, 2));
       else {
         console.log(
           provenance?.verified
-            ? `rules from verified version ${provenance.version} of ${provenance.publisher}`
+            ? `rules from verified version ${provenance.version} of ${provenance.publisher}; ${provenance.revocations === 'checked' ? 'revocations checked' : 'revocations not checked (pass --onchain)'}`
             : `UNVERIFIED rules from the unsigned files in ${options.registry}; pass --versions to use a signed version`,
         );
+        for (const record of revoked)
+          console.log(
+            `${record.id}: REVOKED on chain by its publisher (at version ${record.atVersion}); its rules were not run`,
+          );
         print(report);
       }
       process.exitCode = report.findings.some((finding) => finding.confidence === 'breaks')

@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -290,5 +290,87 @@ describe('epochnotes registry anchor / verify --onchain', () => {
     expect(afterRevocation.code).toBe(1);
     expect(afterRevocation.out).toContain('revoked on chain by its publisher (at version 2)');
     expect((await verify()).code).toBe(0); // without the chain, nothing tells the client
+  });
+
+  // Runs after the revocation above: tx-v1 is withdrawn on chain, the other entries are not.
+  describe('a consumer after the revocation', () => {
+    const source = ['--versions', versions, '--publishers', publishers];
+    const chain = ['--onchain', '--cluster', 'localnet'];
+    const title = 'Transaction V1 Format';
+
+    it('is refused the revoked entry it asked for: exit 1, and not a word of the entry', async () => {
+      const read = await run('registry', 'read', 'tx-v1', ...source, ...chain, '--json');
+      expect(read.code).toBe(1);
+      const answer = JSON.parse(read.stdout) as { ok: boolean; issues: { message: string }[] };
+      expect(answer.ok).toBe(false);
+      expect(answer.issues[0]?.message).toContain('revoked on chain by its publisher (at version 2)');
+      expect(read.out).not.toContain(title);
+    });
+
+    it('gets the other entries, with the revoked one named apart and absent from the entries', async () => {
+      const read = await run('registry', 'read', ...source, ...chain, '--json');
+      expect(read.code).toBe(0);
+      const reading = JSON.parse(read.stdout) as {
+        provenance: { revocations: string };
+        entries: { entry: { id: string } }[];
+        revoked: { id: string; atVersion: number; address: string }[];
+      };
+      expect(reading.provenance.revocations).toBe('checked');
+      expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
+        'alpenglow',
+        'rent-simd-0437',
+        'slot-duration',
+      ]);
+      expect(reading.revoked).toEqual([{ id: 'tx-v1', atVersion: 2, address: expect.any(String) }]);
+      expect(read.out).not.toContain(title);
+
+      const prose = await run('registry', 'read', ...source, ...chain);
+      expect(prose.out).toContain('tx-v1: REVOKED on chain');
+      expect(prose.out).not.toContain(title);
+    });
+
+    it('shows the revoked entry only when asked to include it, and marks it', async () => {
+      const read = await run('registry', 'read', 'tx-v1', ...source, ...chain, '--include-revoked', '--json');
+      expect(read.code).toBe(0);
+      expect(JSON.parse(read.stdout)).toMatchObject({
+        entries: [{ entry: { id: 'tx-v1' }, revokedOnChain: true }],
+        revoked: [{ id: 'tx-v1' }],
+      });
+    });
+
+    it('says that revocations were not checked when the chain was not asked', async () => {
+      const read = await run('registry', 'read', 'tx-v1', ...source, '--json');
+      expect(read.code).toBe(0);
+      expect(JSON.parse(read.stdout)).toMatchObject({
+        provenance: { chain: 'not-checked', revocations: 'not-checked' },
+      });
+      expect((await run('registry', 'read', 'tx-v1', ...source)).out).toContain('revocations not checked');
+    });
+
+    it('does not run the rules of the revoked entry against a repository', async () => {
+      const repo = join(dir, 'repo');
+      mkdirSync(repo);
+      writeFileSync(join(repo, 'reader.ts'), 'getTransaction(sig, { maxSupportedTransactionVersion: 0 });\n');
+      const unchecked = await run('check', 'repo', repo, ...source, '--json');
+      expect(unchecked.code).toBe(1);
+      expect(JSON.parse(unchecked.stdout)).toMatchObject({ findings: [{ entry: 'tx-v1' }] });
+
+      const checked = await run('check', 'repo', repo, ...source, ...chain, '--json');
+      expect(checked.code).toBe(0);
+      expect(JSON.parse(checked.stdout)).toMatchObject({
+        provenance: { revocations: 'checked' },
+        findings: [],
+        revoked: [{ id: 'tx-v1' }],
+      });
+    });
+
+    it('does not probe an endpoint with the rules of the revoked entry', async () => {
+      const probe = await run(
+        ...['check', 'rpc', '--rpc-url', 'http://127.0.0.1:8899', ...source],
+        ...['--onchain', '--registry-cluster', 'localnet', '--json'],
+      );
+      expect(JSON.parse(probe.stdout)).toMatchObject({ probes: [], revoked: [{ id: 'tx-v1' }] });
+      expect(probe.code).toBe(0);
+    });
   });
 });

@@ -15,6 +15,30 @@ export function rpcUrlOf(options: { cluster: string; rpcUrl?: string }): string 
   return options.rpcUrl ?? CLUSTERS[options.cluster as keyof typeof CLUSTERS];
 }
 
+/**
+ * For commands whose own `--cluster` / `--rpc-url` mean something else (the endpoint being probed, the cluster
+ * being measured): where the registry program lives gets its own pair of options.
+ */
+export const registryClusterOption = () =>
+  new Option('--registry-cluster <name>', 'with --onchain: cluster of the registry program')
+    .choices(Object.keys(CLUSTERS))
+    .default('devnet');
+
+export const registryRpcUrlOption = () =>
+  new Option(
+    '--registry-rpc-url <url>',
+    'with --onchain: JSON-RPC endpoint of that cluster instead of the public one',
+  );
+
+export function registryClusterOf(options: {
+  registryCluster: string;
+  registryRpcUrl?: string;
+}): OnchainCluster {
+  return clusterFromRpcUrl(
+    options.registryRpcUrl ?? CLUSTERS[options.registryCluster as keyof typeof CLUSTERS],
+  );
+}
+
 export function clusterOf(options: { cluster: string; rpcUrl?: string }): OnchainCluster {
   return clusterFromRpcUrl(rpcUrlOf(options));
 }

@@ -35,6 +35,8 @@ epochnotes check repo <path> --versions <dir-or-url>    # detection rules taken 
 epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does this provider behave as the entry says
 ```
 
+A publisher withdraws an entry with a record on chain, which the signed log alone does not show. With `--onchain`, `registry read`, `check repo`, `check rpc` and `rent scan` leave withdrawn entries out, name them under `revoked`, and refuse an entry asked for by name (exit 1), in the same words as `registry verify`. Without it the output says that revocations were not checked.
+
 `--versions` and `--publishers` default to the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. `--working-copy <dir>` reads unsigned entry files, and the output says so.
 
 ## Rent held above the minimum

@@ -12,9 +12,17 @@ import {
 } from '@epochnotes/core';
 import { Command } from 'commander';
 
-import { clusterOption, EXIT, rpcUrlOf, rpcUrlOption } from './cluster.js';
+import {
+  clusterOption,
+  EXIT,
+  registryClusterOf,
+  registryClusterOption,
+  registryRpcUrlOption,
+  rpcUrlOf,
+  rpcUrlOption,
+} from './cluster.js';
 import { reportError, reportIssues } from './output.js';
-import { provenanceLine, sourceOf, type SourceOptions, withSource } from './read.js';
+import { type ChainOptions, provenanceLine, sourceOf, type SourceOptions, withSource } from './read.js';
 
 /** Lamports as SOL, rounded to three decimals. */
 const sol = (lamports: bigint): string => {
@@ -59,7 +67,7 @@ function print(report: RentScanReport): void {
   for (const note of report.notes) console.log(`note: ${note}`);
 }
 
-interface ScanCommandOptions extends SourceOptions {
+interface ScanCommandOptions extends SourceOptions, ChainOptions {
   program?: string;
   wallet?: string;
   entry: string;
@@ -97,6 +105,9 @@ export function rentCommand(): Command {
         '20260918',
       ),
   )
+    .option('--onchain', 'also compare the log with the chain and refuse a schedule entry revoked there')
+    .addOption(registryClusterOption())
+    .addOption(registryRpcUrlOption())
     .addOption(clusterOption('mainnet-beta'))
     .addOption(rpcUrlOption())
     .option('--json', 'print the report as JSON')
@@ -133,7 +144,11 @@ export function rentCommand(): Command {
       try {
         const source = sourceOf(options);
         if (source === undefined) return;
-        const reading = await readRegistry({ ...source, ids: [options.entry] });
+        const reading = await readRegistry({
+          ...source,
+          ids: [options.entry],
+          ...(options.onchain ? { onchain: registryClusterOf(options) } : {}),
+        });
         if (!reading.ok) return reportIssues(options.json, reading.issues);
         const entry = reading.entries[0]?.entry;
         if (entry === undefined) {

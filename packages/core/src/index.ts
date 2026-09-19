@@ -115,6 +115,8 @@ export {
 } from './onchain.js';
 export { type ProbeCall, type ProbeResult, probeRpc, type RpcProbeReport } from './probe-rpc.js';
 export {
+  type ChainSource,
+  chainSourceOf,
   type EntryReading,
   type GateReading,
   type Provenance,

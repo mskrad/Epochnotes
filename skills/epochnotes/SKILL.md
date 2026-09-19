@@ -26,20 +26,23 @@ epochnotes registry read --json --status <cluster>
   defaults do not exist, ask the person where their registry log is. Do not invent a URL.
 - `<cluster>` is the cluster the person's project runs on. If they did not say, ask, or use `mainnet-beta`
   and say that you assumed it.
-- Add `--onchain` when the person wants the log compared with the on-chain anchor, and `--pin <n:root>` when
-  they give you the version they saw last time.
+- Add `--onchain` whenever the answer will be relied on (a fix to ship, a decision to make), or the person
+  asks for the log to be compared with its on-chain anchor. Only the chain shows that a publisher withdrew an
+  entry or that the log was cut short. It needs network access to the cluster of the registry program.
+- Add `--pin <n:root>` when the person gives you the version they saw last time.
 - The registry is small: read all entries, then pick the ones whose `subject`, `breaks` and `detect` match
   the question. Match on symptoms too: an error text the person quotes may appear in a `breaks[].summary`.
 
 ## 2. Decide whether you may answer
 
-| What the command returned             | What you do                                                                                                                                                                                                                                                                                        |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| exit 0, `provenance.verified: true`   | Answer from the entries.                                                                                                                                                                                                                                                                           |
-| exit 0, `provenance.verified: false`  | Answer, but open with: the entries are an unsigned working copy, not a published version.                                                                                                                                                                                                          |
-| exit 1 with `unknownIds`, no `issues` | The version verified but has no entry with the id you asked for. Read all entries instead and match by content.                                                                                                                                                                                    |
-| exit 1 with `issues`                  | **Do not answer the question.** Say that the registry failed verification, quote the issues, and say what to do (fetch the log again, check the publishers file, compare with the chain). Do not fall back to memory: a registry that fails verification is exactly the case this tool exists for. |
-| exit 2 with `error`                   | The environment failed (network, path, usage). Say what failed. If only the status cluster was unreachable, you may rerun without `--status` and answer with "activation status: not read".                                                                                                        |
+| What the command returned                         | What you do                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| exit 0, `provenance.verified: true`               | Answer from the entries. Entries listed under `revoked` were withdrawn by the publisher: name them as withdrawn if the question touches them, never use their content. If `provenance.revocations` is `not-checked`, say that withdrawals were not checked.                                        |
+| exit 0, `provenance.verified: false`              | Answer, but open with: the entries are an unsigned working copy, not a published version.                                                                                                                                                                                                          |
+| exit 1 with `unknownIds`, no `issues`             | The version verified but has no entry with the id you asked for. Read all entries instead and match by content.                                                                                                                                                                                    |
+| exit 1 with an issue saying the entry was revoked | The registry verified, and the publisher withdrew this entry on chain. **Do not answer from it**, and do not rerun with `--include-revoked` to get its text. Say that the entry was withdrawn, quote the issue, and offer what the remaining entries say.                                          |
+| exit 1 with `issues`                              | **Do not answer the question.** Say that the registry failed verification, quote the issues, and say what to do (fetch the log again, check the publishers file, compare with the chain). Do not fall back to memory: a registry that fails verification is exactly the case this tool exists for. |
+| exit 2 with `error`                               | The environment failed (network, path, usage). Say what failed. If only the status cluster was unreachable, you may rerun without `--status` and answer with "activation status: not read".                                                                                                        |
 
 If no entry matches the question, say so: "the registry (version N) has no entry about this". You may then
 add what you know yourself, under a separate heading that says it is not from the registry and may be stale.

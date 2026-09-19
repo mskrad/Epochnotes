@@ -1,10 +1,18 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { type FeatureAccountSource, publishVersion, readRegistry } from '../src/index.js';
+import {
+  type ChainSource,
+  type FeatureAccountSource,
+  type Issue,
+  type OnchainRevocation,
+  publishVersion,
+  type ReadOptions,
+  readRegistry,
+} from '../src/index.js';
 import { writeTestKey } from './keys.js';
 
 const entries = new URL('../../../registry/entries', import.meta.url).pathname;
@@ -113,5 +121,117 @@ describe('reading the registry for a consumer', () => {
     expect(reading).not.toHaveProperty('entries');
     if (reading.ok) throw new Error('unreachable');
     expect(reading.issues.map((issue) => issue.message).join(' ')).toMatch(/hash|content/i);
+  });
+});
+
+describe('entries the publisher withdrew', () => {
+  const work = join(dir, 'withdrawn');
+  const log = join(work, 'versions');
+  const copy = join(work, 'entries');
+  const key = writeTestKey(join(dir, 'withdrawn-key.json'));
+  let signer = '';
+  const record = {
+    address: 'RevocationAccount1111111111111111111111111111',
+    entryId: 'tx-v1',
+    atVersion: 1n,
+  };
+  const chainWith = (revokedIds: string[], differences: Issue[] = []): ChainSource => ({
+    differences: async () => differences,
+    revocation: async (_publisher, entryId) =>
+      revokedIds.includes(entryId) ? ({ ...record, entryId } as OnchainRevocation) : undefined,
+  });
+  const publish = (revoke?: string[]) =>
+    publishVersion({
+      entriesDir: copy,
+      versionsDir: log,
+      keyFile: key,
+      uri: join(log, '{root}.jsonl'),
+      published: '2026-09-19',
+      ...(revoke === undefined ? {} : { revoke }),
+    });
+  const read = (extra: Partial<ReadOptions> = {}) =>
+    readRegistry({ log: { versionsDir: log, trustedPublishers: [signer] }, ...extra });
+
+  it('says that revocations were not checked when the chain was not asked', async () => {
+    cpSync(entries, copy, { recursive: true });
+    const published = await publish();
+    if (!published.ok) throw new Error(JSON.stringify(published.issues));
+    signer = published.manifest.publisher;
+    const reading = await read();
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    expect(reading.provenance).toMatchObject({ chain: 'not-checked', revocations: 'not-checked' });
+    expect(reading.revoked).toEqual([]);
+  });
+
+  it('leaves an entry revoked on chain out of the entries and names it apart', async () => {
+    const reading = await read({ chain: chainWith(['tx-v1']) });
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    expect(reading.provenance).toMatchObject({ chain: 'matches', revocations: 'checked' });
+    expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
+      'alpenglow',
+      'rent-simd-0437',
+      'slot-duration',
+    ]);
+    expect(reading.revoked).toEqual([{ id: 'tx-v1', atVersion: 1, address: record.address }]);
+    expect(JSON.stringify(reading)).not.toContain('Transaction V1 Format');
+  });
+
+  it('refuses a revoked entry asked for by name, in the words of verify, and returns no entry at all', async () => {
+    const reading = await read({ ids: ['tx-v1', 'alpenglow'], chain: chainWith(['tx-v1']) });
+    expect(reading).toEqual({
+      ok: false,
+      issues: [
+        {
+          path: 'tx-v1',
+          message: 'Entry was revoked on chain by its publisher (at version 1)',
+          hint: `Do not rely on this entry. The revocation account is ${record.address}.`,
+        },
+      ],
+    });
+  });
+
+  it('finds a revocation of an entry that was not asked for: what is built on the reading needs it', async () => {
+    const reading = await read({ ids: ['alpenglow'], chain: chainWith(['tx-v1']) });
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    expect(reading.entries.map(({ entry }) => entry.id)).toEqual(['alpenglow']);
+    expect(reading.revoked.map(({ id }) => id)).toEqual(['tx-v1']);
+  });
+
+  it('returns a revoked entry only when told to include it, and marks it', async () => {
+    const reading = await read({ ids: ['tx-v1'], chain: chainWith(['tx-v1']), includeRevoked: true });
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    expect(reading.entries).toHaveLength(1);
+    expect(reading.entries[0]).toMatchObject({ entry: { id: 'tx-v1' }, revokedOnChain: true });
+    const others = await read({ chain: chainWith(['tx-v1']), includeRevoked: true });
+    if (!others.ok) throw new Error(JSON.stringify(others.issues));
+    expect(others.entries.filter((item) => item.revokedOnChain).map(({ entry }) => entry.id)).toEqual([
+      'tx-v1',
+    ]);
+  });
+
+  it('returns nothing when the log disagrees with the chain, and fails when the chain does not answer', async () => {
+    const difference = { path: 'log', message: 'rolled back or truncated', hint: 'x' };
+    expect(await read({ chain: chainWith([], [difference]) })).toEqual({ ok: false, issues: [difference] });
+    const down: ChainSource = {
+      differences: async () => [],
+      revocation: () => Promise.reject(new Error('fetch failed')),
+    };
+    await expect(read({ chain: down })).rejects.toThrow('fetch failed');
+  });
+
+  it('never returns an entry withdrawn in the signed log itself', async () => {
+    rmSync(join(copy, 'rent-simd-0437.yaml'));
+    const second = await publish(['rent-simd-0437']);
+    if (!second.ok) throw new Error(JSON.stringify(second.issues));
+    expect(second.manifest.revoked).toContain('rent-simd-0437');
+    const reading = await read();
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    expect(reading.provenance).toMatchObject({ version: 2 });
+    expect(reading.entries.map(({ entry }) => entry.id)).toEqual(['alpenglow', 'slot-duration', 'tx-v1']);
+    expect(await read({ ids: ['rent-simd-0437'] })).toMatchObject({
+      ok: true,
+      entries: [],
+      unknownIds: ['rent-simd-0437'],
+    });
   });
 });

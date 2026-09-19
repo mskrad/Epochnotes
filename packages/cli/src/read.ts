@@ -10,8 +10,23 @@ import {
 } from '@epochnotes/core';
 import { type Command, Option } from 'commander';
 
-import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
+import {
+  clusterOf,
+  clusterOption,
+  EXIT,
+  registryClusterOf,
+  registryClusterOption,
+  registryRpcUrlOption,
+  rpcUrlOption,
+} from './cluster.js';
 import { reportError, reportIssues } from './output.js';
+
+/** Options of commands that can ask the registry program, and keep `--cluster` / `--rpc-url` for something else. */
+export interface ChainOptions {
+  onchain?: boolean;
+  registryCluster: string;
+  registryRpcUrl?: string;
+}
 
 export interface SourceOptions {
   versions: string;
@@ -70,8 +85,19 @@ export function sourceOf(options: SourceOptions): Pick<ReadOptions, 'log' | 'wor
 export function provenanceLine(reading: Extract<RegistryReading, { ok: true }>): string {
   const from = reading.provenance;
   if (!from.verified) return `UNVERIFIED working copy ${from.workingCopy}: ${from.warning}`;
-  const chain = from.chain === 'matches' ? 'log matches the chain' : 'chain not checked';
+  const chain =
+    from.chain === 'matches'
+      ? 'log matches the chain, revocations checked'
+      : 'chain and revocations not checked (pass --onchain): a withdrawn entry may be among these';
   return `verified: version ${from.version} of ${from.publisher}, root ${from.merkleRoot}, published ${from.published}; ${chain}`;
+}
+
+/** Entries the publisher withdrew on chain: named, never shown. */
+export function printRevoked(reading: Extract<RegistryReading, { ok: true }>): void {
+  for (const record of reading.revoked)
+    console.log(
+      `${record.id}: REVOKED on chain by its publisher (at version ${record.atVersion}); not used. Revocation account ${record.address}`,
+    );
 }
 
 export function addReadCommand(registry: Command): void {
@@ -83,7 +109,8 @@ export function addReadCommand(registry: Command): void {
       )
       .argument('[entry-id...]', 'ids to print; all entries when omitted'),
   )
-    .option('--onchain', 'also compare the log with the chain and look up revocations')
+    .option('--onchain', 'also compare the log with the chain and leave out entries revoked there')
+    .option('--include-revoked', 'with --onchain: print revoked entries too, marked; for diagnostics only')
     .addOption(clusterOption('devnet'))
     .addOption(rpcUrlOption())
     .addOption(
@@ -98,6 +125,7 @@ export function addReadCommand(registry: Command): void {
         ids: string[],
         options: SourceOptions & {
           onchain?: boolean;
+          includeRevoked?: boolean;
           cluster: string;
           rpcUrl?: string;
           status?: string;
@@ -112,6 +140,7 @@ export function addReadCommand(registry: Command): void {
             ...source,
             ids,
             ...(options.onchain ? { onchain: clusterOf(options) } : {}),
+            ...(options.includeRevoked ? { includeRevoked: true } : {}),
             ...(options.status === undefined
               ? {}
               : {
@@ -143,13 +172,15 @@ export function addReadCommand(registry: Command): void {
             console.log(`status read from ${reading.network.cluster} at slot ${reading.network.slot}`);
           for (const { entry, gates, revokedOnChain } of reading.entries) {
             console.log(`\n${entry.id}@${entry.rev}  ${entry.subject.name}: ${entry.subject.title}`);
-            if (revokedOnChain) console.log('  REVOKED on chain by the publisher');
+            if (revokedOnChain) console.log('  REVOKED on chain by its publisher: do not rely on this entry');
             for (const gate of gates ?? [])
               console.log(
                 `  gate ${gate.label}: ${gate.status.state}${gate.status.state === 'active' ? ` since slot ${gate.status.activatedAt}` : ''}`,
               );
             for (const item of entry.breaks) console.log(`  breaks ${item.surface}: ${item.summary}`);
           }
+          if (reading.revoked.length > 0) console.log('');
+          printRevoked(reading);
           for (const id of reading.unknownIds) console.log(`\n${id}: no such entry in this version`);
         }
         process.exitCode = reading.unknownIds.length > 0 ? EXIT.findings : EXIT.ok;
@@ -166,20 +197,30 @@ export function addRpcCheckCommand(check: Command): void {
       )
       .requiredOption('--rpc-url <url>', 'the JSON-RPC endpoint to probe'),
   )
+    .option('--onchain', 'also compare the log with the chain and leave out entries revoked there')
+    .addOption(registryClusterOption())
+    .addOption(registryRpcUrlOption())
     .option('--json', 'print the report as JSON')
-    .action(async (options: SourceOptions & { rpcUrl: string }) => {
+    .action(async (options: SourceOptions & ChainOptions & { rpcUrl: string }) => {
       try {
         const source = sourceOf(options);
         if (source === undefined) return;
-        const reading = await readRegistry(source);
+        const reading = await readRegistry({
+          ...source,
+          ...(options.onchain ? { onchain: registryClusterOf(options) } : {}),
+        });
         if (!reading.ok) return reportIssues(options.json, reading.issues);
         const report = await probeRpc(
           options.rpcUrl,
           reading.entries.map(({ entry }) => entry),
         );
-        if (options.json) console.log(JSON.stringify({ provenance: reading.provenance, ...report }, null, 2));
+        if (options.json)
+          console.log(
+            JSON.stringify({ provenance: reading.provenance, revoked: reading.revoked, ...report }, null, 2),
+          );
         else {
           console.log(provenanceLine(reading));
+          printRevoked(reading);
           console.log(
             `endpoint ${report.endpoint} serves ${report.cluster}; ${report.observed} probe(s) observed its behaviour`,
           );

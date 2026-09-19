@@ -87,6 +87,13 @@ export interface ReadOptions {
 export async function readRegistry(options: ReadOptions): Promise<RegistryReading> {
   const chainSource =
     options.chain ?? (options.onchain === undefined ? undefined : chainSourceOf(options.onchain));
+  // Asking for the chain and not getting it must never pass in silence.
+  if (chainSource !== undefined && options.log === undefined)
+    throw new Error(
+      'unsigned files have no publisher to ask the chain about: --onchain needs the signed log',
+    );
+  if (options.includeRevoked && chainSource === undefined)
+    throw new Error('revocations are known only from the chain: --include-revoked needs --onchain');
   let entries: Entry[];
   let provenance: Provenance;
   if (options.log !== undefined) {
@@ -160,7 +167,12 @@ export async function readRegistry(options: ReadOptions): Promise<RegistryReadin
           path: record.id,
           message: `Entry was revoked on chain by its publisher (at version ${record.atVersion})`,
           hint: `Do not rely on this entry. The revocation account is ${record.address}.`,
-        })),
+        }))
+        .concat(
+          asked
+            .filter((id) => !entries.some((entry) => entry.id === id))
+            .map((id) => ({ path: id, message: 'No such entry in this version', hint: 'Check the id.' })),
+        ),
     };
   }
 

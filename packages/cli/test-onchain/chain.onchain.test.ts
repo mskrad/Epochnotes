@@ -364,6 +364,31 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       });
     });
 
+    it('refuses to measure rent with a revoked entry as the schedule, before any request to the measured cluster', async () => {
+      const scan = await run(
+        ...['rent', 'scan', '--program', 'opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb', '--entry', 'tx-v1'],
+        ...[
+          ...source,
+          '--onchain',
+          '--registry-cluster',
+          'localnet',
+          '--rpc-url',
+          'http://127.0.0.1:1',
+          '--json',
+        ],
+      );
+      expect(scan.code).toBe(1);
+      const answer = JSON.parse(scan.stdout) as { ok: boolean; issues: { message: string }[] };
+      expect(answer.ok).toBe(false);
+      expect(answer.issues[0]?.message).toContain('revoked on chain by its publisher');
+    });
+
+    it('does not contradict itself when asked to include the revoked entry', async () => {
+      const prose = await run('registry', 'read', 'tx-v1', ...source, ...chain, '--include-revoked');
+      expect(prose.out).toContain('shown above because you asked to include it');
+      expect(prose.out).not.toContain('not used');
+    });
+
     it('does not probe an endpoint with the rules of the revoked entry', async () => {
       const probe = await run(
         ...['check', 'rpc', '--rpc-url', 'http://127.0.0.1:8899', ...source],

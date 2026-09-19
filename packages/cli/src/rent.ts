@@ -22,7 +22,14 @@ import {
   rpcUrlOption,
 } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
-import { type ChainOptions, provenanceLine, sourceOf, type SourceOptions, withSource } from './read.js';
+import {
+  type ChainOptions,
+  printRevoked,
+  provenanceLine,
+  sourceOf,
+  type SourceOptions,
+  withSource,
+} from './read.js';
 
 /** Lamports as SOL, rounded to three decimals. */
 const sol = (lamports: bigint): string => {
@@ -171,13 +178,14 @@ export function rentCommand(): Command {
         if (options.json)
           console.log(
             JSON.stringify(
-              { provenance: reading.provenance, ...report },
+              { provenance: reading.provenance, revoked: reading.revoked, ...report },
               (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
               2,
             ),
           );
         else {
           console.log(provenanceLine(reading));
+          printRevoked(reading);
           print(report);
         }
         process.exitCode = EXIT.ok;

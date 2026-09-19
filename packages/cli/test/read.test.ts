@@ -73,6 +73,27 @@ describe('epochnotes registry read / check rpc', () => {
     expect(answer.error).toContain('cluster localnet did not answer');
   });
 
+  it('treats a request for the chain that cannot be honoured as a usage error, exit 2, for every consumer command', async () => {
+    const program = 'opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb';
+    const cases: [string[], string][] = [
+      [['registry', 'read', '--working-copy', entries, '--onchain'], '--onchain needs the signed log'],
+      [
+        ['check', 'rpc', '--rpc-url', nowhere, '--working-copy', entries, '--onchain'],
+        '--onchain needs the signed log',
+      ],
+      [
+        ['rent', 'scan', '--program', program, '--working-copy', entries, '--onchain'],
+        '--onchain needs the signed log',
+      ],
+      [['registry', 'read', ...source, '--include-revoked'], '--include-revoked needs --onchain'],
+    ];
+    for (const [args, reason] of cases) {
+      const result = await run(...args, '--json');
+      expect(result.code, args.join(' ')).toBe(2);
+      expect((JSON.parse(result.stdout) as { error: string }).error).toContain(reason);
+    }
+  });
+
   it('exits 2 when the probed endpoint does not answer', async () => {
     const probe = await run('check', 'rpc', '--rpc-url', nowhere, ...source, '--json');
     expect(probe.code).toBe(2);

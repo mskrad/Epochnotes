@@ -42,6 +42,7 @@ epochnotes registry read --json --status <cluster>
 | exit 1 with `unknownIds`, no `issues`             | The version verified but has no entry with the id you asked for. Read all entries instead and match by content.                                                                                                                                                                                    |
 | exit 1 with an issue saying the entry was revoked | The registry verified, and the publisher withdrew this entry on chain. **Do not answer from it**, and do not rerun with `--include-revoked` to get its text. Say that the entry was withdrawn, quote the issue, and offer what the remaining entries say.                                          |
 | exit 1 with `issues`                              | **Do not answer the question.** Say that the registry failed verification, quote the issues, and say what to do (fetch the log again, check the publishers file, compare with the chain). Do not fall back to memory: a registry that fails verification is exactly the case this tool exists for. |
+| any entry carrying `revokedOnChain: true`         | Someone passed `--include-revoked`. You never pass it. Treat such an entry as absent: do not answer from it.                                                                                                                                                                                       |
 | exit 2 with `error`                               | The environment failed (network, path, usage). Say what failed. If only the status cluster was unreachable, you may rerun without `--status` and answer with "activation status: not read".                                                                                                        |
 
 If no entry matches the question, say so: "the registry (version N) has no entry about this". You may then
@@ -74,6 +75,13 @@ the strongest read-only method available, and label every conclusion with how it
 epochnotes check repo <path> --versions <dir-or-url> --publishers <file> --json
 epochnotes check rpc --rpc-url <endpoint> --json
 ```
+
+These commands take the same `--onchain` as the read. With it, the rules of entries the publisher withdrew
+are not run, and the report names those entries under `revoked`. Without it, `provenance.revocations` is
+`not-checked`: say so in the report, because a withdrawn rule may have produced a finding. The registry
+program lives on one cluster, which is not necessarily the cluster the project runs on: `registry read` and
+`check repo` take it as `--cluster`, while `check rpc` and `rent scan` take it as `--registry-cluster`. Ask
+the person which cluster their registry is anchored on if the CLI default does not answer.
 
 In the probe report, `observed` counts the probes that actually saw the endpoint behave. Zero means nothing
 was learned about that endpoint, even though the command exits with success: report it as "cannot verify".

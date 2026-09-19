@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   type ChainSource,
+  checkDirectory,
   type FeatureAccountSource,
   type Issue,
   type OnchainRevocation,
@@ -209,9 +210,46 @@ describe('entries the publisher withdrew', () => {
     ]);
   });
 
-  it('returns nothing when the log disagrees with the chain, and fails when the chain does not answer', async () => {
+  it('filters by entry, not wholesale: with another entry revoked, the rules of tx-v1 still run', async () => {
+    const reading = await read({ chain: chainWith(['alpenglow']) });
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    const repo = join(work, 'repo');
+    mkdirSync(repo);
+    writeFileSync(join(repo, 'reader.ts'), 'getTransaction(sig, { maxSupportedTransactionVersion: 0 });\n');
+    const usable = reading.entries.map(({ entry }) => entry);
+    expect(checkDirectory(repo, usable).findings.map((finding) => finding.entry)).toEqual(['tx-v1']);
+    const withdrawn = await read({ chain: chainWith(['tx-v1']) });
+    if (!withdrawn.ok) throw new Error(JSON.stringify(withdrawn.issues));
+    expect(
+      checkDirectory(
+        repo,
+        withdrawn.entries.map(({ entry }) => entry),
+      ).findings,
+    ).toEqual([]);
+  });
+
+  it('names an unknown id too when it refuses a revoked one', async () => {
+    const reading = await read({ ids: ['tx-v1', 'no-such'], chain: chainWith(['tx-v1']) });
+    if (reading.ok) throw new Error('must be refused');
+    expect(reading.issues.map((issue) => `${issue.path}: ${issue.message}`)).toEqual([
+      'tx-v1: Entry was revoked on chain by its publisher (at version 1)',
+      'no-such: No such entry in this version',
+    ]);
+  });
+
+  it('never lets a request for the chain pass in silence', async () => {
+    await expect(readRegistry({ workingCopy: entries, chain: chainWith([]) })).rejects.toThrow(
+      '--onchain needs the signed log',
+    );
+    await expect(read({ includeRevoked: true })).rejects.toThrow('--include-revoked needs --onchain');
+  });
+
+  it('returns nothing when the log disagrees with the chain', async () => {
     const difference = { path: 'log', message: 'rolled back or truncated', hint: 'x' };
     expect(await read({ chain: chainWith([], [difference]) })).toEqual({ ok: false, issues: [difference] });
+  });
+
+  it('fails, rather than treat the entry as not revoked, when the chain does not answer', async () => {
     const down: ChainSource = {
       differences: async () => [],
       revocation: () => Promise.reject(new Error('fetch failed')),

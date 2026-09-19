@@ -94,10 +94,12 @@ export function provenanceLine(reading: Extract<RegistryReading, { ok: true }>):
 
 /** Entries the publisher withdrew on chain: named, never shown. */
 export function printRevoked(reading: Extract<RegistryReading, { ok: true }>): void {
-  for (const record of reading.revoked)
+  for (const record of reading.revoked) {
+    const shown = reading.entries.some(({ entry }) => entry.id === record.id);
     console.log(
-      `${record.id}: REVOKED on chain by its publisher (at version ${record.atVersion}); not used. Revocation account ${record.address}`,
+      `${record.id}: REVOKED on chain by its publisher (at version ${record.atVersion}); ${shown ? 'shown above because you asked to include it' : 'not used'}. Revocation account ${record.address}`,
     );
+  }
 }
 
 export function addReadCommand(registry: Command): void {

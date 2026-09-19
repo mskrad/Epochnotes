@@ -17,7 +17,11 @@ describe('exit codes', () => {
     ['a missing required option', ['registry', 'publish']],
     ['a value outside the choices', ['registry', 'anchor', '--key', 'k', '--cluster', 'moonnet']],
   ])('%s is a usage error: 2, never the 1 that means findings', async (_what, args) => {
-    expect((await run(...args)).code).toBe(2);
+    const result = await run(...args);
+    expect(result.code).toBe(2);
+    // 2 is also what a crash gives, so the reason has to be the usage error itself
+    expect(result.stderr).toMatch(/^error: /m);
+    expect(result.stderr).not.toContain('failed unexpectedly');
   });
 
   it('--help and --version end with 0', async () => {
@@ -38,10 +42,13 @@ describe('exit codes', () => {
     const { main } = await import('../src/main.js');
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(await main(['node', 'epochnotes'])).toBe(2);
-    expect(errors.mock.calls.join(' ')).toContain('failed unexpectedly: boom');
-    vi.doUnmock('../src/program.js');
-    vi.restoreAllMocks();
-    vi.resetModules();
+    try {
+      expect(errors.mock.calls.join(' ')).toContain('failed unexpectedly: boom');
+    } finally {
+      vi.doUnmock('../src/program.js');
+      vi.restoreAllMocks();
+      vi.resetModules();
+    }
   });
 
   it('offers the same clusters to every command that takes one', async () => {
@@ -97,6 +104,27 @@ describe('--json', () => {
     expect(unreachable.code).toBe(2);
     expect(JSON.parse(unreachable.stdout)).toMatchObject({ ok: false, kind: 'network' });
     expect(unreachable.stderr).toBe('');
+  });
+
+  it('answers in JSON for a usage error and for a refused confirmation too, always with ok: false', async () => {
+    const usage = await run('registry', 'verify', '--json');
+    expect(usage.code).toBe(2);
+    expect(JSON.parse(usage.stdout)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Usage error'),
+    });
+
+    const unconfirmed = await run('registry', 'revoke', '--key', 'k.json', '--entry', 'tx-v1', '--json');
+    expect(unconfirmed.code).toBe(2);
+    expect(JSON.parse(unconfirmed.stdout)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('--yes'),
+    });
+    expect(unconfirmed.stderr).toBe('');
+
+    const badPin = await run('registry', 'verify', 'tx-v1', '--pin', 'latest', '--json');
+    expect(badPin.code).toBe(2);
+    expect(JSON.parse(badPin.stdout)).toMatchObject({ ok: false, error: expect.stringContaining('--pin') });
   });
 
   it('keeps prose failures on stderr when --json is not asked for', async () => {

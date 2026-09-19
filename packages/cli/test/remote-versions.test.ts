@@ -40,7 +40,12 @@ describe('epochnotes registry verify --versions <url>', () => {
     expect(failing.code).toBe(2);
     expect(failing.stderr).toContain('HTTP 500');
 
-    const nobody = await verify('http://127.0.0.1:9');
+    // a port that was open a moment ago and is closed now: a real refused connection
+    const closed = createServer();
+    await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
+    const gone = `http://127.0.0.1:${(closed.address() as AddressInfo).port}`;
+    await new Promise((resolve) => closed.close(resolve));
+    const nobody = await verify(gone);
     expect(nobody.code).toBe(2);
     expect(nobody.stderr).toContain('Cannot verify');
   });
@@ -61,7 +66,14 @@ describe('epochnotes registry verify --versions <url>', () => {
     expect(requests).toEqual(['/1.json']);
   });
 
-  it('gives up on a manifest that is too large without reading all of it', async () => {
+  it('stops just the same when every path answers with JSON that is not a manifest', async () => {
+    requests = [];
+    answer = () => ({ status: 200, body: '{}' });
+    expect((await verify(base)).code).toBe(1);
+    expect(requests).toEqual(['/1.json']);
+  });
+
+  it('gives up on a manifest that is too large', async () => {
     requests = [];
     answer = () => ({ status: 200, body: `{"padding":"${'x'.repeat(200_000)}"}` });
     expect((await verify(base)).code).toBe(1);

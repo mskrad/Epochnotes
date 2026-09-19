@@ -9,7 +9,11 @@ export interface Problem {
 }
 
 /**
- * With `--json` every outcome is one JSON document on stdout — success, findings and failures alike — so a
+ * With `--json` stdout carries exactly one JSON document, whatever happened. A failure always has `ok: false`,
+ * plus `issues` (findings, exit 1), or `error` (environment or usage, exit 2), or the command's own report
+ * (`status` with `kind`, `validate` with `files`). Commander also writes usage errors to stderr as prose.
+ *
+ * In short: with `--json` every outcome is one JSON document on stdout — success, findings and failures alike — so a
  * caller never has to parse prose. Without it, results go to stdout and problems to stderr.
  */
 export function reportIssues(json: boolean | undefined, issues: Problem[]): void {

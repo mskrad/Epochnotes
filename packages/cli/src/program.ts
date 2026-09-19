@@ -10,7 +10,7 @@ import { statusCommand } from './status.js';
 /** The version lives in package.json only. */
 export const CLI_VERSION = (createRequire(import.meta.url)('../package.json') as { version: string }).version;
 
-/** Usage errors must not end the process with 1: that code means "findings". The caller decides (see bin.ts). */
+/** Usage errors must not end the process with 1: that code means "findings". The caller decides (see main.ts). */
 function throwOnUsageErrors(command: Command): Command {
   command.exitOverride();
   command.commands.forEach(throwOnUsageErrors);

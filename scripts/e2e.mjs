@@ -110,8 +110,13 @@ try {
   }
   step('finds the break in code before the fix', ['check', 'repo', broken], 1, has('reader.ts:1'));
   step('is silent on code after the fix', ['check', 'repo', fixed], 0, has('0 finding(s)'));
-  step('treats a usage error as 2, not as findings', ['registry', 'verify'], 2);
-  step('treats an unreadable path as 2', ['check', 'repo', join(work, 'absent')], 2);
+  step(
+    'treats a usage error as 2, not as findings',
+    ['registry', 'verify'],
+    2,
+    has("missing required argument 'entry-id'"),
+  );
+  step('treats an unreadable path as 2', ['check', 'repo', join(work, 'absent')], 2, has('Cannot check'));
 
   if (process.env.E2E_OFFLINE === '1')
     console.log('SKIP     status on devnet (E2E_OFFLINE=1): this run does not cover the network step');

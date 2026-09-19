@@ -9,11 +9,11 @@ import {
   createSolanaRpcSubscriptions,
   lamports,
 } from '@solana/kit';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { loadPublisherKey } from '../../core/src/index.js';
 import { sharedTestAdminKey, writeTestKey } from '../../core/test/keys.js';
-import { buildProgram } from '../src/program.js';
+import { run } from '../test/run.js';
 
 const root = new URL('../../../', import.meta.url).pathname;
 const dir = mkdtempSync(join(tmpdir(), 'epochnotes-chain-'));
@@ -24,18 +24,6 @@ const publishers = join(dir, 'publishers.json');
 const adminKey = sharedTestAdminKey();
 const publisherKey = writeTestKey(join(dir, 'publisher.json'));
 let publisher: string;
-
-async function run(...args: string[]): Promise<{ code: number; out: string; stdout: string }> {
-  const lines: string[] = [];
-  const stdout: string[] = [];
-  vi.spyOn(console, 'log').mockImplementation((line: string) => void (lines.push(line), stdout.push(line)));
-  vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line));
-  process.exitCode = undefined;
-  await buildProgram().parseAsync(['node', 'epochnotes', ...args]);
-  const code = Number(process.exitCode ?? 0);
-  process.exitCode = undefined;
-  return { code, out: lines.join('\n'), stdout: stdout.join('\n') };
-}
 
 beforeAll(async () => {
   cpSync(`${root}registry/entries`, entries, { recursive: true });
@@ -54,7 +42,6 @@ beforeAll(async () => {
     await airdrop({ recipientAddress, lamports: lamports(2_000_000_000n), commitment: 'confirmed' });
   }
 });
-afterEach(() => vi.restoreAllMocks());
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 const publish = () =>

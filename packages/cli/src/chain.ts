@@ -60,10 +60,8 @@ export function addChainCommands(registry: Command): void {
     .option('--yes', 'confirm: a revocation is permanent')
     .action(async (options: ChainOptions & { key: string; entry: string; yes?: boolean }) => {
       if (options.yes !== true) {
-        console.error(
-          `Revoking ${options.entry} is permanent: the id can never be published again. Re-run with --yes to confirm.`,
-        );
-        process.exitCode = EXIT.environment;
+        const reason = `revoking ${options.entry} is permanent and its id can never be published again; re-run with --yes to confirm`;
+        reportError(options.json, 'revoke without confirmation', new Error(reason));
         return;
       }
       try {

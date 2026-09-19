@@ -12,6 +12,7 @@ import {
   buildVersion,
   type EntryProof,
   type Manifest,
+  manifestSchema,
   pinIssues,
   type PreviousVersion,
   proveEntry,
@@ -71,9 +72,9 @@ export async function readRawLogFrom(location: string): Promise<unknown[]> {
     if (!response.ok) throw new Error(`${base}/${n}.json answered HTTP ${response.status}`);
     const manifest = await readBoundedJson(response);
     log.push(manifest);
-    // Anything that is not a manifest ends the reading: a host that answers 200 to every path must not be
-    // followed for ten thousand requests. `verifyLog` reports the bad item as a finding.
-    if (manifest === undefined) return log;
+    // Anything that is not a manifest ends the reading: a host that answers 200 to every path, with a page or
+    // with `{}`, must not be followed for ten thousand requests. `verifyLog` reports the bad item as a finding.
+    if (!manifestSchema.safeParse(manifest).success) return log;
   }
   throw new Error(`${base} serves more than ${MAX_REMOTE_VERSIONS} versions; refusing to go on`);
 }

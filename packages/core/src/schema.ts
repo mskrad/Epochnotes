@@ -32,7 +32,9 @@ const detectRule = z.discriminatedUnion('kind', [
     ...ruleBase,
     kind: z.literal('code-pattern'),
     languages: z.array(z.enum(['ts', 'js', 'rust', 'python', 'go', 'markdown'])).min(1),
-    pattern: text,
+    pattern: text.describe(
+      'A JavaScript regular expression, run over the whole text of a file with the flags g and m, after Windows line endings are turned into \\n. ^ and $ mean a line; . does not cross a line; \\s and negated classes do, so that a line break inside a match does not hide it. One finding is reported per rule and starting line. Keep quantifiers bounded by the line where you can: an unbounded negated class is matched against up to one MiB of text.',
+    ),
   }),
   z.strictObject({
     ...ruleBase,

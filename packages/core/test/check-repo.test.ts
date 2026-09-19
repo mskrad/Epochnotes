@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { checkRepository } from '../src/index.js';
+import { checkDirectory, checkRepository, validatePath } from '../src/index.js';
 
 const registry = new URL('../../../registry/entries', import.meta.url).pathname;
 const root = mkdtempSync(join(tmpdir(), 'epochnotes-check-'));
@@ -312,6 +312,114 @@ describe('check repo', () => {
     });
   });
 
+  describe('lockfiles, second round', () => {
+    const yarn = (version: string) =>
+      `# yarn lockfile v1\n\n"@solana/web3.js@^1.98.0":\n  version "${version}"\n  resolved "https://registry.example/web3.js.tgz"\n`;
+    const excerpts = (dir: string) => check(dir).findings.map((finding) => finding.excerpt);
+
+    it('reports a lockfile above its own limit; the limit is a parameter so that the test need not write 64 MiB', () => {
+      const entries = validatePath(registry).files.flatMap((file) =>
+        file.entry === undefined ? [] : [file.entry],
+      );
+      const dir = repo('lock-over-limit', { 'yarn.lock': yarn('1.98.4') });
+      expect(checkDirectory(dir, entries).findings.map((finding) => finding.excerpt)).toEqual([
+        '@solana/web3.js@1.98.4',
+      ]);
+      const limited = checkDirectory(dir, entries, { maxLockfileBytes: 10 });
+      expect(limited.findings).toEqual([]);
+      expect(limited.skipped).toEqual([{ file: 'yarn.lock', reason: 'too-large' }]);
+      expect(limited.filesScanned).toBe(0);
+    });
+
+    it('reads the dependency tree of the first package-lock format', () => {
+      const tree = {
+        lockfileVersion: 1,
+        dependencies: {
+          app: { version: '1.0.0', dependencies: { '@solana/web3.js': { version: '1.98.4' } } },
+        },
+      };
+      expect(excerpts(repo('lock-v1', { 'package-lock.json': JSON.stringify(tree) }))).toEqual([
+        '@solana/web3.js@1.98.4',
+      ]);
+    });
+
+    it('reads a yarn.lock with Windows line endings', () => {
+      expect(excerpts(repo('lock-crlf', { 'yarn.lock': yarn('1.98.4').replaceAll('\n', '\r\n') }))).toEqual([
+        '@solana/web3.js@1.98.4',
+      ]);
+    });
+
+    it('says so when a yarn or pnpm lockfile does not look like one', () => {
+      for (const name of ['yarn.lock', 'pnpm-lock.yaml']) {
+        const report = check(repo(`lock-garbage-${name}`, { [name]: 'this is not a lockfile\n' }));
+        expect(report.skipped, name).toEqual([{ file: name, reason: 'unparsable-lockfile' }]);
+        expect(report.filesScanned, name).toBe(0);
+      }
+    });
+
+    it('reads Cargo.lock for cargo rules only, and says so when it does not look like one', () => {
+      const entries = validatePath(registry).files.flatMap((file) =>
+        file.entry === undefined ? [] : [file.entry],
+      );
+      const entry = entries.find((item) => item.id === 'tx-v1');
+      const rule = entry?.detect.find((item) => item.kind === 'lockfile-version');
+      if (entry === undefined || rule?.kind !== 'lockfile-version')
+        throw new Error('no lockfile rule to borrow');
+      const cargo = {
+        ...entry,
+        detect: [
+          {
+            ...rule,
+            rule: 'old-crate',
+            package: { ecosystem: 'cargo' as const, name: 'solana-sdk', range: '<2.0.0' },
+          },
+        ],
+      };
+      const good = repo('cargo-good', {
+        'Cargo.lock':
+          '[[package]]\nname = "solana-sdk"\nversion = "1.18.0"\n\n[[package]]\nname = "other"\nversion = "0.1.0"\n',
+      });
+      expect(checkDirectory(good, [cargo]).findings.map((finding) => finding.excerpt)).toEqual([
+        'solana-sdk@1.18.0',
+      ]);
+      const garbage = repo('cargo-garbage', { 'Cargo.lock': 'this is not a lockfile\n' });
+      expect(checkDirectory(garbage, [cargo]).skipped).toEqual([
+        { file: 'Cargo.lock', reason: 'unparsable-lockfile' },
+      ]);
+      // With no cargo rule in the registry nothing would have read the file: not worth a word.
+      expect(check(garbage).skipped).toEqual([]);
+    });
+
+    it('reads a lockfile that is a link to a file of another name inside the repository', () => {
+      const dir = repo('lock-alias', {
+        'locks/npm.json': JSON.stringify({
+          packages: { 'node_modules/@solana/web3.js': { version: '1.98.4' } },
+        }),
+      });
+      symlinkSync(join(dir, 'locks', 'npm.json'), join(dir, 'package-lock.json'));
+      expect(excerpts(dir)).toEqual(['@solana/web3.js@1.98.4']);
+    });
+
+    it('does not hang on a yarn.lock built to make a regular expression backtrack', () => {
+      const hostile = `"@solana/web3.js@^1":\n${'  resolved "x"\n'.repeat(40)}\n`.repeat(2000);
+      const started = Date.now();
+      check(repo('lock-hostile', { 'yarn.lock': `# yarn lockfile v1\n${hostile}` }));
+      expect(Date.now() - started).toBeLessThan(5000);
+    });
+
+    it('reports a file it may not read instead of failing the whole check', () => {
+      const dir = repo('unreadable', { 'secret.ts': before, 'own.ts': before });
+      chmodSync(join(dir, 'secret.ts'), 0o000);
+      try {
+        const report = check(dir);
+        expect(report.findings.map((finding) => finding.file)).toEqual(['own.ts']);
+        expect(report.skipped).toEqual([{ file: 'secret.ts', reason: 'unreadable' }]);
+      } finally {
+        chmodSync(join(dir, 'secret.ts'), 0o644);
+      }
+    });
+  });
+
   describe('a match that runs over several lines', () => {
     const find = (name: string, text: string) =>
       check(repo(name, { 'reader.ts': text })).findings.map(
@@ -324,12 +432,14 @@ describe('check repo', () => {
           'multi-colon',
           'const a = 1;\nrpc.getTransaction(sig, { maxSupportedTransactionVersion:\n  0 });\n',
         ),
-      ).toEqual(['rpc-max-version-zero@2: rpc.getTransaction(sig, { maxSupportedTransactionVersion:']);
+      ).toEqual([
+        'rpc-max-version-zero@2: rpc.getTransaction(sig, { maxSupportedTransactionVersion: ⏎ 0 });',
+      ]);
     });
 
     it('is found with Windows line endings and in a file without a final newline', () => {
       expect(find('multi-crlf', 'x;\r\nmaxSupportedTransactionVersion:\r\n  0')).toEqual([
-        'rpc-max-version-zero@2: maxSupportedTransactionVersion:',
+        'rpc-max-version-zero@2: maxSupportedTransactionVersion: ⏎ 0',
       ]);
     });
 
@@ -340,6 +450,39 @@ describe('check repo', () => {
         'rpc-max-version-zero@1',
         'rpc-max-version-zero@2',
       ]);
+    });
+
+    it('lists the findings of a file in the order of its lines, whatever the order of the rules', () => {
+      const text =
+        'a({ maxSupportedTransactionVersion: version });\nb({ maxSupportedTransactionVersion: 0 });\n';
+      expect(find('order', text).map((line) => line.split(':')[0])).toEqual([
+        'rpc-max-version-dynamic@1',
+        'rpc-max-version-zero@2',
+      ]);
+    });
+
+    it('shows every line of a match in the excerpt, so that the offending value is visible', () => {
+      expect(
+        find(
+          'excerpt',
+          'f({ maxSupportedTransactionVersion: 1 }); g({ maxSupportedTransactionVersion:\n  0 });\n',
+        ),
+      ).toEqual([
+        'rpc-max-version-zero@1: f({ maxSupportedTransactionVersion: 1 }); g({ maxSupportedTransactionVersion: ⏎ 0 });',
+      ]);
+    });
+
+    it('keeps ^ and $ meaning a line, also with Windows line endings: a pattern is written for lines', () => {
+      const entries = validatePath(registry).files.flatMap((file) =>
+        file.entry === undefined ? [] : [file.entry],
+      );
+      const entry = entries.find((item) => item.id === 'tx-v1');
+      if (entry === undefined) throw new Error('no tx-v1');
+      const rule = entry.detect.find((item) => item.kind === 'code-pattern');
+      if (rule?.kind !== 'code-pattern') throw new Error('no pattern rule');
+      const anchored = { ...entry, detect: [{ ...rule, rule: 'anchored', pattern: '^legacy = 0$' }] };
+      const dir = repo('anchors', { 'a.ts': 'first;\r\nlegacy = 0\r\nnot legacy = 0\r\nlegacy = 0;\r\n' });
+      expect(checkDirectory(dir, [anchored]).findings.map((finding) => finding.line)).toEqual([2]);
     });
 
     it('does not join what the language keeps apart: the fixed value stays clean over several lines too', () => {

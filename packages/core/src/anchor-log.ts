@@ -14,6 +14,7 @@ import {
   revocationAddress,
   revokeEntryInstruction,
   sendInstructions,
+  setPublisherActiveInstruction,
   versionAddress,
   versionArgsOf,
 } from './onchain.js';
@@ -159,4 +160,23 @@ export async function revokeEntryOnChain(options: {
     address: await revocationAddress(signer.address, options.entryId, options.cluster.programId),
     signature,
   };
+}
+
+/** As the registry admin, suspends or restores a publisher. Returns the publisher account and the signature. */
+export async function setPublisherActiveOnChain(options: {
+  adminKeyFile: string;
+  publisher: string;
+  active: boolean;
+  cluster: Cluster;
+}): Promise<{ address: Address; signature: string }> {
+  await assertWritable(options.cluster);
+  const admin = await loadSigner(options.adminKeyFile);
+  const instruction = await setPublisherActiveInstruction(
+    admin.address,
+    options.publisher,
+    options.active,
+    options.cluster.programId,
+  );
+  const signature = await sendInstructions(options.cluster, admin, [instruction]);
+  return { address: await publisherAddress(options.publisher, options.cluster.programId), signature };
 }

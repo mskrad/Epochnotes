@@ -43,6 +43,39 @@ export function readRawLog(versionsDir: string): unknown[] {
     });
 }
 
+const isUrl = (location: string) => /^https?:\/\//i.test(location);
+const MAX_REMOTE_VERSIONS = 10_000;
+const MANIFEST_TIMEOUT_MS = 20_000;
+const MAX_MANIFEST_BYTES = 64 * 1024;
+
+/**
+ * Reads a publisher's log from a directory or from a static web host laid out the same way
+ * (`<base>/1.json`, `<base>/2.json`, ...). Over HTTP the log ends at the first 404. Nothing read here is
+ * trusted: `verifyLog` checks every manifest, and a server that stops early is what `--pin` and
+ * `--onchain` are for.
+ */
+export async function readRawLogFrom(location: string): Promise<unknown[]> {
+  if (!isUrl(location)) return readRawLog(location);
+  const base = location.replace(/\/+$/, '');
+  const log: unknown[] = [];
+  for (let n = 1; n <= MAX_REMOTE_VERSIONS; n += 1) {
+    const response = await fetch(`${base}/${n}.json`, {
+      signal: AbortSignal.timeout(MANIFEST_TIMEOUT_MS),
+      redirect: 'follow',
+    });
+    if (response.status === 404) return log;
+    if (!response.ok) throw new Error(`${base}/${n}.json answered HTTP ${response.status}`);
+    const text = await response.text();
+    try {
+      // Garbage instead of a manifest is a finding for `verifyLog`, not a crash.
+      log.push(text.length > MAX_MANIFEST_BYTES ? undefined : (JSON.parse(text) as unknown));
+    } catch {
+      log.push(undefined);
+    }
+  }
+  throw new Error(`${base} serves more than ${MAX_REMOTE_VERSIONS} versions; refusing to go on`);
+}
+
 export function readTrustedPublishers(file: string): string[] {
   const parsed = JSON.parse(readFileSync(file, 'utf8')) as {
     publishers?: { key?: unknown; status?: unknown }[];
@@ -73,6 +106,7 @@ export type VerifiedVersion =
   | { ok: false; issues: Issue[]; attempts?: ContentAttempt[] };
 
 export interface VerifyOptions {
+  /** A directory, or the base URL of a static host with the same layout. */
   versionsDir: string;
   trustedPublishers: string[];
   mirrors?: string[];
@@ -86,19 +120,23 @@ export interface VerifyOptions {
  * and root it commits to, then the rule that only the whole log can show: a revoked id never returns.
  */
 export async function verifyLatestVersion(options: VerifyOptions): Promise<VerifiedVersion> {
-  const log = await verifyLog(readRawLog(options.versionsDir), options.trustedPublishers);
+  const log = await verifyLog(await readRawLogFrom(options.versionsDir), options.trustedPublishers);
   if (!log.ok) return log;
   if (options.pin !== undefined) {
     const rollback = pinIssues(log.manifests, options.pin);
     if (rollback.length > 0) return { ok: false, issues: rollback };
   }
   const manifest = log.manifests[log.manifests.length - 1] as Manifest;
-  const local = contentFile(options.versionsDir, manifest.merkle_root);
+  // Content sits next to the manifests, in a directory and on a web host alike; it is accepted by hash only.
+  const remote = isUrl(options.versionsDir);
+  const local = remote
+    ? `${options.versionsDir.replace(/\/+$/, '')}/${manifest.merkle_root}.jsonl`
+    : contentFile(options.versionsDir, manifest.merkle_root);
   try {
     const fetched = await fetchCommittedContent({
       uri: manifest.uri,
       hash: manifest.content_hash,
-      ...(existsSync(local) ? { localFile: local } : {}),
+      ...(remote || existsSync(local) ? { localFile: local } : {}),
       ...(options.mirrors === undefined ? {} : { mirrors: options.mirrors }),
     });
     const content = verifyContent(manifest, fetched.bytes);

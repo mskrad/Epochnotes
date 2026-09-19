@@ -8,8 +8,7 @@ import {
 } from '@epochnotes/core';
 import type { Command } from 'commander';
 
-import { clusterOf, clusterOption } from './chain.js';
-import { EXIT } from './registry.js';
+import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
 
 interface Paths {
   entries: string;
@@ -89,13 +88,17 @@ export function addVersionCommands(registry: Command): void {
     .command('verify')
     .description('Prove that an entry belongs to the latest signed version, without trusting the server.')
     .argument('<entry-id>', 'id of the entry, for example tx-v1')
-    .option('--versions <dir>', 'directory of the version log', 'registry/versions')
+    .option(
+      '--versions <dir-or-url>',
+      'directory of the version log, or the base URL of a host that serves it',
+      'registry/versions',
+    )
     .option('--publishers <file>', 'trusted publishers', 'registry/publishers.json')
     .option('--mirror <url...>', 'hash-addressed mirrors tried after the manifest uri')
     .option('--pin <n:root>', 'the version seen last time; detects a rolled-back or rewritten log')
     .option('--onchain', 'also compare the log with the chain: catches a truncated or rewritten log')
-    .addOption(clusterOption())
-    .option('--rpc-url <url>', 'JSON-RPC endpoint instead of the public one')
+    .addOption(clusterOption('devnet'))
+    .addOption(rpcUrlOption())
     .option('--json', 'print the result as JSON, including the Merkle proof')
     .action(
       async (

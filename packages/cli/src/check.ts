@@ -1,7 +1,7 @@
 import { type CheckReport, checkRepository } from '@epochnotes/core';
 import { Command } from 'commander';
 
-import { EXIT } from './registry.js';
+import { EXIT } from './cluster.js';
 
 const LABEL = { breaks: 'BREAKS', check: 'CHECK ', 'likely-ok': 'OK?   ' } as const;
 

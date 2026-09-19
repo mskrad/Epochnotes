@@ -2,10 +2,8 @@ import { type RegistryReport, validatePath } from '@epochnotes/core';
 import { Command } from 'commander';
 
 import { addChainCommands } from './chain.js';
+import { EXIT } from './cluster.js';
 import { addVersionCommands } from './publish.js';
-
-/** Exit codes shared by all commands: 0 — ok, 1 — findings or invalid input data, 2 — environment error. */
-export const EXIT = { ok: 0, findings: 1, environment: 2 } as const;
 
 function printReport(report: RegistryReport): void {
   const inRegistryTrouble = (id?: string) =>

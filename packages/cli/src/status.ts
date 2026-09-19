@@ -1,13 +1,12 @@
 import {
-  CLUSTERS,
   type FeatureState,
   registryStatus,
   rpcFeatureAccountSource,
   type StatusReport,
 } from '@epochnotes/core';
-import { Command, Option } from 'commander';
+import { Command } from 'commander';
 
-import { EXIT } from './registry.js';
+import { clusterOption, EXIT, rpcUrlOf, rpcUrlOption } from './cluster.js';
 
 function describe(status: FeatureState): string {
   switch (status.state) {
@@ -47,43 +46,26 @@ function print(report: StatusReport): void {
 export function statusCommand(): Command {
   return new Command('status')
     .description('Show, from the network itself, which registry changes are active on a cluster.')
-    .addOption(
-      new Option('--cluster <name>', 'cluster to ask').choices(Object.keys(CLUSTERS)).default('mainnet-beta'),
-    )
-    .option('--rpc-url <url>', 'JSON-RPC endpoint to use instead of the public one for the cluster')
+    .addOption(clusterOption('mainnet-beta'))
+    .addOption(rpcUrlOption())
     .option('--registry <path>', 'directory of registry entries', 'registry/entries')
     .option('--json', 'print the report as JSON')
-    .action(
-      async (options: {
-        cluster: keyof typeof CLUSTERS;
-        rpcUrl?: string;
-        registry: string;
-        json?: boolean;
-      }) => {
-        let report: StatusReport;
-        try {
-          const source = rpcFeatureAccountSource(options.rpcUrl ?? CLUSTERS[options.cluster]);
-          report = await registryStatus(options.registry, options.cluster, source);
-        } catch (error) {
-          console.error(`Cannot read ${options.registry}: ${(error as Error).message}`);
-          process.exitCode = EXIT.environment;
-          return;
-        }
-        if (options.json) {
-          // Slots are 64-bit: printed as decimal strings so no JSON reader rounds them.
-          console.log(
-            JSON.stringify(
-              report,
-              (_key, value) => (typeof value === 'bigint' ? value.toString() : value),
-              2,
-            ),
-          );
-        } else print(report);
-        process.exitCode = report.ok
-          ? EXIT.ok
-          : report.kind === 'registry'
-            ? EXIT.findings
-            : EXIT.environment;
-      },
-    );
+    .action(async (options: { cluster: string; rpcUrl?: string; registry: string; json?: boolean }) => {
+      let report: StatusReport;
+      try {
+        const source = rpcFeatureAccountSource(rpcUrlOf(options));
+        report = await registryStatus(options.registry, options.cluster, source);
+      } catch (error) {
+        console.error(`Cannot read ${options.registry}: ${(error as Error).message}`);
+        process.exitCode = EXIT.environment;
+        return;
+      }
+      if (options.json) {
+        // Slots are 64-bit: printed as decimal strings so no JSON reader rounds them.
+        console.log(
+          JSON.stringify(report, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2),
+        );
+      } else print(report);
+      process.exitCode = report.ok ? EXIT.ok : report.kind === 'registry' ? EXIT.findings : EXIT.environment;
+    });
 }

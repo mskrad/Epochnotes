@@ -211,6 +211,52 @@ describe('epochnotes registry anchor / verify --onchain', () => {
     expect(truncated.out).toContain('rolled back or truncated');
     writeFileSync(join(versions, '2.json'), second);
 
+    // the admin stops vouching for the publisher: clients refuse its whole log until it is restored
+    const suspended = await run(
+      'registry',
+      'suspend',
+      '--admin-key',
+      adminKey,
+      '--publisher',
+      publisher,
+      '--cluster',
+      'localnet',
+    );
+    expect(suspended.code).toBe(0);
+    const whileSuspended = await verify('--onchain');
+    expect(whileSuspended.code).toBe(1);
+    expect(whileSuspended.out).toContain('suspended by the registry admin');
+    expect(
+      (
+        await run(
+          'registry',
+          'suspend',
+          '--admin-key',
+          publisherKey,
+          '--publisher',
+          publisher,
+          '--cluster',
+          'localnet',
+        )
+      ).out,
+    ).toContain('#6000');
+    expect(
+      (
+        await run(
+          'registry',
+          'restore',
+          '--admin-key',
+          adminKey,
+          '--publisher',
+          publisher,
+          '--cluster',
+          'localnet',
+          '--json',
+        )
+      ).code,
+    ).toBe(0);
+    expect((await verify('--onchain')).code).toBe(0);
+
     // the log is intact and anchored, and the entry is still withdrawn: a revocation is its own record on chain
     const unconfirmed = await run(
       'registry',

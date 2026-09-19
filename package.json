@@ -19,7 +19,8 @@
     "verify:ts": "npm run build && npm run test && npm run lint",
     "verify": "npm run verify:ts && npm run build:program",
     "schema:write": "npm run build && node scripts/write-schema.mjs && prettier --write registry/schema.json",
-    "typecheck:tests": "tsc -p tsconfig.tests.json"
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
+    "e2e": "npm run build && node scripts/e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",

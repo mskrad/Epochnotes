@@ -5,6 +5,7 @@ export {
   anchorLog,
   type AnchorResult,
   revokeEntryOnChain,
+  setPublisherActiveOnChain,
 } from './anchor-log.js';
 export { type CheckReport, checkDirectory, checkRepository, type Finding } from './check-repo.js';
 export { canonicalize, CanonicalizationError, entryLeafHash, toHex } from './canonical.js';
@@ -73,6 +74,7 @@ export {
   publishVersion,
   type PublishResult,
   readRawLog,
+  readRawLogFrom,
   readTrustedPublishers,
   verifyEntry,
   verifyLatestVersion,

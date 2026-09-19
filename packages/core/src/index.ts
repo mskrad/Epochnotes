@@ -1,3 +1,10 @@
+export {
+  type AdmitResult,
+  admitPublisher,
+  type AnchoredVersion,
+  anchorLog,
+  type AnchorResult,
+} from './anchor-log.js';
 export { type CheckReport, checkDirectory, checkRepository, type Finding } from './check-repo.js';
 export { canonicalize, CanonicalizationError, entryLeafHash, toHex } from './canonical.js';
 export { type FileReport, type RegistryReport, validatePath } from './load.js';

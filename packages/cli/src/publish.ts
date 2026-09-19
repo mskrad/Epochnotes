@@ -1,6 +1,13 @@
-import { parsePin, publishVersion, readTrustedPublishers, verifyEntry } from '@epochnotes/core';
+import {
+  compareLogWithChain,
+  parsePin,
+  publishVersion,
+  readTrustedPublishers,
+  verifyEntry,
+} from '@epochnotes/core';
 import type { Command } from 'commander';
 
+import { clusterOf, clusterOption } from './chain.js';
 import { EXIT } from './registry.js';
 
 interface Paths {
@@ -85,11 +92,23 @@ export function addVersionCommands(registry: Command): void {
     .option('--publishers <file>', 'trusted publishers', 'registry/publishers.json')
     .option('--mirror <url...>', 'hash-addressed mirrors tried after the manifest uri')
     .option('--pin <n:root>', 'the version seen last time; detects a rolled-back or rewritten log')
+    .option('--onchain', 'also compare the log with the chain: catches a truncated or rewritten log')
+    .addOption(clusterOption())
+    .option('--rpc-url <url>', 'JSON-RPC endpoint instead of the public one')
     .option('--json', 'print the result as JSON, including the Merkle proof')
     .action(
       async (
         entryId: string,
-        options: { versions: string; publishers: string; mirror?: string[]; pin?: string; json?: boolean },
+        options: {
+          versions: string;
+          publishers: string;
+          mirror?: string[];
+          pin?: string;
+          onchain?: boolean;
+          cluster: string;
+          rpcUrl?: string;
+          json?: boolean;
+        },
       ) => {
         const pin = options.pin === undefined ? undefined : parsePin(options.pin);
         if (options.pin !== undefined && pin === undefined) {
@@ -112,6 +131,19 @@ export function addVersionCommands(registry: Command): void {
           return;
         }
         if (!result.ok) return fail(result.issues);
+        let chain = 'not checked (pass --onchain)';
+        if (options.onchain) {
+          let differences;
+          try {
+            differences = await compareLogWithChain(clusterOf(options), result.log);
+          } catch (error) {
+            console.error(`Cannot read the chain: ${(error as Error).message}`);
+            process.exitCode = EXIT.environment;
+            return;
+          }
+          if (differences.length > 0) return fail(differences);
+          chain = `${result.versions} version(s) match the ${options.cluster} program: count, roots, content hashes`;
+        }
         if (options.json) console.log(JSON.stringify(result, null, 2));
         else {
           const { manifest, proof } = result;
@@ -124,6 +156,7 @@ export function addVersionCommands(registry: Command): void {
           console.log(
             `  log       ${result.versions} version(s), signatures and prev_root chain verified\n  content   ${result.contentSource} (sha256 matches the manifest)`,
           );
+          console.log(`  chain     ${chain}`);
           console.log(`  pin       ${manifest.n}:${manifest.merkle_root}`);
           console.log(
             '  note      signatures prove the log is consistent, not complete: pass --pin next time to detect a rollback.',

@@ -13,10 +13,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   compareLogWithChain,
+  configAddress,
   fetchPublisher,
   fetchVersion,
   GENESIS_ROOT,
   initializeInstruction,
+  loadSigner,
   type Manifest,
   type OnchainCluster,
   publishVersionInstruction,
@@ -25,6 +27,7 @@ import {
   sendInstructions,
   type VersionArgs,
 } from '../src/index.js';
+import { sharedTestAdminKey } from '../test/keys.js';
 
 const cluster: OnchainCluster = { rpcUrl: 'http://127.0.0.1:8899', wsUrl: 'ws://127.0.0.1:8900' };
 const root = (byte: string) => byte.repeat(32);
@@ -75,11 +78,9 @@ let outsider: KeyPairSigner;
 beforeAll(async () => {
   const rpc = createSolanaRpc(cluster.rpcUrl);
   const airdrop = airdropFactory({ rpc, rpcSubscriptions: createSolanaRpcSubscriptions(cluster.wsUrl) });
-  [admin, publisher, outsider] = await Promise.all([
-    generateKeyPairSigner(),
-    generateKeyPairSigner(),
-    generateKeyPairSigner(),
-  ]);
+  // The registry config is a singleton: every on-chain suite acts as the same admin.
+  admin = await loadSigner(sharedTestAdminKey());
+  [publisher, outsider] = await Promise.all([generateKeyPairSigner(), generateKeyPairSigner()]);
   for (const signer of [admin, publisher, outsider]) {
     await airdrop({
       recipientAddress: signer.address,
@@ -87,7 +88,10 @@ beforeAll(async () => {
       commitment: 'confirmed',
     });
   }
-  await sendInstructions(cluster, admin, [await initializeInstruction(admin.address)]);
+  const config = await rpc.getAccountInfo(await configAddress(), { encoding: 'base64' }).send();
+  if (config.value === null) {
+    await sendInstructions(cluster, admin, [await initializeInstruction(admin.address)]);
+  }
   await sendInstructions(cluster, admin, [
     await registerPublisherInstruction(admin.address, publisher.address, 'Epochnotes test'),
   ]);

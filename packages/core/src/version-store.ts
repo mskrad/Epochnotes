@@ -129,7 +129,14 @@ export async function verifyLatestVersion(options: VerifyOptions): Promise<Verif
 }
 
 export type EntryVerification =
-  | { ok: true; manifest: Manifest; versions: number; contentSource: string; proof: EntryProof }
+  | {
+      ok: true;
+      manifest: Manifest;
+      versions: number;
+      contentSource: string;
+      proof: EntryProof;
+      log: Manifest[];
+    }
   | { ok: false; issues: Issue[] };
 
 /** Proves that an entry belongs to the latest verified version of the log. */
@@ -174,6 +181,7 @@ export async function verifyEntry(options: VerifyOptions & { entryId: string }):
     versions: version.log.length,
     contentSource: version.contentSource,
     proof,
+    log: version.log,
   };
 }
 

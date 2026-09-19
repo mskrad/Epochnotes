@@ -275,6 +275,79 @@ describe('check repo', () => {
     });
   });
 
+  describe('what it could not cover', () => {
+    const lock = (padding: number) =>
+      JSON.stringify({ packages: { 'node_modules/@solana/web3.js': { version: '1.98.4' } } }) +
+      ' '.repeat(padding);
+
+    it('reads a lockfile larger than the limit for source files: three of 95 in the field corpus were', () => {
+      const small = check(repo('lock-small', { 'package-lock.json': lock(0) }));
+      const large = check(repo('lock-large', { 'package-lock.json': lock(2 * 1024 * 1024) }));
+      expect(small.findings.map((finding) => finding.excerpt)).toEqual(['@solana/web3.js@1.98.4']);
+      expect(large.findings).toEqual(small.findings);
+      expect(large.skipped).toEqual([]);
+    });
+
+    it('says so when a file is too large to read, a source file and a lockfile alike', () => {
+      const dir = repo('too-large', {
+        'bundle.js': `${before}// ${'x'.repeat(1024 * 1024)}\n`,
+        'small.ts': after,
+      });
+      const report = check(dir);
+      expect(report.findings).toEqual([]);
+      expect(report.skipped).toEqual([{ file: 'bundle.js', reason: 'too-large' }]);
+    });
+
+    it('does not report a large file that no rule would read anyway', () => {
+      const report = check(
+        repo('large-irrelevant', { 'data.bin': 'x'.repeat(2 * 1024 * 1024), 'own.ts': after }),
+      );
+      expect(report.skipped).toEqual([]);
+    });
+
+    it('says so when a lockfile cannot be parsed, instead of reporting nothing about its packages', () => {
+      const report = check(repo('lock-broken', { 'package-lock.json': '{ not json' }));
+      expect(report.findings).toEqual([]);
+      expect(report.skipped).toEqual([{ file: 'package-lock.json', reason: 'unparsable-lockfile' }]);
+    });
+  });
+
+  describe('a match that runs over several lines', () => {
+    const find = (name: string, text: string) =>
+      check(repo(name, { 'reader.ts': text })).findings.map(
+        (finding) => `${finding.rule}@${finding.line}: ${finding.excerpt}`,
+      );
+
+    it('is found where a formatter broke the line after the colon, at the line where the match starts', () => {
+      expect(
+        find(
+          'multi-colon',
+          'const a = 1;\nrpc.getTransaction(sig, { maxSupportedTransactionVersion:\n  0 });\n',
+        ),
+      ).toEqual(['rpc-max-version-zero@2: rpc.getTransaction(sig, { maxSupportedTransactionVersion:']);
+    });
+
+    it('is found with Windows line endings and in a file without a final newline', () => {
+      expect(find('multi-crlf', 'x;\r\nmaxSupportedTransactionVersion:\r\n  0')).toEqual([
+        'rpc-max-version-zero@2: maxSupportedTransactionVersion:',
+      ]);
+    });
+
+    it('still reports every line of a file on its own, and the same line once per rule', () => {
+      const text =
+        'a({ maxSupportedTransactionVersion: 0 });\nb({ maxSupportedTransactionVersion: 0, x: { maxSupportedTransactionVersion: 0 } });\n';
+      expect(find('multi-lines', text).map((line) => line.split(':')[0])).toEqual([
+        'rpc-max-version-zero@1',
+        'rpc-max-version-zero@2',
+      ]);
+    });
+
+    it('does not join what the language keeps apart: the fixed value stays clean over several lines too', () => {
+      expect(find('multi-fixed', 'get(sig, { maxSupportedTransactionVersion:\n  1 });\n')).toEqual([]);
+      expect(find('multi-hex', 'get(sig, { maxSupportedTransactionVersion:\n  0x1 });\n')).toEqual([]);
+    });
+  });
+
   it('says which rules it could not run', () => {
     expect(check(repo('empty', { 'a.ts': 'export {};\n' })).notRun).toMatchObject([
       { entry: 'tx-v1', rule: 'rpc-reads-v1-transaction' },

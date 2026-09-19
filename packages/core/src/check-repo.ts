@@ -22,7 +22,13 @@ const EXTENSIONS: Record<Language, string[]> = {
 /** Used only when the directory is not a git work tree: names that are dependencies or VCS data everywhere. */
 const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
 const LOCKFILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Cargo.lock']);
+/** Source files above this are generated bundles, not code somebody maintains; they are reported, not read. */
 const MAX_FILE_BYTES = 1024 * 1024;
+/**
+ * Lockfiles are generated too, but they are the only place a dependency version can be read from. Of 95
+ * lockfiles in the field corpus three were above one MiB, the largest 1.5 MiB; monorepos grow well past that.
+ */
+const MAX_LOCKFILE_BYTES = 64 * 1024 * 1024;
 
 export interface Finding {
   entry: string;
@@ -42,7 +48,13 @@ export interface Finding {
 export interface Skipped {
   /** Path relative to the scanned directory, as it is named there. */
   file: string;
-  reason: 'symlink-outside-root' | 'broken-symlink' | 'symlink-target-not-scanned' | 'unreadable';
+  reason:
+    | 'symlink-outside-root'
+    | 'broken-symlink'
+    | 'symlink-target-not-scanned'
+    | 'unreadable'
+    | 'too-large'
+    | 'unparsable-lockfile';
 }
 
 export type CheckReport =
@@ -104,7 +116,11 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
  * Not covered: hard links, which cannot be told from the file itself, and a path swapped between resolving and
  * reading. The scanner is not a sandbox; run it with the rights you would give the repository's own scripts.
  */
-function sourceFiles(root: string): { realRoot: string; files: string[]; skipped: Skipped[] } {
+function sourceFiles(root: string): {
+  realRoot: string;
+  files: { path: string; bytes: number }[];
+  skipped: Skipped[];
+} {
   const realRoot = realpathSync(root);
   const prefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
   const skipped: Skipped[] = [];
@@ -124,7 +140,7 @@ function sourceFiles(root: string): { realRoot: string; files: string[]; skipped
     tracked = false;
     candidates = [...walk(realRoot, skipped)];
   }
-  const files = new Set<string>();
+  const files = new Map<string, number>();
   const aliases: { file: string; real: string }[] = [];
   for (const path of candidates.sort()) {
     const file = relative(realRoot, path);
@@ -159,7 +175,7 @@ function sourceFiles(root: string): { realRoot: string; files: string[]; skipped
       skipped.push({ file, reason: 'unreadable' });
       continue;
     }
-    if (stats.isFile() && stats.size <= MAX_FILE_BYTES) files.add(real);
+    if (stats.isFile()) files.set(real, stats.size);
   }
   // A path reached through a link inside the root: fine when the scan covers its target anyway, which includes
   // every link to a directory. Otherwise the link would widen the scan, so it is reported instead.
@@ -178,7 +194,8 @@ function sourceFiles(root: string): { realRoot: string; files: string[]; skipped
         .some((part) => SKIPPED_DIRECTORIES.has(part));
     if (directory ? leftOut : !files.has(real)) skipped.push({ file, reason: 'symlink-target-not-scanned' });
   }
-  return { realRoot, files: [...files].sort(), skipped };
+  const sorted = [...files].sort(([a], [b]) => (a < b ? -1 : 1)).map(([path, bytes]) => ({ path, bytes }));
+  return { realRoot, files: sorted, skipped };
 }
 
 /** Versions of one package as the lockfile pins them. Best effort across the common lockfile formats. */
@@ -226,7 +243,9 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
           entry,
           rule,
           extensions: new Set(rule.languages.flatMap((language) => EXTENSIONS[language])),
-          regex: new RegExp(rule.pattern),
+          // Over the whole text, so that a line break inside the match does not hide it; `m` keeps ^ and $ meaning
+          // a line, as they did when patterns ran line by line.
+          regex: new RegExp(rule.pattern, 'gm'),
         });
       } else if (rule.kind === 'lockfile-version') lockRules.push({ entry, rule });
       else
@@ -244,17 +263,40 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
 
   let filesScanned = 0;
   const { realRoot, files, skipped } = sourceFiles(root);
-  for (const path of files) {
+  for (const { path, bytes } of files) {
     const file = relative(realRoot, path);
     const matching = patterns.filter((item) => item.extensions.has(extname(path)));
     const locking = LOCKFILES.has(basename(path)) ? lockRules : [];
     if (matching.length === 0 && locking.length === 0) continue;
+    // Only a file that a rule would have read is worth a word when it is left out.
+    if (bytes > (locking.length > 0 ? MAX_LOCKFILE_BYTES : MAX_FILE_BYTES)) {
+      skipped.push({ file, reason: 'too-large' });
+      continue;
+    }
     const text = readFileSync(path, 'utf8');
     filesScanned += 1;
     if (matching.length > 0) {
-      text.split('\n').forEach((content, index) => {
-        for (const { entry, rule, regex } of matching) {
-          if (!regex.test(content)) continue;
+      const lineStarts = [0];
+      for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) lineStarts.push(at + 1);
+      const lineOf = (offset: number) => {
+        let low = 0;
+        let high = lineStarts.length - 1;
+        while (low < high) {
+          const middle = (low + high + 1) >> 1;
+          if ((lineStarts[middle] as number) <= offset) low = middle;
+          else high = middle - 1;
+        }
+        return low;
+      };
+      for (const { entry, rule, regex } of matching) {
+        let lastLine = -1;
+        regex.lastIndex = 0;
+        for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
+          if (match[0] === '') regex.lastIndex += 1; // an empty match must not loop forever
+          const line = lineOf(match.index);
+          if (line === lastLine) continue; // one finding for a line and a rule, as before
+          lastLine = line;
+          const end = lineStarts[line + 1] ?? text.length + 1;
           findings.push({
             entry: entry.id,
             rev: entry.rev,
@@ -263,19 +305,26 @@ export function checkDirectory(root: string, entries: Entry[]): Extract<CheckRep
             confidence: rule.confidence,
             summary: rule.summary,
             file,
-            line: index + 1,
-            excerpt: content.trim().slice(0, 200),
+            line: line + 1,
+            // the line on which the match starts; a match may go on below it
+            excerpt: text
+              .slice(lineStarts[line], end - 1)
+              .trim()
+              .slice(0, 200),
             fix: fixesFor(entry, rule.rule),
           });
         }
-      });
+      }
     }
     for (const { entry, rule } of locking) {
       let versions: string[];
       try {
         versions = lockedVersions(path, text, rule.package.ecosystem, rule.package.name);
       } catch {
-        continue; // an unreadable lockfile is not a finding
+        // Not a finding, and not silence either: nothing is known about the packages of this project.
+        if (!skipped.some((item) => item.file === file))
+          skipped.push({ file, reason: 'unparsable-lockfile' });
+        continue;
       }
       const range =
         rule.package.ecosystem === 'cargo' ? rule.package.range.replaceAll(',', ' ') : rule.package.range;

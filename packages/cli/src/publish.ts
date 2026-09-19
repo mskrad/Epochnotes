@@ -9,6 +9,7 @@ import {
 import type { Command } from 'commander';
 
 import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
+import { reportError, reportIssues } from './output.js';
 
 interface Paths {
   entries: string;
@@ -16,12 +17,6 @@ interface Paths {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-
-function fail(issues: { path: string; message: string; hint: string }[]): void {
-  for (const issue of issues)
-    console.error(`FAIL  ${issue.path}: ${issue.message}\n        fix: ${issue.hint}`);
-  process.exitCode = EXIT.findings;
-}
 
 /** Adds `publish` and `verify` to the `registry` command. */
 export function addVersionCommands(registry: Command): void {
@@ -58,11 +53,10 @@ export function addVersionCommands(registry: Command): void {
             ...(options.dryRun === undefined ? {} : { dryRun: options.dryRun }),
           });
         } catch (error) {
-          console.error(`Cannot publish: ${(error as Error).message}`);
-          process.exitCode = EXIT.environment;
+          reportError(options.json, 'publish', error);
           return;
         }
-        if (!result.ok) return fail(result.issues);
+        if (!result.ok) return reportIssues(options.json, result.issues);
         if (options.json) console.log(JSON.stringify(result, null, 2));
         else if (!result.published)
           console.log(
@@ -116,8 +110,11 @@ export function addVersionCommands(registry: Command): void {
       ) => {
         const pin = options.pin === undefined ? undefined : parsePin(options.pin);
         if (options.pin !== undefined && pin === undefined) {
-          console.error('--pin must look like 3:<64 hex characters>, as printed by a previous verify.');
-          process.exitCode = EXIT.environment;
+          reportError(
+            options.json,
+            'read --pin',
+            new Error('it must look like 3:<64 hex characters>, as printed by a previous verify'),
+          );
           return;
         }
         let result;
@@ -130,11 +127,10 @@ export function addVersionCommands(registry: Command): void {
             ...(pin === undefined ? {} : { pin }),
           });
         } catch (error) {
-          console.error(`Cannot verify: ${(error as Error).message}`);
-          process.exitCode = EXIT.environment;
+          reportError(options.json, 'verify', error);
           return;
         }
-        if (!result.ok) return fail(result.issues);
+        if (!result.ok) return reportIssues(options.json, result.issues);
         let chain = 'not checked (pass --onchain)';
         if (options.onchain) {
           let differences;
@@ -150,11 +146,10 @@ export function addVersionCommands(registry: Command): void {
               });
             }
           } catch (error) {
-            console.error(`Cannot read the chain: ${(error as Error).message}`);
-            process.exitCode = EXIT.environment;
+            reportError(options.json, 'verify', error);
             return;
           }
-          if (differences.length > 0) return fail(differences);
+          if (differences.length > 0) return reportIssues(options.json, differences);
           chain = `${result.versions} version(s) match the ${options.cluster} program: count, roots, content hashes`;
         }
         if (options.json) console.log(JSON.stringify(result, null, 2));

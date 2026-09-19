@@ -2,6 +2,7 @@ import { type CheckReport, checkRepository } from '@epochnotes/core';
 import { Command } from 'commander';
 
 import { EXIT } from './cluster.js';
+import { reportError } from './output.js';
 
 const LABEL = { breaks: 'BREAKS', check: 'CHECK ', 'likely-ok': 'OK?   ' } as const;
 
@@ -32,13 +33,15 @@ export function checkCommand(): Command {
       try {
         report = checkRepository(path, options.registry);
       } catch (error) {
-        console.error(`Cannot check ${path}: ${(error as Error).message}`);
-        process.exitCode = EXIT.environment;
+        reportError(options.json, `check ${path}`, error);
         return;
       }
       if (!report.ok) {
-        console.error('The registry is not valid; run `epochnotes registry validate` for details.');
-        process.exitCode = EXIT.environment;
+        reportError(
+          options.json,
+          'use the registry',
+          new Error('it is not valid; run `epochnotes registry validate` for details'),
+        );
         return;
       }
       if (options.json) console.log(JSON.stringify(report, null, 2));

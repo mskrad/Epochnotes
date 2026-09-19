@@ -70,6 +70,30 @@ describe('a version log served over HTTP', () => {
     expect(result.ok && result.contentSource).toContain(base);
   });
 
+  it('finds the content next to the manifests when the committed uri leads nowhere', async () => {
+    const elsewhere = join(dir, 'elsewhere');
+    const log = join(elsewhere, 'versions');
+    // a log of its own starts from rev 1 entries, so it gets a fresh copy of the registry
+    const fresh = join(elsewhere, 'entries');
+    cpSync(new URL('../../../registry/entries', import.meta.url).pathname, fresh, { recursive: true });
+    const result = await publishVersion({
+      entriesDir: fresh,
+      versionsDir: log,
+      keyFile,
+      uri: `${base}/moved-away/{root}.jsonl`,
+      published: '2026-09-19',
+    });
+    if (!result.ok || !result.published) throw new Error('publish failed');
+    cpSync(log, join(served, 'other'), { recursive: true });
+    override = () => undefined;
+    const verified = await verifyEntry({
+      versionsDir: `${base}/other`,
+      trustedPublishers: [publisher],
+      entryId: 'tx-v1',
+    });
+    expect(verified.ok && verified.contentSource).toBe(`${base}/other/${result.manifest.merkle_root}.jsonl`);
+  });
+
   it('is not trusted: altered content and an altered manifest are refused', async () => {
     override = (path) =>
       path.endsWith('.jsonl') ? { status: 200, body: 'not the committed content\n' } : undefined;

@@ -10,7 +10,6 @@ import { statusCommand } from './status.js';
 /** The version lives in package.json only. */
 export const CLI_VERSION = (createRequire(import.meta.url)('../package.json') as { version: string }).version;
 
-/** Builds the command tree. Commands stay thin: logic lives in `@epochnotes/core`. */
 /** Usage errors must not end the process with 1: that code means "findings". The caller decides (see bin.ts). */
 function throwOnUsageErrors(command: Command): Command {
   command.exitOverride();
@@ -18,6 +17,7 @@ function throwOnUsageErrors(command: Command): Command {
   return command;
 }
 
+/** Builds the command tree. Commands stay thin: logic lives in `@epochnotes/core`. */
 export function buildProgram(): Command {
   return throwOnUsageErrors(
     new Command('epochnotes')

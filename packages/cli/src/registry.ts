@@ -3,6 +3,7 @@ import { Command } from 'commander';
 
 import { addChainCommands } from './chain.js';
 import { EXIT } from './cluster.js';
+import { reportError } from './output.js';
 import { addVersionCommands } from './publish.js';
 
 function printReport(report: RegistryReport): void {
@@ -39,8 +40,7 @@ export function registryCommand(): Command {
       try {
         report = validatePath(path);
       } catch (error) {
-        console.error(`Cannot read ${path}: ${(error as Error).message}`);
-        process.exitCode = EXIT.environment;
+        reportError(options.json, `read ${path}`, error);
         return;
       }
       if (options.json) {

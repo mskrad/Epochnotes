@@ -1,36 +1,14 @@
-import {
-  admitPublisher,
-  anchorLog,
-  redactUrl,
-  revokeEntryOnChain,
-  setPublisherActiveOnChain,
-} from '@epochnotes/core';
+import { admitPublisher, anchorLog, revokeEntryOnChain, setPublisherActiveOnChain } from '@epochnotes/core';
 import type { Command } from 'commander';
 
 import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
+import { reportError, reportIssues } from './output.js';
 
 interface ChainOptions {
   cluster: string;
   rpcUrl?: string;
   json?: boolean;
 }
-
-/** A failed transaction hides its reason in the cause chain ("Custom program error: #6000"): print all of it. */
-function fail(error: unknown, what: string): void {
-  const reasons: string[] = [];
-  for (let at: unknown = error; at instanceof Error && reasons.length < 5; at = at.cause)
-    reasons.push(at.message);
-  // Transport errors quote the endpoint, and provider API keys travel in its path or query.
-  const text = reasons.join(' <- ').replace(/https?:\/\/[^\s'"]+/g, (url) => redactUrl(url));
-  console.error(`Cannot ${what}: ${text}`);
-  process.exitCode = EXIT.environment;
-}
-
-const printIssues = (issues: { path: string; message: string; hint: string }[]) => {
-  for (const issue of issues)
-    console.error(`FAIL  ${issue.path}: ${issue.message}\n        fix: ${issue.hint}`);
-  process.exitCode = EXIT.findings;
-};
 
 /** Every chain command takes the same cluster options and can print JSON. Writes are gated in core by genesis hash. */
 const chainCommand = (registry: Command, name: string, description: string) =>
@@ -53,7 +31,7 @@ export function addChainCommands(registry: Command): void {
           keyFile: options.key,
           cluster: clusterOf(options),
         });
-        if (!result.ok) return printIssues(result.issues);
+        if (!result.ok) return reportIssues(options.json, result.issues);
         if (options.json) console.log(JSON.stringify(result, null, 2));
         else {
           console.log(
@@ -68,7 +46,7 @@ export function addChainCommands(registry: Command): void {
         }
         process.exitCode = EXIT.ok;
       } catch (error) {
-        fail(error, 'anchor the log');
+        reportError(options.json, 'anchor the log', error);
       }
     });
 
@@ -101,7 +79,7 @@ export function addChainCommands(registry: Command): void {
           );
         process.exitCode = EXIT.ok;
       } catch (error) {
-        fail(error, 'revoke the entry');
+        reportError(options.json, 'revoke the entry', error);
       }
     });
 
@@ -131,7 +109,7 @@ export function addChainCommands(registry: Command): void {
         }
         process.exitCode = EXIT.ok;
       } catch (error) {
-        fail(error, 'admit the publisher');
+        reportError(options.json, 'admit the publisher', error);
       }
     });
 
@@ -162,7 +140,7 @@ export function addChainCommands(registry: Command): void {
             );
           process.exitCode = EXIT.ok;
         } catch (error) {
-          fail(error, `${name} the publisher`);
+          reportError(options.json, `${name} the publisher`, error);
         }
       });
   }

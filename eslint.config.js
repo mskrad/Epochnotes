@@ -12,8 +12,9 @@ export default tseslint.config(
         {
           patterns: [
             {
-              regex: '^(?!@epochnotes/core$|commander$|\\./|node:)',
-              message: 'CLI may import only @epochnotes/core, commander, node: builtins and its own files.',
+              regex: '^(?!@epochnotes/core$|commander$|\\./|node:module$)',
+              message:
+                'CLI may import only @epochnotes/core, commander, node:module (to read its own package.json) and its own files.',
             },
           ],
         },

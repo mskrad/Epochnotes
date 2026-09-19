@@ -304,6 +304,15 @@ export interface Cluster {
   programId?: Address;
 }
 
+/** The endpoints of a cluster from its JSON-RPC URL. The test validator serves websockets on the next port. */
+export function clusterFromRpcUrl(rpcUrl: string): Cluster {
+  const local = /^http:\/\/(127\.0\.0\.1|localhost):8899\/?$/.test(rpcUrl);
+  return {
+    rpcUrl,
+    wsUrl: local ? rpcUrl.replace(/^http/, 'ws').replace(':8899', ':8900') : rpcUrl.replace(/^http/, 'ws'),
+  };
+}
+
 export async function loadSigner(keyFile: string): Promise<KeyPairSigner> {
   try {
     return await createKeyPairSignerFromBytes(

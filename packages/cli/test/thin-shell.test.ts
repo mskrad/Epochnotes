@@ -10,14 +10,20 @@ async function restrictedImports(source: string): Promise<string[]> {
 }
 
 describe('cli stays a thin shell', () => {
-  it('rejects imports other than core, the argument parser, node builtins and own files', async () => {
-    const messages = await restrictedImports("import 'fs';\nimport 'yaml';\nimport '@solana/kit';\n");
-    expect(messages).toHaveLength(3);
+  it('rejects every import but core, the argument parser, node:module and own files', async () => {
+    const forbidden = [
+      "import 'fs';",
+      "import 'node:fs';",
+      "import 'node:http';",
+      "import 'yaml';",
+      "import '@solana/kit';",
+    ];
+    expect(await restrictedImports(`${forbidden.join('\n')}\n`)).toHaveLength(forbidden.length);
   });
 
   it('accepts the allowed imports', async () => {
     const allowed =
-      "import '@epochnotes/core';\nimport 'commander';\nimport 'node:fs';\nimport './program.js';\n";
+      "import '@epochnotes/core';\nimport 'commander';\nimport 'node:module';\nimport './program.js';\n";
     expect(await restrictedImports(allowed)).toEqual([]);
   });
 });

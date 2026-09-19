@@ -7,6 +7,7 @@ import {
 import { Command } from 'commander';
 
 import { clusterOption, EXIT, rpcUrlOf, rpcUrlOption } from './cluster.js';
+import { reportError } from './output.js';
 
 function describe(status: FeatureState): string {
   switch (status.state) {
@@ -56,8 +57,7 @@ export function statusCommand(): Command {
         const source = rpcFeatureAccountSource(rpcUrlOf(options));
         report = await registryStatus(options.registry, options.cluster, source);
       } catch (error) {
-        console.error(`Cannot read ${options.registry}: ${(error as Error).message}`);
-        process.exitCode = EXIT.environment;
+        reportError(options.json, `read the registry at ${options.registry}`, error);
         return;
       }
       if (options.json) {

@@ -25,15 +25,16 @@ const adminKey = sharedTestAdminKey();
 const publisherKey = writeTestKey(join(dir, 'publisher.json'));
 let publisher: string;
 
-async function run(...args: string[]): Promise<{ code: number; out: string }> {
+async function run(...args: string[]): Promise<{ code: number; out: string; stdout: string }> {
   const lines: string[] = [];
-  vi.spyOn(console, 'log').mockImplementation((line: string) => void lines.push(line));
+  const stdout: string[] = [];
+  vi.spyOn(console, 'log').mockImplementation((line: string) => void (lines.push(line), stdout.push(line)));
   vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line));
   process.exitCode = undefined;
   await buildProgram().parseAsync(['node', 'epochnotes', ...args]);
   const code = Number(process.exitCode ?? 0);
   process.exitCode = undefined;
-  return { code, out: lines.join('\n') };
+  return { code, out: lines.join('\n'), stdout: stdout.join('\n') };
 }
 
 beforeAll(async () => {
@@ -240,21 +241,36 @@ describe('epochnotes registry anchor / verify --onchain', () => {
         )
       ).out,
     ).toContain('#6000');
-    expect(
-      (
-        await run(
-          'registry',
-          'restore',
-          '--admin-key',
-          adminKey,
-          '--publisher',
-          publisher,
-          '--cluster',
-          'localnet',
-          '--json',
-        )
-      ).code,
-    ).toBe(0);
+    const restored = await run(
+      'registry',
+      'restore',
+      '--admin-key',
+      adminKey,
+      '--publisher',
+      publisher,
+      '--cluster',
+      'localnet',
+      '--json',
+    );
+    expect(restored.code).toBe(0);
+    expect(JSON.parse(restored.stdout)).toMatchObject({
+      publisher,
+      active: true,
+      signature: expect.stringMatching(/^[1-9A-HJ-NP-Za-km-z]{80,90}$/),
+    });
+    const refused = await run(
+      'registry',
+      'suspend',
+      '--admin-key',
+      publisherKey,
+      '--publisher',
+      publisher,
+      '--cluster',
+      'localnet',
+      '--json',
+    );
+    expect(refused.code).toBe(2);
+    expect(JSON.parse(refused.stdout)).toMatchObject({ ok: false, error: expect.stringContaining('#6000') });
     expect((await verify('--onchain')).code).toBe(0);
 
     // the log is intact and anchored, and the entry is still withdrawn: a revocation is its own record on chain

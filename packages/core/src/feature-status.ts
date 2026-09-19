@@ -4,6 +4,8 @@ export const CLUSTERS = {
   'mainnet-beta': 'https://api.mainnet-beta.solana.com',
   testnet: 'https://api.testnet.solana.com',
   devnet: 'https://api.devnet.solana.com',
+  /** `solana-test-validator` on this machine. */
+  localnet: 'http://127.0.0.1:8899',
 } as const;
 
 export type Cluster = keyof typeof CLUSTERS;

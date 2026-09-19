@@ -84,6 +84,7 @@ export {
 export {
   assertWritable,
   type Cluster as OnchainCluster,
+  clusterFromRpcUrl,
   compareLogWithChain,
   configAddress,
   decodePublisher,

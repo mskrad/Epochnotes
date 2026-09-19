@@ -94,6 +94,8 @@ export async function fetchCommittedContent(options: {
   uri: string;
   hash: string;
   localFile?: string;
+  /** Other places the same bytes may live, tried after the committed uri and before the mirrors. */
+  alsoAt?: string[];
   mirrors?: string[];
   timeoutMs?: number;
   maxBytes?: number;
@@ -104,7 +106,9 @@ export async function fetchCommittedContent(options: {
   const maxBytes = options.maxBytes ?? DEFAULT_CONTENT_MAX_BYTES;
   const sources = [
     ...(options.localFile === undefined ? [] : [options.localFile]),
-    ...contentSourceCandidates(options.uri, expected, options.mirrors),
+    ...contentSourceCandidates(options.uri, expected, []),
+    ...(options.alsoAt ?? []),
+    ...contentSourceCandidates('', expected, options.mirrors),
   ];
   const attempts: ContentAttempt[] = [];
   for (const source of new Set(sources)) {

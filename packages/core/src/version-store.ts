@@ -47,6 +47,7 @@ const isUrl = (location: string) => /^https?:\/\//i.test(location);
 const MAX_REMOTE_VERSIONS = 10_000;
 const MANIFEST_TIMEOUT_MS = 20_000;
 const MAX_MANIFEST_BYTES = 64 * 1024;
+const REMOTE_LOG_DEADLINE_MS = 120_000;
 
 /**
  * Reads a publisher's log from a directory or from a static web host laid out the same way
@@ -57,23 +58,45 @@ const MAX_MANIFEST_BYTES = 64 * 1024;
 export async function readRawLogFrom(location: string): Promise<unknown[]> {
   if (!isUrl(location)) return readRawLog(location);
   const base = location.replace(/\/+$/, '');
+  const deadline = Date.now() + REMOTE_LOG_DEADLINE_MS;
   const log: unknown[] = [];
   for (let n = 1; n <= MAX_REMOTE_VERSIONS; n += 1) {
+    if (Date.now() > deadline)
+      throw new Error(`${base} did not serve its log within ${REMOTE_LOG_DEADLINE_MS / 1000} s`);
     const response = await fetch(`${base}/${n}.json`, {
       signal: AbortSignal.timeout(MANIFEST_TIMEOUT_MS),
       redirect: 'follow',
     });
     if (response.status === 404) return log;
     if (!response.ok) throw new Error(`${base}/${n}.json answered HTTP ${response.status}`);
-    const text = await response.text();
-    try {
-      // Garbage instead of a manifest is a finding for `verifyLog`, not a crash.
-      log.push(text.length > MAX_MANIFEST_BYTES ? undefined : (JSON.parse(text) as unknown));
-    } catch {
-      log.push(undefined);
-    }
+    const manifest = await readBoundedJson(response);
+    log.push(manifest);
+    // Anything that is not a manifest ends the reading: a host that answers 200 to every path must not be
+    // followed for ten thousand requests. `verifyLog` reports the bad item as a finding.
+    if (manifest === undefined) return log;
   }
   throw new Error(`${base} serves more than ${MAX_REMOTE_VERSIONS} versions; refusing to go on`);
+}
+
+/** The body as JSON, or undefined when it is too large or not JSON. The size is checked while reading. */
+async function readBoundedJson(response: Response): Promise<unknown> {
+  if (Number(response.headers.get('content-length') ?? 0) > MAX_MANIFEST_BYTES) {
+    await response.body?.cancel();
+    return undefined;
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of response.body ?? []) {
+    total += chunk.byteLength;
+    if (total > MAX_MANIFEST_BYTES) return undefined;
+    chunks.push(chunk);
+  }
+  try {
+    const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+    return typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function readTrustedPublishers(file: string): string[] {
@@ -128,15 +151,14 @@ export async function verifyLatestVersion(options: VerifyOptions): Promise<Verif
   }
   const manifest = log.manifests[log.manifests.length - 1] as Manifest;
   // Content sits next to the manifests, in a directory and on a web host alike; it is accepted by hash only.
-  const remote = isUrl(options.versionsDir);
-  const local = remote
+  const sibling = isUrl(options.versionsDir)
     ? `${options.versionsDir.replace(/\/+$/, '')}/${manifest.merkle_root}.jsonl`
     : contentFile(options.versionsDir, manifest.merkle_root);
   try {
     const fetched = await fetchCommittedContent({
       uri: manifest.uri,
       hash: manifest.content_hash,
-      ...(remote || existsSync(local) ? { localFile: local } : {}),
+      ...(isUrl(sibling) ? { alsoAt: [sibling] } : existsSync(sibling) ? { localFile: sibling } : {}),
       ...(options.mirrors === undefined ? {} : { mirrors: options.mirrors }),
     });
     const content = verifyContent(manifest, fetched.bytes);

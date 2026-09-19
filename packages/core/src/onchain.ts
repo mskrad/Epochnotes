@@ -259,6 +259,25 @@ export async function publishVersionInstruction(
   return instruction(programId, 'publish_version', [u64le(version.n), Uint8Array.from(encoded)], accounts);
 }
 
+export async function setPublisherActiveInstruction(
+  admin: Address,
+  authority: string,
+  active: boolean,
+  programId = REGISTRY_PROGRAM_ID,
+): Promise<Instruction> {
+  const accounts = [
+    readonly(await configAddress(programId)),
+    writable(await publisherAddress(authority, programId)),
+    { address: admin, role: AccountRole.READONLY_SIGNER },
+  ];
+  return instruction(
+    programId,
+    'set_publisher_active',
+    [Uint8Array.from(getBooleanCodec().encode(active))],
+    accounts,
+  );
+}
+
 export async function revokeEntryInstruction(
   authority: Address,
   entryId: string,
@@ -342,6 +361,46 @@ export async function fetchVersion(
   return data === undefined ? undefined : decodeVersion(at, data);
 }
 
+/** Solana mainnet-beta, by genesis hash: the name a user passes says nothing about where an endpoint leads. */
+export const MAINNET_GENESIS_HASH = '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
+
+/** Throws unless the endpoint is something other than mainnet. Writing there is a decision for the project owner. */
+export async function assertNotMainnet(cluster: Cluster): Promise<void> {
+  const genesis = await createSolanaRpc(cluster.rpcUrl).getGenesisHash().send();
+  if (genesis === MAINNET_GENESIS_HASH) {
+    throw new Error(
+      `${cluster.rpcUrl} is mainnet-beta (genesis ${genesis}); this tool writes to devnet and localnet only`,
+    );
+  }
+}
+
+export interface OnchainRevocation {
+  address: Address;
+  entryId: string;
+  atVersion: bigint;
+}
+
+const revocationCodec = getStructCodec([
+  ['publisher', getAddressCodec()],
+  ['entryId', text],
+  ['atVersion', getU64Codec()],
+  ['slot', getU64Codec()],
+  ['bump', getU8Codec()],
+]);
+
+/** The on-chain record that a publisher withdrew an entry, if there is one. */
+export async function fetchRevocation(
+  cluster: Cluster,
+  authority: string,
+  entryId: string,
+): Promise<OnchainRevocation | undefined> {
+  const at = await revocationAddress(authority, entryId, cluster.programId);
+  const data = await fetchAccount(cluster, at);
+  if (data === undefined) return undefined;
+  const raw = decodeAccount('Revocation', data, revocationCodec);
+  return { address: at, entryId: raw.entryId, atVersion: raw.atVersion };
+}
+
 /**
  * Compares an off-chain log with the chain. The chain cannot be truncated or forked, so this is what
  * catches a server that serves only the first versions, or a publisher that signed two histories:
@@ -361,12 +420,15 @@ export async function compareLogWithChain(cluster: Cluster, log: Manifest[]): Pr
       },
     ];
   const issues: Issue[] = [];
-  if (!publisher.active)
+  if (!publisher.active) {
+    // A suspended publisher cannot publish, so everything on chain predates the suspension. But the admin
+    // suspends a key after something went wrong, and the chain does not say since when it was unsafe: fail closed.
     issues.push({
       path: 'chain',
-      message: `Publisher ${publisher.name} is suspended on chain`,
-      hint: 'Versions published while it was active stay valid; do not trust newer ones.',
+      message: `Publisher ${publisher.name} is suspended by the registry admin`,
+      hint: 'The admin no longer vouches for this key. Ask the publisher or the admin which versions are still good.',
     });
+  }
   if (publisher.versionCount !== BigInt(log.length)) {
     const hint =
       publisher.versionCount > BigInt(log.length)

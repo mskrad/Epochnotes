@@ -15,6 +15,7 @@ import {
   compareLogWithChain,
   configAddress,
   fetchPublisher,
+  fetchRevocation,
   fetchVersion,
   GENESIS_ROOT,
   initializeInstruction,
@@ -25,6 +26,7 @@ import {
   registerPublisherInstruction,
   revokeEntryInstruction,
   sendInstructions,
+  setPublisherActiveInstruction,
   type VersionArgs,
 } from '../src/index.js';
 import { sharedTestAdminKey } from '../test/keys.js';
@@ -49,6 +51,11 @@ const ERROR = {
   BrokenChain: 6004,
   InvalidEntryId: 6008,
 } as const;
+
+/** The system program's "account already in use": custom error 0, as kit reports it. */
+const ACCOUNT_IN_USE = /Custom program error: #0\b/;
+/** Anchor's ConstraintSeeds (2006), ConstraintHasOne (2001), or this program's NotPublisher (6001). */
+const SEEDS_OR_OWNER = /Custom program error: #(2006|2001|6001)\b/;
 
 async function failure(run: Promise<unknown>): Promise<string> {
   const error = await run.then(
@@ -147,7 +154,8 @@ describe('registry program', () => {
     const repeated = sendInstructions(cluster, publisher, [
       await publishVersionInstruction(publisher.address, version(2n, root('b2'), root('a2'))),
     ]);
-    expect(await failure(repeated)).not.toBe('');
+    // the version account for n = 2 exists already: the system program refuses to create it again (error 0)
+    expect(await failure(repeated)).toMatch(ACCOUNT_IN_USE);
     const skipped = sendInstructions(cluster, publisher, [
       await publishVersionInstruction(publisher.address, version(4n, root('a4'), root('a2'))),
     ]);
@@ -167,16 +175,45 @@ describe('registry program', () => {
         : account,
     );
     const forged = { ...honest, accounts } as Instruction;
-    expect(await failure(sendInstructions(cluster, outsider, [forged]))).toMatch(/2006|2001|6001/); // ConstraintSeeds, ConstraintHasOne or NotPublisher
+    expect(await failure(sendInstructions(cluster, outsider, [forged]))).toMatch(SEEDS_OR_OWNER);
     expect(await fetchPublisher(cluster, publisher.address)).toMatchObject({ versionCount: 2n });
   });
 
-  it('records a revoked entry, and refuses an id that does not match its hash', async () => {
+  it('records a revoked entry once, and only for the id that matches its hash', async () => {
+    expect(await fetchRevocation(cluster, publisher.address, 'tx-v1')).toBeUndefined();
     await sendInstructions(cluster, publisher, [await revokeEntryInstruction(publisher.address, 'tx-v1')]);
+    expect(await fetchRevocation(cluster, publisher.address, 'tx-v1')).toMatchObject({
+      entryId: 'tx-v1',
+      atVersion: 2n,
+    });
+
     const again = sendInstructions(cluster, publisher, [
       await revokeEntryInstruction(publisher.address, 'tx-v1'),
     ]);
-    expect(await failure(again)).not.toBe('');
+    expect(await failure(again)).toMatch(ACCOUNT_IN_USE);
+
+    // the hash (and so the account) of one id, the text of another
+    const honest = await revokeEntryInstruction(publisher.address, 'slot-duration');
+    const other = new TextEncoder().encode('alpenglow');
+    const length = new Uint8Array(4);
+    new DataView(length.buffer).setUint32(0, other.length, true);
+    const data = Uint8Array.from([...(honest.data ?? []).slice(0, 8 + 32), ...length, ...other]);
+    const forged = { ...honest, data } as Instruction;
+    expect(await failure(sendInstructions(cluster, publisher, [forged]))).toContain(
+      String(ERROR.InvalidEntryId),
+    );
+    expect(await fetchRevocation(cluster, publisher.address, 'slot-duration')).toBeUndefined();
+
+    // nobody revokes in another publisher's name: the account is derived from the signer
+    const foreign = await revokeEntryInstruction(publisher.address, 'rent-simd-0437');
+    const accounts = (foreign.accounts ?? []).map((account) =>
+      account.role === AccountRole.WRITABLE_SIGNER
+        ? { address: outsider.address as Address, role: AccountRole.WRITABLE_SIGNER }
+        : account,
+    );
+    expect(
+      await failure(sendInstructions(cluster, outsider, [{ ...foreign, accounts } as Instruction])),
+    ).toMatch(SEEDS_OR_OWNER);
   });
 
   it('lets a client detect a truncated log and a rewritten history', async () => {
@@ -212,5 +249,59 @@ describe('registry program', () => {
       { ...(full[0] as Manifest), publisher: outsider.address },
     ]);
     expect(stranger.map((issue) => issue.message).join(' ')).toContain('not registered on chain');
+  });
+
+  it('lets only the admin suspend a publisher; a suspended publisher can neither publish nor revoke', async () => {
+    const byOutsider = sendInstructions(cluster, outsider, [
+      await setPublisherActiveInstruction(outsider.address, publisher.address, false),
+    ]);
+    expect(await failure(byOutsider)).toContain(String(ERROR.NotAdmin));
+
+    await sendInstructions(cluster, admin, [
+      await setPublisherActiveInstruction(admin.address, publisher.address, false),
+    ]);
+    expect(await fetchPublisher(cluster, publisher.address)).toMatchObject({
+      active: false,
+      versionCount: 2n,
+    });
+
+    const publishing = sendInstructions(cluster, publisher, [
+      await publishVersionInstruction(publisher.address, version(3n, root('a3'), root('a2'))),
+    ]);
+    expect(await failure(publishing)).toContain(String(ERROR.PublisherNotActive));
+    const revoking = sendInstructions(cluster, publisher, [
+      await revokeEntryInstruction(publisher.address, 'alpenglow'),
+    ]);
+    expect(await failure(revoking)).toContain(String(ERROR.PublisherNotActive));
+
+    const manifest = {
+      manifest_version: 1,
+      publisher: publisher.address,
+      n: 1,
+      merkle_root: root('a1'),
+      prev_root: GENESIS_ROOT,
+      entry_count: 4,
+      content_hash: root('cc'),
+      uri: 'x',
+      published: '2026-09-19',
+      revoked: [],
+      signature: '00'.repeat(64),
+    } as Manifest;
+    const second = { ...manifest, n: 2, merkle_root: root('a2'), prev_root: root('a1') };
+    expect(
+      (await compareLogWithChain(cluster, [manifest, second])).map((issue) => issue.message).join(' '),
+    ).toContain('suspended by the registry admin');
+
+    await sendInstructions(cluster, admin, [
+      await setPublisherActiveInstruction(admin.address, publisher.address, true),
+    ]);
+    await sendInstructions(cluster, publisher, [
+      await publishVersionInstruction(publisher.address, version(3n, root('a3'), root('a2'))),
+    ]);
+    expect(await fetchPublisher(cluster, publisher.address)).toMatchObject({
+      active: true,
+      versionCount: 3n,
+      latestRoot: root('a3'),
+    });
   });
 });

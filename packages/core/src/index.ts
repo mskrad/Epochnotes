@@ -4,6 +4,7 @@ export {
   type AnchoredVersion,
   anchorLog,
   type AnchorResult,
+  revokeEntryOnChain,
 } from './anchor-log.js';
 export { type CheckReport, checkDirectory, checkRepository, type Finding } from './check-repo.js';
 export { canonicalize, CanonicalizationError, entryLeafHash, toHex } from './canonical.js';
@@ -79,6 +80,7 @@ export {
   writeNewFile,
 } from './version-store.js';
 export {
+  assertNotMainnet,
   type Cluster as OnchainCluster,
   compareLogWithChain,
   configAddress,
@@ -86,10 +88,13 @@ export {
   decodeVersion,
   discriminator,
   fetchPublisher,
+  fetchRevocation,
   fetchVersion,
   initializeInstruction,
   loadSigner,
+  MAINNET_GENESIS_HASH,
   type OnchainPublisher,
+  type OnchainRevocation,
   type OnchainVersion,
   publisherAddress,
   publishVersionInstruction,
@@ -98,6 +103,7 @@ export {
   revocationAddress,
   revokeEntryInstruction,
   sendInstructions,
+  setPublisherActiveInstruction,
   versionAddress,
   type VersionArgs,
   versionArgsOf,

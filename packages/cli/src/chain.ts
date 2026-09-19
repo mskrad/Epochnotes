@@ -2,8 +2,8 @@ import {
   admitPublisher,
   anchorLog,
   CLUSTERS,
-  compareLogWithChain,
   type OnchainCluster,
+  revokeEntryOnChain,
 } from '@epochnotes/core';
 import { type Command, Option } from 'commander';
 
@@ -31,8 +31,12 @@ function refuseWrites(cluster: string): boolean {
   return true;
 }
 
+/** A failed transaction hides its reason in the cause chain ("Custom program error: #6000"): print all of it. */
 function fail(error: unknown, what: string): void {
-  console.error(`Cannot ${what}: ${(error as Error).message}`);
+  const reasons: string[] = [];
+  for (let at: unknown = error; at instanceof Error && reasons.length < 5; at = at.cause)
+    reasons.push(at.message);
+  console.error(`Cannot ${what}: ${reasons.join(' <- ')}`);
   process.exitCode = EXIT.environment;
 }
 
@@ -87,6 +91,30 @@ export function addChainCommands(registry: Command): void {
     );
 
   registry
+    .command('revoke')
+    .description('Record on chain that the publisher withdrew an entry. It cannot be undone.')
+    .requiredOption('--key <file>', 'publisher keypair; it signs and pays')
+    .requiredOption('--entry <id>', 'id of the entry to withdraw')
+    .addOption(clusterOption())
+    .option('--rpc-url <url>', 'JSON-RPC endpoint instead of the public one')
+    .action(async (options: { key: string; entry: string; cluster: string; rpcUrl?: string }) => {
+      if (refuseWrites(options.cluster)) return;
+      try {
+        const result = await revokeEntryOnChain({
+          keyFile: options.key,
+          entryId: options.entry,
+          cluster: clusterOf(options),
+        });
+        console.log(
+          `Revoked ${options.entry} on ${options.cluster}\n  account   ${result.address}\n  signature ${result.signature}`,
+        );
+        process.exitCode = EXIT.ok;
+      } catch (error) {
+        fail(error, 'revoke the entry');
+      }
+    });
+
+  registry
     .command('admit')
     .description('As the registry admin, admit a publisher key (creates the registry on first use).')
     .requiredOption('--admin-key <file>', 'admin keypair; it signs and pays')
@@ -122,5 +150,3 @@ export function addChainCommands(registry: Command): void {
       },
     );
 }
-
-export { compareLogWithChain };

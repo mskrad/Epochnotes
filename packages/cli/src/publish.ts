@@ -1,5 +1,6 @@
 import {
   compareLogWithChain,
+  fetchRevocation,
   parsePin,
   publishVersion,
   readTrustedPublishers,
@@ -136,6 +137,15 @@ export function addVersionCommands(registry: Command): void {
           let differences;
           try {
             differences = await compareLogWithChain(clusterOf(options), result.log);
+            // The log can be intact and the entry still withdrawn: a revocation is a record of its own on chain.
+            const revoked = await fetchRevocation(clusterOf(options), result.manifest.publisher, entryId);
+            if (revoked !== undefined) {
+              differences.push({
+                path: entryId,
+                message: `Entry was revoked on chain by its publisher (at version ${revoked.atVersion})`,
+                hint: 'Do not rely on this entry. The revocation account is ' + revoked.address + '.',
+              });
+            }
           } catch (error) {
             console.error(`Cannot read the chain: ${(error as Error).message}`);
             process.exitCode = EXIT.environment;

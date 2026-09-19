@@ -1,6 +1,7 @@
 import type { Address } from '@solana/kit';
 
 import {
+  assertNotMainnet,
   type Cluster,
   compareLogWithChain,
   configAddress,
@@ -10,6 +11,8 @@ import {
   publisherAddress,
   publishVersionInstruction,
   registerPublisherInstruction,
+  revocationAddress,
+  revokeEntryInstruction,
   sendInstructions,
   versionAddress,
   versionArgsOf,
@@ -39,6 +42,7 @@ export async function anchorLog(options: {
   keyFile: string;
   cluster: Cluster;
 }): Promise<AnchorResult> {
+  await assertNotMainnet(options.cluster);
   const signer = await loadSigner(options.keyFile);
   const log = await verifyLog(readRawLog(options.versionsDir), [signer.address]);
   if (!log.ok) return log;
@@ -104,6 +108,7 @@ export async function admitPublisher(options: {
   name: string;
   cluster: Cluster;
 }): Promise<AdmitResult> {
+  await assertNotMainnet(options.cluster);
   const admin = await loadSigner(options.adminKeyFile);
   const config = await configAddress(options.cluster.programId);
   const signatures: string[] = [];
@@ -133,5 +138,25 @@ export async function admitPublisher(options: {
     publisher: await publisherAddress(options.publisher, options.cluster.programId),
     initialized,
     signatures,
+  };
+}
+
+/** Records on chain that the publisher withdrew an entry. Returns the revocation account and the signature. */
+export async function revokeEntryOnChain(options: {
+  keyFile: string;
+  entryId: string;
+  cluster: Cluster;
+}): Promise<{ address: Address; signature: string }> {
+  await assertNotMainnet(options.cluster);
+  const signer = await loadSigner(options.keyFile);
+  const instruction = await revokeEntryInstruction(
+    signer.address,
+    options.entryId,
+    options.cluster.programId,
+  );
+  const signature = await sendInstructions(options.cluster, signer, [instruction]);
+  return {
+    address: await revocationAddress(signer.address, options.entryId, options.cluster.programId),
+    signature,
   };
 }

@@ -131,20 +131,22 @@ describe('epochnotes registry anchor / verify --onchain', () => {
     expect(admitted.code).toBe(0);
     expect(admitted.out).toMatch(/dmitted cli test on localnet/);
 
-    // a key that is not the admin cannot admit anyone, itself included
+    // a key that is not the admin cannot admit anyone (a fresh key, so nothing else can be the reason)
+    const fresh = (await loadPublisherKey(writeTestKey(join(dir, 'fresh.json')))).address;
     const stranger = await run(
       'registry',
       'admit',
       '--admin-key',
       publisherKey,
       '--publisher',
-      publisher,
+      fresh,
       '--name',
-      'self',
+      'x',
       '--cluster',
       'localnet',
     );
     expect(stranger.code).toBe(2);
+    expect(stranger.out).toContain('Custom program error: #6000'); // NotAdmin, not just any failure
 
     const anchored = await run(
       'registry',
@@ -208,5 +210,22 @@ describe('epochnotes registry anchor / verify --onchain', () => {
     expect(truncated.code).toBe(1);
     expect(truncated.out).toContain('rolled back or truncated');
     writeFileSync(join(versions, '2.json'), second);
+
+    // the log is intact and anchored, and the entry is still withdrawn: a revocation is its own record on chain
+    const revoked = await run(
+      'registry',
+      'revoke',
+      '--key',
+      publisherKey,
+      '--entry',
+      'tx-v1',
+      '--cluster',
+      'localnet',
+    );
+    expect(revoked.code).toBe(0);
+    const afterRevocation = await verify('--onchain');
+    expect(afterRevocation.code).toBe(1);
+    expect(afterRevocation.out).toContain('revoked on chain by its publisher (at version 2)');
+    expect((await verify()).code).toBe(0); // without the chain, nothing tells the client
   });
 });

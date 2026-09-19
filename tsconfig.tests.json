@@ -8,5 +8,11 @@
     "sourceMap": false,
     "paths": { "@epochnotes/core": ["./packages/core/src/index.ts"] }
   },
-  "include": ["packages/*/src", "packages/*/test", "vitest.config.ts"]
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "packages/*/test-onchain",
+    "vitest.config.ts",
+    "vitest.onchain.config.ts"
+  ]
 }

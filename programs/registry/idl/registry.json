@@ -1,0 +1,505 @@
+{
+  "address": "Diad4BcYWeB3Epgma7RZFNWspm5gpdtTLnwoj3UWEcdy",
+  "metadata": {
+    "name": "registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Publisher registry and version log"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "docs": ["Creates the registry and names the admin who admits publishers."],
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "publish_version",
+      "docs": ["Appends version `n` to the publisher's log."],
+      "discriminator": [6, 123, 155, 174, 43, 89, 146, 212],
+      "accounts": [
+        {
+          "name": "publisher",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 117, 98, 108, 105, 115, 104, 101, 114]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "version",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [118, 101, 114, 115, 105, 111, 110]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "n"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["publisher"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "n",
+          "type": "u64"
+        },
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "VersionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_publisher",
+      "docs": ["Admits a publisher key. Only the admin can do this."],
+      "discriminator": [144, 151, 194, 252, 185, 4, 145, 252],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "publisher",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 117, 98, 108, 105, 115, 104, 101, 114]
+              },
+              {
+                "kind": "arg",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": ["config"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "revoke_entry",
+      "docs": ["Records that the publisher withdrew an entry. `entry_id_hash` is sha256 of the entry id."],
+      "discriminator": [185, 114, 145, 255, 155, 184, 136, 191],
+      "accounts": [
+        {
+          "name": "publisher",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 117, 98, 108, 105, 115, 104, 101, 114]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revocation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [114, 101, 118, 111, 107, 101, 100]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "entry_id_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": ["publisher"]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "entry_id_hash",
+          "type": {
+            "array": ["u8", 32]
+          }
+        },
+        {
+          "name": "entry_id",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "set_publisher_active",
+      "docs": ["Suspends or restores a publisher. Versions published while it was active stay valid."],
+      "discriminator": [108, 230, 122, 146, 16, 198, 237, 58],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 111, 110, 102, 105, 103]
+              }
+            ]
+          }
+        },
+        {
+          "name": "publisher",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [112, 117, 98, 108, 105, 115, 104, 101, 114]
+              },
+              {
+                "kind": "account",
+                "path": "publisher.authority",
+                "account": "Publisher"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": ["config"]
+        }
+      ],
+      "args": [
+        {
+          "name": "active",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+    },
+    {
+      "name": "Publisher",
+      "discriminator": [86, 152, 93, 215, 234, 89, 232, 104]
+    },
+    {
+      "name": "RegistryVersion",
+      "discriminator": [41, 204, 169, 76, 233, 253, 160, 18]
+    },
+    {
+      "name": "Revocation",
+      "discriminator": [128, 117, 129, 229, 11, 159, 79, 234]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotAdmin",
+      "msg": "Only the registry admin can do this"
+    },
+    {
+      "code": 6001,
+      "name": "NotPublisher",
+      "msg": "The signer is not the authority of this publisher"
+    },
+    {
+      "code": 6002,
+      "name": "PublisherNotActive",
+      "msg": "The publisher is not active"
+    },
+    {
+      "code": 6003,
+      "name": "VersionOutOfOrder",
+      "msg": "Version number must be the publisher's version count plus one"
+    },
+    {
+      "code": 6004,
+      "name": "BrokenChain",
+      "msg": "prev_root must equal the Merkle root of the publisher's previous version"
+    },
+    {
+      "code": 6005,
+      "name": "EmptyVersion",
+      "msg": "A version holds at least one entry"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidName",
+      "msg": "Name must be 1 to 32 bytes"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidUri",
+      "msg": "URI must be 1 to 200 bytes"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidEntryId",
+      "msg": "Entry id must be 1 to 64 bytes and match its hash"
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Publisher",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "admitted_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "version_count",
+            "type": "u64"
+          },
+          {
+            "name": "latest_root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RegistryVersion",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "publisher",
+            "type": "pubkey"
+          },
+          {
+            "name": "n",
+            "type": "u64"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "prev_root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "entry_count",
+            "type": "u32"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Revocation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "publisher",
+            "type": "pubkey"
+          },
+          {
+            "name": "entry_id",
+            "type": "string"
+          },
+          {
+            "name": "at_version",
+            "docs": ["The publisher's latest version when the entry was withdrawn."],
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VersionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "prev_root",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": ["u8", 32]
+            }
+          },
+          {
+            "name": "entry_count",
+            "type": "u32"
+          },
+          {
+            "name": "uri",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

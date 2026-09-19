@@ -12,3 +12,6 @@ registry = "Diad4BcYWeB3Epgma7RZFNWspm5gpdtTLnwoj3UWEcdy"
 [provider]
 cluster = "localnet"
 wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "npx vitest run --config vitest.onchain.config.ts"

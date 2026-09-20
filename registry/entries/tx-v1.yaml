@@ -51,13 +51,13 @@ detect:
     confidence: breaks
     summary: RPC read call pins maxSupportedTransactionVersion to the literal 0; it fails as soon as the result contains a version 1 transaction.
     languages: [ts, js, rust, go, python]
-    pattern: 'maxSupportedTransactionVersion"?\s*:\s*0\b'
+    pattern: 'maxSupportedTransactionVersion[''"]?\s*[:=]\s*0\b'
   - rule: rust-client-max-version-zero
     kind: code-pattern
     confidence: breaks
     summary: The Rust RPC client config pins max_supported_transaction_version to Some(0); reads fail as soon as the result contains a version 1 transaction.
     languages: [rust]
-    pattern: 'max_supported_transaction_version\s*:\s*Some\(\s*0\s*\)'
+    pattern: 'max_supported_transaction_version\s*[:=]\s*Some\(\s*0(_?u8)?\s*\)'
   - rule: go-client-max-version-zero
     kind: code-pattern
     confidence: breaks
@@ -71,7 +71,13 @@ detect:
       A transaction or block is read without maxSupportedTransactionVersion, which the RPC treats like the
       lowest version. Check that this is a Solana RPC call: libraries of other chains use the same method names.
     languages: [ts, js]
-    pattern: '\.(getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)\((?!\s*[{''"`)])(?![^;]{0,400}maxSupportedTransactionVersion)'
+    pattern: '\.(getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)(<[^>\n]{0,80}>)?\((?!\s*[{''"`)])(?![^,()\n]{1,80},\s*[A-Za-z_$][\w$.]*\s*\))(?!(?:(?!\n\s*\n)[^;]){0,400}maxSupportedTransactionVersion)'
+  - rule: python-client-max-version-zero
+    kind: code-pattern
+    confidence: breaks
+    summary: The Python RPC client is called with max_supported_transaction_version=0; reads fail as soon as the result contains a version 1 transaction.
+    languages: [python]
+    pattern: 'max_supported_transaction_version\s*=\s*0\b'
   - rule: rpc-max-version-dynamic
     kind: code-pattern
     confidence: check
@@ -115,8 +121,6 @@ fix:
     for_rules:
       [
         rpc-max-version-zero,
-        rust-client-max-version-zero,
-        go-client-max-version-zero,
         rpc-read-without-max-version,
         rpc-max-version-dynamic,
         docs-teach-max-version-zero,
@@ -127,6 +131,8 @@ fix:
     for_rules: [kit-below-8]
     links:
       - https://github.com/anza-xyz/kit/releases/tag/v8.0.0
+  - summary: Set the maximum supported transaction version to 1 in the configuration of the RPC client (Some(1) in Rust, rpc.MaxSupportedTransactionVersion1 or uint64(1) in Go, max_supported_transaction_version=1 in Python), and check that the client library in use can decode a version 1 transaction.
+    for_rules: [rust-client-max-version-zero, go-client-max-version-zero, python-client-max-version-zero]
 sources:
   - kind: simd
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md

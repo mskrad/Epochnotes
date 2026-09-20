@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -80,16 +80,36 @@ describe('the corpus of before/after pairs', () => {
     expect(
       problemsAfter('extra-detected', append('pairs/tx-v1/real-whoearns-live-getblock/before.ts')),
     ).toEqual([expect.stringContaining('before is also reported by rpc-max-version-dynamic')]);
-    // A Rust case is read by no rule today; given a .ts name on the way in, the other rule sees the added line.
-    const problems = problemsAfter('extra-miss', (dir) => {
-      append('pairs/tx-v1/real-rpc-latency-monitor-json-macro/before.rs')(dir);
-      edit(
-        join(dir, 'manifest.yaml'),
-        'files: { before: before.rs, after: after.rs }',
-        'files: { before: before.rs, after: after.rs, as: case.ts }',
-      );
-    });
-    expect(problems).toEqual([expect.stringContaining('before is also reported by rpc-max-version-dynamic')]);
+    // The decoder case is a recorded miss with no rule of its own: any rule that reports it is unexpected.
+    const problems = problemsAfter(
+      'extra-miss',
+      append('pairs/tx-v1/synthetic-decoder-version-byte/before.ts'),
+    );
+    expect(problems).toEqual([
+      expect.stringContaining('recorded as a miss, but the engine now reports rpc-max-version-dynamic'),
+    ]);
+  });
+
+  it('holds a quiet sample to its word: it must be read by a rule, and no rule may report it', () => {
+    const sample = 'pairs/tx-v1/quiet-other-chain-same-method/sample.ts';
+    expect(
+      problemsAfter('noisy', (dir) =>
+        writeFileSync(
+          join(dir, sample),
+          `${readFileSync(join(dir, sample), 'utf8')}await connection.getTransaction(signature);\n`,
+        ),
+      ),
+    ).toEqual([
+      expect.stringContaining(
+        'quiet-other-chain-same-method: must stay silent, rpc-read-without-max-version reports line',
+      ),
+    ]);
+    expect(
+      problemsAfter('unread', (dir) => {
+        renameSync(join(dir, sample), join(dir, 'pairs/tx-v1/quiet-other-chain-same-method/sample.txt'));
+        edit(join(dir, 'manifest.yaml'), 'file: sample.ts', 'file: sample.txt');
+      }),
+    ).toEqual(['quiet-other-chain-same-method: no rule of tx-v1 reads sample.txt']);
   });
 
   it('holds the header of an excerpt, the manifest and the notice to one story', () => {

@@ -145,7 +145,11 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
         if (name !== item.file) problems.push(`${item.id}: ${name} is not its sample file`);
       const target = join(scratch, item.id);
       cpSync(join(directory, item.file), join(target, item.file), { recursive: true });
-      const found = checkDirectory(target, [entry]).findings;
+      const checked = checkDirectory(target, [entry]);
+      // a sample no rule reads is quiet for the wrong reason
+      if (checked.filesScanned === 0)
+        problems.push(`${item.id}: no rule of ${item.entry} reads ${item.file}`);
+      const found = checked.findings;
       quiet.push({ id: item.id, silent: found.length === 0 });
       for (const finding of found)
         problems.push(

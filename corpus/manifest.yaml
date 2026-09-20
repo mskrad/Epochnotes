@@ -89,6 +89,15 @@ cases:
         The shape of real fixes (sig-net/mpc#1215, and a cookbook example of solana-com found in the field);
         the fix that shows it best is under AGPL-3.0 and is referred to, not copied.
 
+  - id: synthetic-python-client
+    entry: tx-v1
+    files: { before: before.py, after: after.py }
+    expect: { rule: python-client-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: synthetic
+      reason: The keyword-argument form of the Python clients; no public fix of this shape was found that could be copied.
+
   - id: synthetic-formatter-line-break
     entry: tx-v1
     files: { before: before.ts, after: after.ts }

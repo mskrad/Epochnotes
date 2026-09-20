@@ -303,6 +303,16 @@ function lockedVersions(lockfile: string, raw: string, name: string): string[] {
   return [...found];
 }
 
+/**
+ * A line that is nothing but a comment, by the language of the file. Documentation is not code and has no
+ * comments to skip: a rule for markdown means what it says.
+ */
+function commentLine(extension: string): RegExp {
+  if (EXTENSIONS.markdown.includes(extension)) return /^(?!)/;
+  // `*` opens a continuation line of a block comment only when a blank or a slash follows: `*p = 0` is code.
+  return EXTENSIONS.python.includes(extension) ? /^#/ : /^(\/\/|\/\*|\*(\s|\/|$))/;
+}
+
 export interface CheckLimits {
   maxFileBytes?: number;
   maxLockfileBytes?: number;
@@ -402,6 +412,9 @@ export function checkDirectory(
           if (match[0] === '') regex.lastIndex += 1; // an empty match must not loop forever
           const line = lineOf(match.index);
           if (line === lastLine) continue; // one finding for a line and a rule, as before
+          // Commented-out code does not run. Only whole-line comments are told apart: what follows code on the
+          // same line, and what sits inside a string, is still reported.
+          if (commentLine(extname(path)).test(lineText(line))) continue;
           lastLine = line;
           const last = lineOf(match.index + Math.max(match[0].length - 1, 0));
           let excerpt = lineText(line).slice(0, 200);

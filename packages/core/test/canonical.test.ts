@@ -13,7 +13,7 @@ import { reference, referenceYaml } from './helpers.js';
 // Changed on 2026-09-20 with the rules for Rust, Go and reads without the parameter. The entry stays at rev 1:
 // no version of the registry has been published yet, and the first published version must start every entry
 // at rev 1. After the first publication this value changes only together with `rev`.
-const PINNED_TX_V1_REV_1 = '35e086b6f58b1a226cbdb9009ee776612363e9311eca6d65b8e2037f317747e5';
+const PINNED_TX_V1_REV_1 = '3ec974b0ff65c12d4f9cbef3a039721b16044893bb776536c22dfefd2e220508';
 
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);

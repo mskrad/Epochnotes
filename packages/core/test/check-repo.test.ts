@@ -601,6 +601,38 @@ describe('check repo', () => {
     });
   });
 
+  describe('commented-out code', () => {
+    const lines = (name: string, files: Record<string, string>) =>
+      check(repo(name, files)).findings.map((finding) => `${finding.file}:${finding.line}`);
+
+    it('is not reported when the whole line is a comment, in the comment syntax of the language', () => {
+      expect(
+        lines('comments', {
+          'a.ts': `// old: { maxSupportedTransactionVersion: 0 }\n/* { maxSupportedTransactionVersion: 0 } */\n/**\n * pass { maxSupportedTransactionVersion: 0 }\n */\n`,
+          'b.rs': '// max_supported_transaction_version: Some(0),\n',
+          'c.go': '// MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion0,\n',
+          'd.py': '# client.get_transaction(sig, max_supported_transaction_version=0)\n',
+        }),
+      ).toEqual([]);
+    });
+
+    it('is still reported after code on the same line, in a string, and where a star starts real code', () => {
+      expect(
+        lines('not-comments', {
+          'a.ts': `get(sig, { maxSupportedTransactionVersion: 0 }); // why\nconst s = '{ maxSupportedTransactionVersion: 0 }';\n`,
+          'c.go':
+            '*opts = rpc.GetTransactionOpts{MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion0}\n',
+        }),
+      ).toEqual(['a.ts:1', 'a.ts:2', 'c.go:1']);
+    });
+
+    it('does not apply to documentation: a rule for markdown means what it says', () => {
+      expect(lines('docs-hash', { 'README.md': '# maxSupportedTransactionVersion: 0\n' })).toEqual([
+        'README.md:1',
+      ]);
+    });
+  });
+
   it('says which rules it could not run', () => {
     expect(check(repo('empty', { 'a.ts': 'export {};\n' })).notRun).toMatchObject([
       { entry: 'tx-v1', rule: 'rpc-reads-v1-transaction' },

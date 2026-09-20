@@ -123,6 +123,16 @@ describe('patterns that would be slow on a whole file', () => {
     expect(issue?.hint).toContain('[^;]{0,400}');
   });
 
+  it('is not fooled by punctuation around the word, a short word, or another kind of bracket', () => {
+    for (const pattern of [
+      '\\.getTransaction\\((?![^;]*maxSupportedTransactionVersion)',
+      'get\\([^)]*\\)',
+      'getTransaction\\s*\\{[^}]*\\}',
+      'maxSupportedTransactionVersion"[^}]*\\}',
+    ])
+      expect(slowPatternInput(pattern), pattern).toBeDefined();
+  }, 30_000);
+
   it('accepts the same idea once it is bounded, and every pattern of the registry', () => {
     expect(withPattern('getTransaction\\([^)]{0,400}\\)')).toEqual([]);
     for (const rule of reference().detect)

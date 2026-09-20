@@ -43,12 +43,24 @@ const account = (type: string, lamports: number, space: number) => ({
   },
 });
 
-function fake(accounts: (params: unknown[]) => unknown, rate = 500n) {
+/** Whether a request asks for accounts of one exact size, and which. */
+const sizeAsked = (params: unknown[]): number | undefined =>
+  (params[1] as { filters?: { dataSize?: number }[] }).filters?.find(
+    (filter) => filter.dataSize !== undefined,
+  )?.dataSize;
+
+/** In the fakes below the callback answers the sampled groups; exact-size requests find nothing unless `short` says otherwise. */
+function fake(
+  accounts: (params: unknown[]) => unknown,
+  rate = 500n,
+  short: (size: number) => unknown[] = () => [],
+) {
   const calls: { method: string; params: unknown[] }[] = [];
   const rpc: RentRpc = async (method, params) => {
     calls.push({ method, params });
     if (method === 'getAccountInfo') return { result: sysvar(rate) };
-    return { result: accounts(params) };
+    const size = method === 'getProgramAccounts' ? sizeAsked(params) : undefined;
+    return { result: size === undefined ? accounts(params) : short(size) };
   };
   return { rpc, calls, options: { rpc, gates, endpoint: 'https://rpc.example/?api-key=secret', schedule } };
 }
@@ -181,7 +193,8 @@ describe('sampling a program', () => {
     expect(report.total).toMatchObject({ accounts: 256, excessNow: 25_600_000n });
     expect(report.standardError).toBe(0n);
     const filters = calls
-      .filter((call) => call.method === 'getProgramAccounts')
+      // the sampled groups; the exact-size requests for short accounts have a test of their own
+      .filter((call) => call.method === 'getProgramAccounts' && sizeAsked(call.params) === undefined)
       .map((call) => JSON.stringify(call.params[1]));
     expect(filters).toHaveLength(4);
     expect(new Set(filters).size).toBe(4);
@@ -237,6 +250,78 @@ describe('sampling a program', () => {
     expect(report.standardError).toBeGreaterThan(report.total.excessNow / 2n);
     expect(report.reliability).toBe('unreliable');
     expect(report.notes[0]).toMatch(/^UNRELIABLE: /);
+  });
+});
+
+describe('accounts too short to hold the sampled byte', () => {
+  // The audit's fixture: one account of 8 bytes, one of 72, sampled by the byte at offset 40.
+  const long = account('Market', 200_000, 72);
+  const tiny = {
+    pubkey: 'tiny',
+    account: { lamports: 136_000, space: 8, data: [Buffer.alloc(8).toString('base64'), 'base64'] },
+  };
+  const byByte = (params: unknown[]) =>
+    (params[1] as { filters: { memcmp: { bytes: string } }[] }).filters[0]?.memcmp.bytes === '1'
+      ? [long]
+      : [];
+
+  it('are read by exact size and added unscaled: all groups plus the short sizes give the full scan', async () => {
+    const { options, calls } = fake(byByte, 500n, (size) => (size === 8 ? [tiny] : []));
+    const report = await sampleProgram('11111111111111111111111111111111', {
+      ...options,
+      offset: 40,
+      buckets: 256,
+      seed: 1,
+    });
+    expect(report.total).toMatchObject({ accounts: 2, excessNow: 168_000n });
+    expect(report.reliability).toBe('estimate');
+    const sizes = calls.map((call) =>
+      call.method === 'getProgramAccounts' ? sizeAsked(call.params) : undefined,
+    );
+    expect(sizes.filter((size) => size !== undefined)).toEqual(Array.from({ length: 41 }, (_, size) => size));
+    expect(report.method).toContain('41 exact-size requests');
+  });
+
+  it('are not scaled with the sample: with a fraction of the groups read, the short accounts count once', async () => {
+    const { options } = fake(
+      () => [long],
+      500n,
+      (size) => (size === 8 ? [tiny] : []),
+    );
+    const report = await sampleProgram('11111111111111111111111111111111', {
+      ...options,
+      offset: 40,
+      buckets: 4,
+      seed: 1,
+    });
+    // 4 groups with one long account each, scaled by 64, plus the one short account as it is
+    expect(report.total).toMatchObject({ accounts: 257, excessNow: 256n * 100_000n + 68_000n });
+  });
+
+  it('are declared uncovered, and the result partial, when the offset is too far in to ask for every size', async () => {
+    const { options, calls } = fake(() => [long]);
+    const report = await sampleProgram('11111111111111111111111111111111', {
+      ...options,
+      offset: 300,
+      buckets: 4,
+      seed: 1,
+    });
+    expect(report.reliability).toBe('partial');
+    expect(report.notes[0]).toContain('accounts of 300 bytes or fewer are not covered');
+    expect(
+      calls.some((call) => call.method === 'getProgramAccounts' && sizeAsked(call.params) !== undefined),
+    ).toBe(false);
+  });
+
+  it('says what the standard error belongs to', async () => {
+    const { options } = fake(() => [long]);
+    const report = await sampleProgram('11111111111111111111111111111111', {
+      ...options,
+      offset: 40,
+      buckets: 4,
+      seed: 1,
+    });
+    expect(report.notes.join(' ')).toContain('The standard error belongs to excessNow of the sampled part');
   });
 });
 

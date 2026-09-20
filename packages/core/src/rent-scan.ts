@@ -92,7 +92,12 @@ export interface RentScanReport {
   };
   method: string;
   /** `unreliable`: a sample whose standard error is more than a quarter of the estimate. Do not quote it. */
-  reliability: 'exact' | 'estimate' | 'unreliable';
+  /**
+   * `partial`: a sample that leaves accounts out by construction (those too short to hold the sampled byte)
+   * and could not read them separately. The figures are a lower bound of the sampled kind, not an estimate of
+   * the whole program.
+   */
+  reliability: 'exact' | 'estimate' | 'unreliable' | 'partial';
   /** One standard error of `excessNow`, in lamports; zero for a full scan. */
   standardError: bigint;
   buckets: RentBucket[];
@@ -268,6 +273,9 @@ export async function scanProgram(program: string, options: ScanOptions): Promis
   };
 }
 
+/** More exact-size requests than this are not worth it on a public endpoint; the sample is declared partial instead. */
+const MAX_SHORT_SIZE_REQUESTS = 129;
+
 /** A small deterministic generator, so that a sampled scan can be repeated by anyone with the same seed. */
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;
@@ -355,6 +363,33 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       unreliable: rare || tooWide(error, scale(bucket.excessNow)),
     };
   });
+  // An account of `offset` bytes or fewer has no byte at the offset, so it is in none of the 256 groups, and
+  // no number of groups brings it back. The RPC filters by exact size only; the short sizes are few, so each
+  // is asked for. What they hold is counted as it is: it was read in full, not sampled.
+  const shortSizes = options.offset + 1;
+  const covered = shortSizes <= MAX_SHORT_SIZE_REQUESTS;
+  const short = classify(known, options.schedule, rate);
+  if (covered) {
+    for (let size = 0; size < shortSizes; size += 1) {
+      const accounts = await result<RpcAccount[]>(options.rpc, 'getProgramAccounts', [
+        program,
+        { encoding: 'base64', dataSlice: SLICE, filters: [{ dataSize: size }] },
+      ]);
+      for (const account of accounts) short.add(account);
+    }
+  }
+  for (const exact of short.buckets()) {
+    const sampled = buckets.find((bucket) => bucket.type === exact.type);
+    if (sampled === undefined) buckets.push({ ...exact, standardError: 0n, unreliable: false });
+    else {
+      sampled.accounts += exact.accounts;
+      sampled.fundedAtEarlierRate += exact.fundedAtEarlierRate;
+      sampled.excessNow += exact.excessNow;
+      sampled.aboveMinimumUpperBound += exact.aboveMinimumUpperBound;
+      for (const [step, value] of Object.entries(exact.afterStep))
+        sampled.afterStep[step] = (sampled.afterStep[step] ?? 0n) + value;
+    }
+  }
   const total = sum('total', buckets);
   const error = standardError(perGroup);
   const unreliable = total.accounts === 0 || tooWide(error, total.excessNow);
@@ -368,12 +403,17 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       legacyRate: options.schedule.legacyRate,
       steps,
     },
-    method: `sample: ${chosen.length} of 256 groups by the byte at offset ${options.offset}, seed ${options.seed}; sums scaled by 256/${chosen.length}`,
-    reliability: unreliable ? 'unreliable' : 'estimate',
+    method: `sample: ${chosen.length} of 256 groups by the byte at offset ${options.offset}, seed ${options.seed}; sums scaled by 256/${chosen.length}${covered ? `; plus ${shortSizes} exact-size requests for accounts of ${options.offset} bytes or fewer, counted unscaled` : ''}`,
+    reliability: unreliable ? 'unreliable' : covered ? 'estimate' : 'partial',
     standardError: error,
     buckets,
     total,
     notes: [
+      ...(covered
+        ? []
+        : [
+            `PARTIAL: accounts of ${options.offset} bytes or fewer are not covered. They have no byte at the offset and sit in no group, and asking for every size up to ${options.offset} would take more than ${MAX_SHORT_SIZE_REQUESTS} requests. Choose an offset nearer the start of the data, or treat the figures as covering larger accounts only.`,
+          ]),
       ...(unreliable
         ? [
             `UNRELIABLE: ${total.accounts === 0 ? 'the groups read hold no accounts' : 'the standard error is more than a quarter of the estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
@@ -381,6 +421,7 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
         : []),
       ...(known?.note === undefined ? [] : [known.note]),
       splitNote(known),
+      'The standard error belongs to excessNow of the sampled part. The other figures of a sample (accounts, later steps, the upper bound) are scaled the same way and carry an error of the same relative order, which is not computed.',
       'A sample can be good for the total and useless for a small account type: each bucket carries its own standard error, and a type that occurs in none of the groups read is missing from the report, not zero.',
       'The byte must be spread evenly over accounts (a byte of a stored key). A byte of a flag or a counter gives empty groups and a useless estimate: check that the standard error is small next to excessNow.',
       ...notes,

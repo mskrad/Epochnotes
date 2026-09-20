@@ -1,0 +1,190 @@
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { parse } from 'yaml';
+import { z } from 'zod';
+
+import { checkDirectory } from './check-repo.js';
+import { validatePath } from './load.js';
+
+/** Licences under which an excerpt may be copied into this repository, with attribution. */
+const COPYABLE = ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'Unlicense', 'CC0-1.0'];
+
+const caseSchema = z.strictObject({
+  id: z.string().regex(/^(real|synthetic)-[a-z0-9-]+$/),
+  entry: z.string().min(1),
+  files: z.strictObject({
+    before: z.string().min(1),
+    after: z.string().min(1),
+    as: z.string().min(1).optional(),
+  }),
+  expect: z.strictObject({
+    rule: z.string().min(1).optional(),
+    confidence: z.enum(['breaks', 'check', 'likely-ok']),
+  }),
+  detected: z.boolean(),
+  gap: z.string().min(1).optional(),
+  source: z.discriminatedUnion('kind', [
+    z.strictObject({
+      kind: z.literal('repository'),
+      repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+      pull_request: z.number().int().positive(),
+      path: z.string().min(1),
+      before_commit: z.string().regex(/^[0-9a-f]{40}$/),
+      after_commit: z.string().regex(/^[0-9a-f]{40}$/),
+      license: z.enum(COPYABLE),
+    }),
+    z.strictObject({ kind: z.literal('synthetic'), reason: z.string().min(1) }),
+  ]),
+});
+const manifestSchema = z.strictObject({ cases: z.array(caseSchema).min(1) });
+
+export type CorpusCase = z.infer<typeof caseSchema>;
+
+export interface CorpusRow {
+  id: string;
+  kind: 'repository' | 'synthetic';
+  expected: string;
+  /** What the engine reported on `before`, as `rule (confidence)`. */
+  reported: string[];
+  detected: boolean;
+}
+
+export interface CorpusReport {
+  problems: string[];
+  rows: CorpusRow[];
+  /** Of the cases a correct engine must report, how many today's engine does. */
+  recall: { detected: number; of: number; repository: { detected: number; of: number } };
+}
+
+/**
+ * Holds three things against each other: the manifest, the files of `corpus/pairs`, and the engine. A case
+ * the manifest calls detected must be reported with the expected rule and confidence; a known miss must still
+ * be missed, so that closing a gap is recorded and not just enjoyed; `after` must be silent for the entry.
+ */
+export function checkCorpus(corpusDir: string, registryDir: string): CorpusReport {
+  const problems: string[] = [];
+  const rows: CorpusRow[] = [];
+  const registry = validatePath(registryDir);
+  const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
+  if (!registry.ok) problems.push('the registry is not valid: run `epochnotes registry validate`');
+
+  const parsed = manifestSchema.safeParse(parse(readFileSync(join(corpusDir, 'manifest.yaml'), 'utf8')));
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues)
+      problems.push(`manifest ${issue.path.join('.')}: ${issue.message}`);
+    return { problems, rows, recall: { detected: 0, of: 0, repository: { detected: 0, of: 0 } } };
+  }
+  const cases = parsed.data.cases;
+  const notice = existsSync(join(corpusDir, 'pairs', 'NOTICE.md'))
+    ? readFileSync(join(corpusDir, 'pairs', 'NOTICE.md'), 'utf8')
+    : '';
+
+  // every directory has a case, every case a directory
+  const onDisk = new Set<string>();
+  for (const entry of readdirSync(join(corpusDir, 'pairs'), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const item of readdirSync(join(corpusDir, 'pairs', entry.name), { withFileTypes: true }))
+      if (item.isDirectory()) onDisk.add(`${entry.name}/${item.name}`);
+  }
+  const ids = new Set<string>();
+  for (const item of cases) {
+    if (ids.has(item.id)) problems.push(`${item.id}: listed twice`);
+    ids.add(item.id);
+    if (!onDisk.delete(`${item.entry}/${item.id}`))
+      problems.push(`${item.id}: no directory pairs/${item.entry}/${item.id}`);
+  }
+  for (const orphan of onDisk) problems.push(`pairs/${orphan}: not in the manifest`);
+
+  const scratch = mkdtempSync(join(tmpdir(), 'epochnotes-corpus-'));
+  try {
+    for (const item of cases) {
+      const entry = entries.find((candidate) => candidate.id === item.entry);
+      const directory = join(corpusDir, 'pairs', item.entry, item.id);
+      if (entry === undefined) {
+        problems.push(`${item.id}: the registry has no entry ${item.entry}`);
+        continue;
+      }
+      if (!existsSync(join(directory, item.files.before)) || !existsSync(join(directory, item.files.after))) {
+        problems.push(`${item.id}: before or after file is missing`);
+        continue;
+      }
+      const rule = entry.detect.find((candidate) => candidate.rule === item.expect.rule);
+      if (item.expect.rule !== undefined && rule === undefined)
+        problems.push(`${item.id}: ${item.entry} has no rule ${item.expect.rule}`);
+      if (rule !== undefined && rule.confidence !== item.expect.confidence)
+        problems.push(`${item.id}: expects ${item.expect.confidence}, the rule says ${rule.confidence}`);
+      if (item.expect.rule === undefined && item.detected)
+        problems.push(`${item.id}: detected without a rule to detect it`);
+      if (!item.detected && item.gap === undefined) problems.push(`${item.id}: a known miss needs a gap`);
+      if (item.detected && item.gap !== undefined)
+        problems.push(`${item.id}: a detected case has no gap to explain`);
+      if (item.id.startsWith('real-') !== (item.source.kind === 'repository'))
+        problems.push(`${item.id}: the name and the kind of source disagree`);
+      if (item.source.kind === 'repository') {
+        if (!notice.includes(`https://github.com/${item.source.repository}`))
+          problems.push(`${item.id}: ${item.source.repository} is not named in pairs/NOTICE.md`);
+        for (const side of ['before', 'after'] as const) {
+          const head = readFileSync(join(directory, item.files[side]), 'utf8')
+            .split('\n')
+            .slice(0, 4)
+            .join('\n');
+          const commit = item.source[`${side}_commit`].slice(0, 12);
+          if (
+            !head.includes(item.source.repository) ||
+            !head.includes(commit) ||
+            !head.includes(item.source.path)
+          )
+            problems.push(
+              `${item.id}: the ${side} file does not name its repository, path and commit ${commit}`,
+            );
+        }
+      }
+
+      const run = (side: 'before' | 'after') => {
+        const target = join(scratch, `${item.id}-${side}`);
+        cpSync(join(directory, item.files[side]), join(target, item.files.as ?? item.files[side]), {
+          recursive: true,
+        });
+        return checkDirectory(target, [entry]).findings;
+      };
+      const before = run('before');
+      const hit = before.some(
+        (finding) => finding.rule === item.expect.rule && finding.confidence === item.expect.confidence,
+      );
+      const reported = [...new Set(before.map((finding) => `${finding.rule} (${finding.confidence})`))];
+      if (item.detected && !hit)
+        problems.push(
+          `${item.id}: expected ${item.expect.rule} on before, the engine reported ${reported.join(', ') || 'nothing'}`,
+        );
+      if (!item.detected && (item.expect.rule === undefined ? before.length > 0 : hit))
+        problems.push(
+          `${item.id}: recorded as a miss, but the engine now reports ${reported.join(', ')}: update the manifest`,
+        );
+      const after = run('after');
+      if (after.length > 0)
+        problems.push(
+          `${item.id}: after must be silent, the engine reported ${after.map((finding) => finding.rule).join(', ')}`,
+        );
+      rows.push({
+        id: item.id,
+        kind: item.source.kind,
+        expected: `${item.expect.rule ?? 'no rule yet'} (${item.expect.confidence})`,
+        reported,
+        detected: item.detected,
+      });
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  const count = (list: CorpusRow[]) => ({
+    detected: list.filter((row) => row.detected).length,
+    of: list.length,
+  });
+  return {
+    problems,
+    rows,
+    recall: { ...count(rows), repository: count(rows.filter((row) => row.kind === 'repository')) },
+  };
+}

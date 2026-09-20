@@ -13,7 +13,7 @@ Status: early development. Nothing here is ready for use yet.
 | `programs/registry` | Anchor program: publishers and the version log                              |
 | `registry/`         | Entry schema, registry entries (YAML) and published versions                |
 | `skills/epochnotes` | Claude skill: answers from the verified registry, checks a whole project    |
-| `corpus/`           | Before/after code pairs used to evaluate detection rules                    |
+| `corpus/`           | Before/after code pairs and the manifest of what a correct check reports    |
 
 ## Develop
 
@@ -23,6 +23,7 @@ Requires Node.js 22.12+, and for the program: Rust, Solana CLI 4.x, Anchor 0.32.
 npm ci
 npm run verify        # build + tests + lint
 npm run build:program # anchor build
+npm run corpus:check  # the corpus manifest, its files and the detection engine agree; prints recall
 ```
 
 ## For AI assistants

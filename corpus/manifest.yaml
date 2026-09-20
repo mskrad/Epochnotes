@@ -1,0 +1,129 @@
+# What a correct check must report for every case of corpus/pairs, and what the engine reports today.
+#
+# expect    the rule and confidence a correct engine gives for `before`; `after` must always be silent.
+#           Without `rule`, no rule of the registry covers the case yet.
+# detected  whether today's engine reports it. `false` is a known miss and needs a `gap` saying why.
+#           `npm run corpus:check` fails when the engine and this file disagree, in either direction:
+#           a fixed miss has to be recorded here, not just enjoyed.
+# source    a repository case names the repository, the pull request, the path, both commits and the
+#           licence (corpus/pairs/NOTICE.md); a synthetic case says why it was written.
+cases:
+  - id: real-whoearns-live-getblock
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: repository
+      repository: 0base-vc/whoearns-live
+      pull_request: 68
+      path: src/services/fee.service.ts
+      before_commit: e600b4bd69565b4edec82d61ce1f82ad3cad41b1
+      after_commit: 52e9b3979f0512b5cbb3ef03f4386852f2cc9195
+      license: MIT
+
+  - id: real-altude-js-gettransaction
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: repository
+      repository: AltudePlatform/altude-js
+      pull_request: 73
+      path: packages/gasstation/src/client.ts
+      before_commit: 0547ba0cc1049bb510b8bc18bb5147a142a2afde
+      after_commit: 294662fb078ecfe498e417bf7626d3ea49511216
+      license: MIT
+
+  - id: real-rpc-latency-monitor-json-macro
+    entry: tx-v1
+    files: { before: before.rs, after: after.rs }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: false
+    gap: >-
+      The rule covers ts and js only, and its pattern does not allow the quote that a JSON key carries
+      before the colon. Rust code that builds the request with json! is not seen.
+    source:
+      kind: repository
+      repository: solana-foundation/rpc-latency-monitor
+      pull_request: 86
+      path: src/rpc/methods.rs
+      before_commit: cca0a575c15545b66c0c0bb665e4d02ab605a4e9
+      after_commit: 553539f06c3d7a301dfbf034ee012d55251b60aa
+      license: Apache-2.0
+
+  - id: real-audius-api-go-constant
+    entry: tx-v1
+    files: { before: before.go, after: after.go }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: false
+    gap: >-
+      Go clients name the value through a constant of the SDK (rpc.MaxSupportedTransactionVersion0) instead
+      of writing a number, and the rule covers ts and js only.
+    source:
+      kind: repository
+      repository: AudiusProject/api
+      pull_request: 1040
+      path: solana/indexer/common/transaction.go
+      before_commit: 1d398f977396bdd5bf5346a17c35be23c4f8dc5e
+      after_commit: 53f7da590c9abd8be6ccfa9dfe5a0a146acca368
+      license: Apache-2.0
+
+  - id: synthetic-formatter-line-break
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: synthetic
+      reason: Reproduces a reported miss; no instance was found in the field. The value sits on the line after the colon.
+
+  - id: synthetic-variable-value
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: rpc-max-version-dynamic, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: The value comes from a variable; the rule can only ask a person to look.
+
+  - id: synthetic-docs-snippet
+    entry: tx-v1
+    files: { before: before.md, after: after.md }
+    expect: { rule: docs-teach-max-version-zero, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: >-
+        Documentation that teaches the pattern. Real instances exist, but the ones found so far sit in
+        repositories without a licence that allows copying.
+
+  - id: synthetic-web3js-lockfile
+    entry: tx-v1
+    files: { before: before.package-lock.json, after: after.package-lock.json, as: package-lock.json }
+    expect: { rule: web3js-below-1-99, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: A lockfile cut down to the one package the rule reads.
+
+  - id: synthetic-omitted-parameter
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { confidence: breaks }
+    detected: false
+    gap: No rule yet. The RPC treats a missing parameter like the lowest version; telling a read call without it needs more than a pattern on one line.
+    source:
+      kind: synthetic
+      reason: The entry states this break; no public fix of it was found that could be copied.
+
+  - id: synthetic-decoder-version-byte
+    entry: tx-v1
+    files: { before: before.ts, after: after.ts }
+    expect: { confidence: check }
+    detected: false
+    gap: No rule yet. A hand-written decoder has no fixed shape to match.
+    source:
+      kind: synthetic
+      reason: The entry states this break (the version byte of version 1 has no branch in older decoders).

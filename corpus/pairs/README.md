@@ -1,9 +1,10 @@
 # Before/after pairs
 
-Code before a fix and after it, one directory per case: `<entry>/<rule>/<case>/before.<ext>` and `after.<ext>`.
-The rule named by the path must find `before` and must not find `after`; a test walks this directory and checks
-exactly that, so a pair added here is a test added.
+Code before a fix and after it, one directory per case: `<entry>/<case>/before.<ext>` and `after.<ext>`.
+`corpus/manifest.yaml` says, for every case, which rule a correct check reports on `before`, whether today's
+engine does, and where the case comes from; `after` must always be silent. `npm run corpus:check` holds the
+manifest, the files and the engine against each other, and the same check runs as a test.
 
-A case is either taken from a repository in the field or written to reproduce a reported miss; the first comment
-of its `before` file says which. The files are kept out of the formatter: some cases are about the very line
-breaks a formatter would remove.
+A `real-*` case is an unmodified excerpt of a public repository (see `NOTICE.md`); a `synthetic-*` case was
+written here, and the manifest says why. The files are kept out of the formatter: some cases are about the
+very line breaks a formatter would remove.

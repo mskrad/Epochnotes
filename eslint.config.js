@@ -1,7 +1,17 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', 'target/**', '.anchor/**', 'node_modules/**', 'test-ledger/**'] },
+  // corpus/pairs holds excerpts of other people's files: fragments, not programs, and not ours to restyle
+  {
+    ignores: [
+      '**/dist/**',
+      'target/**',
+      '.anchor/**',
+      'node_modules/**',
+      'test-ledger/**',
+      'corpus/pairs/**',
+    ],
+  },
   ...tseslint.configs.strict,
   {
     files: ['packages/cli/src/**/*.ts'],

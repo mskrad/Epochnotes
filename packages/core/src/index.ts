@@ -166,3 +166,4 @@ export {
   type SimulationResult,
 } from './rent-close.js';
 export { type WithdrawExcessOptions, withdrawExcessTemplate } from './rent-template.js';
+export { checkCorpus, type CorpusCase, type CorpusReport, type CorpusRow } from './corpus.js';

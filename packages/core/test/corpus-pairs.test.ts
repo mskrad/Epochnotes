@@ -49,8 +49,8 @@ describe('the corpus of before/after pairs', () => {
     ).toEqual([expect.stringContaining('real-whoearns-live-getblock: after must be silent')]);
   });
 
-  it('notices a known miss that the engine started to find: the manifest has to be told', () => {
-    const problems = problemsAfter('miss-closed', (dir) =>
+  it('wants a detected case to carry no gap', () => {
+    const problems = problemsAfter('gap-on-detected', (dir) =>
       edit(
         join(dir, 'manifest.yaml'),
         'id: synthetic-variable-value',
@@ -58,6 +58,9 @@ describe('the corpus of before/after pairs', () => {
       ),
     );
     expect(problems).toEqual([expect.stringContaining('a detected case has no gap to explain')]);
+  });
+
+  it('notices a recorded miss that the engine finds after all: the manifest has to be told', () => {
     const flipped = problemsAfter('miss-flipped', (dir) => {
       const manifest = join(dir, 'manifest.yaml');
       const text = readFileSync(manifest, 'utf8');
@@ -68,6 +71,66 @@ describe('the corpus of before/after pairs', () => {
       );
     });
     expect(flipped).toEqual([expect.stringContaining('recorded as a miss, but the engine now reports')]);
+  });
+
+  it('notices a rule nobody expected on the before side, on a detected case and on a recorded miss alike', () => {
+    const extra = '\nconst other = { maxSupportedTransactionVersion: fromConfig };\n';
+    const append = (file: string) => (dir: string) =>
+      writeFileSync(join(dir, file), readFileSync(join(dir, file), 'utf8') + extra);
+    expect(
+      problemsAfter('extra-detected', append('pairs/tx-v1/real-whoearns-live-getblock/before.ts')),
+    ).toEqual([expect.stringContaining('before is also reported by rpc-max-version-dynamic')]);
+    // A Rust case is read by no rule today; given a .ts name on the way in, the other rule sees the added line.
+    const problems = problemsAfter('extra-miss', (dir) => {
+      append('pairs/tx-v1/real-rpc-latency-monitor-json-macro/before.rs')(dir);
+      edit(
+        join(dir, 'manifest.yaml'),
+        'files: { before: before.rs, after: after.rs }',
+        'files: { before: before.rs, after: after.rs, as: case.ts }',
+      );
+    });
+    expect(problems).toEqual([expect.stringContaining('before is also reported by rpc-max-version-dynamic')]);
+  });
+
+  it('holds the header of an excerpt, the manifest and the notice to one story', () => {
+    const manifest = (from: string, to: string) => (dir: string) =>
+      edit(join(dir, 'manifest.yaml'), from, to);
+    expect(problemsAfter('pr', manifest('pull_request: 68', 'pull_request: 69'))).toEqual([
+      expect.stringContaining('the before file does not name the licence and the pull request'),
+      expect.stringContaining('the after file does not name the licence and the pull request'),
+    ]);
+    expect(
+      problemsAfter(
+        'same-commit',
+        manifest(
+          'after_commit: 52e9b3979f0512b5cbb3ef03f4386852f2cc9195',
+          'after_commit: e600b4bd69565b4edec82d61ce1f82ad3cad41b1',
+        ),
+      ),
+    ).toContainEqual('real-whoearns-live-getblock: before and after name the same commit');
+    const licence = problemsAfter('licence-swapped', (dir) => {
+      const file = join(dir, 'manifest.yaml');
+      const text = readFileSync(file, 'utf8');
+      const at = text.indexOf('id: real-whoearns-live-getblock');
+      writeFileSync(file, text.slice(0, at) + text.slice(at).replace('license: MIT', 'license: Apache-2.0'));
+    });
+    expect(licence).toContainEqual(
+      expect.stringContaining('pairs/NOTICE.md has no row with its repository and the licence Apache-2.0'),
+    );
+    expect(
+      problemsAfter('no-licence-text', (dir) => rmSync(join(dir, 'pairs/LICENSES/MIT.txt'))),
+    ).toContainEqual(expect.stringContaining('pairs/LICENSES/MIT.txt is missing'));
+  });
+
+  it('notices a stray file in a case, and a manifest that is not there', () => {
+    expect(
+      problemsAfter('stray', (dir) =>
+        writeFileSync(join(dir, 'pairs/tx-v1/synthetic-docs-snippet/notes.txt'), 'x'),
+      ),
+    ).toEqual(['synthetic-docs-snippet: notes.txt is neither its before nor its after file']);
+    expect(problemsAfter('no-manifest', (dir) => rmSync(join(dir, 'manifest.yaml')))).toEqual([
+      'there is no manifest.yaml',
+    ]);
   });
 
   it('notices a directory without a case, a case without a source commit in its file, and an uncopyable licence', () => {

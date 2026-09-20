@@ -11,14 +11,13 @@ import { validatePath } from './load.js';
 /** Licences under which an excerpt may be copied into this repository, with attribution. */
 const COPYABLE = ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'Unlicense', 'CC0-1.0'];
 
+/** A plain file name: a case never reaches outside its own directory. */
+const fileName = z.string().regex(/^[\w][\w.-]*$/);
+
 const caseSchema = z.strictObject({
   id: z.string().regex(/^(real|synthetic)-[a-z0-9-]+$/),
   entry: z.string().min(1),
-  files: z.strictObject({
-    before: z.string().min(1),
-    after: z.string().min(1),
-    as: z.string().min(1).optional(),
-  }),
+  files: z.strictObject({ before: fileName, after: fileName, as: fileName.optional() }),
   expect: z.strictObject({
     rule: z.string().min(1).optional(),
     confidence: z.enum(['breaks', 'check', 'likely-ok']),
@@ -70,11 +69,16 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
   if (!registry.ok) problems.push('the registry is not valid: run `epochnotes registry validate`');
 
+  const empty = { problems, rows, recall: { detected: 0, of: 0, repository: { detected: 0, of: 0 } } };
+  if (!existsSync(join(corpusDir, 'manifest.yaml'))) {
+    problems.push('there is no manifest.yaml');
+    return empty;
+  }
   const parsed = manifestSchema.safeParse(parse(readFileSync(join(corpusDir, 'manifest.yaml'), 'utf8')));
   if (!parsed.success) {
     for (const issue of parsed.error.issues)
       problems.push(`manifest ${issue.path.join('.')}: ${issue.message}`);
-    return { problems, rows, recall: { detected: 0, of: 0, repository: { detected: 0, of: 0 } } };
+    return empty;
   }
   const cases = parsed.data.cases;
   const notice = existsSync(join(corpusDir, 'pairs', 'NOTICE.md'))
@@ -96,6 +100,13 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
       problems.push(`${item.id}: no directory pairs/${item.entry}/${item.id}`);
   }
   for (const orphan of onDisk) problems.push(`pairs/${orphan}: not in the manifest`);
+  for (const item of cases) {
+    const directory = join(corpusDir, 'pairs', item.entry, item.id);
+    if (!existsSync(directory)) continue;
+    const allowed = new Set([item.files.before, item.files.after]);
+    for (const name of readdirSync(directory))
+      if (!allowed.has(name)) problems.push(`${item.id}: ${name} is neither its before nor its after file`);
+  }
 
   const scratch = mkdtempSync(join(tmpdir(), 'epochnotes-corpus-'));
   try {
@@ -123,6 +134,21 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
       if (item.id.startsWith('real-') !== (item.source.kind === 'repository'))
         problems.push(`${item.id}: the name and the kind of source disagree`);
       if (item.source.kind === 'repository') {
+        if (item.source.before_commit === item.source.after_commit)
+          problems.push(`${item.id}: before and after name the same commit`);
+        // the cells of this case's row in the notice table, whatever padding a formatter gave them
+        const row = (notice.split('\n').find((line) => line.includes(`\`${item.id}\``)) ?? '')
+          .split('|')
+          .map((cell) => cell.trim());
+        if (
+          !row.includes(`https://github.com/${item.source.repository}`) ||
+          !row.includes(item.source.license)
+        )
+          problems.push(
+            `${item.id}: pairs/NOTICE.md has no row with its repository and the licence ${item.source.license}`,
+          );
+        if (!existsSync(join(corpusDir, 'pairs', 'LICENSES', `${item.source.license}.txt`)))
+          problems.push(`${item.id}: pairs/LICENSES/${item.source.license}.txt is missing`);
         if (!notice.includes(`https://github.com/${item.source.repository}`))
           problems.push(`${item.id}: ${item.source.repository} is not named in pairs/NOTICE.md`);
         for (const side of ['before', 'after'] as const) {
@@ -131,6 +157,13 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
             .slice(0, 4)
             .join('\n');
           const commit = item.source[`${side}_commit`].slice(0, 12);
+          if (
+            !head.includes(`Licensed under ${item.source.license} `) ||
+            !head.includes(`pull request #${item.source.pull_request}.`)
+          )
+            problems.push(
+              `${item.id}: the ${side} file does not name the licence and the pull request of the manifest`,
+            );
           if (
             !head.includes(item.source.repository) ||
             !head.includes(commit) ||
@@ -161,6 +194,11 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
       if (!item.detected && (item.expect.rule === undefined ? before.length > 0 : hit))
         problems.push(
           `${item.id}: recorded as a miss, but the engine now reports ${reported.join(', ')}: update the manifest`,
+        );
+      const unexpected = before.filter((finding) => finding.rule !== item.expect.rule);
+      if (unexpected.length > 0 && item.expect.rule !== undefined)
+        problems.push(
+          `${item.id}: before is also reported by ${[...new Set(unexpected.map((finding) => finding.rule))].join(', ')}, which the manifest does not expect`,
         );
       const after = run('after');
       if (after.length > 0)

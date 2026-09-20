@@ -129,9 +129,13 @@ describe('patterns that would be slow on a whole file', () => {
       'get\\([^)]*\\)',
       'getTransaction\\s*\\{[^}]*\\}',
       'maxSupportedTransactionVersion"[^}]*\\}',
+      'getBlock<[^>]*>',
+      '[gG]etTransaction\\([^)]*\\)',
+      'getBlock\\s*=>\\s*\\{[^}]*\\}',
+      'await\\s+conn\\.getTransaction\\((?![^;]*never)',
     ])
       expect(slowPatternInput(pattern), pattern).toBeDefined();
-  }, 30_000);
+  }, 60_000);
 
   it('accepts the same idea once it is bounded, and every pattern of the registry', () => {
     expect(withPattern('getTransaction\\([^)]{0,400}\\)')).toEqual([]);

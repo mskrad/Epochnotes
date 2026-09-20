@@ -601,6 +601,40 @@ describe('check repo', () => {
     });
   });
 
+  describe('reads without the parameter', () => {
+    const found = (name: string, text: string) =>
+      check(repo(name, { 'a.ts': text }))
+        .findings.filter((finding) => finding.rule === 'rpc-read-without-max-version')
+        .map((finding) => finding.line);
+
+    it('reports a read whose second argument is a variable: it may be a commitment, not options', () => {
+      expect(found('second-arg', 'const tx = await connection.getTransaction(sig, commitment);\n')).toEqual([
+        1,
+      ]);
+    });
+
+    it('sees the parameter across a blank line inside the call', () => {
+      expect(
+        found(
+          'blank-line',
+          'connection.getTransaction(sig, {\n  commitment,\n\n  maxSupportedTransactionVersion: 1,\n});\n',
+        ),
+      ).toEqual([]);
+    });
+
+    it('does not borrow the parameter of a later read in code without semicolons', () => {
+      const text =
+        'const a = await connection.getTransaction(first)\nconst b = await connection.getTransaction(second, { maxSupportedTransactionVersion: 1 })\n';
+      expect(found('no-semicolons', text)).toEqual([1]);
+    });
+
+    it('leaves calls of other chains alone: an object or a string as the first argument', () => {
+      expect(
+        found('other-chains', "client.getTransaction({ hash });\nprovider.getBlock('finalized');\n"),
+      ).toEqual([]);
+    });
+  });
+
   describe('commented-out code', () => {
     const lines = (name: string, files: Record<string, string>) =>
       check(repo(name, files)).findings.map((finding) => `${finding.file}:${finding.line}`);
@@ -624,6 +658,33 @@ describe('check repo', () => {
             '*opts = rpc.GetTransactionOpts{MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion0}\n',
         }),
       ).toEqual(['a.ts:1', 'a.ts:2', 'c.go:1']);
+    });
+
+    it('reports code that follows a comment on the same line, and lines that start with a star without being comments', () => {
+      expect(
+        lines('after-comment', {
+          'a.ts': `/* why */ get(sig, { maxSupportedTransactionVersion: 0 });\n/* a\n   b */ get(sig, { maxSupportedTransactionVersion: 0 });\nconst n = rate\n  * weight({ maxSupportedTransactionVersion: 0 });\n`,
+          'b.rs': '* cfg = RpcTransactionConfig { max_supported_transaction_version: Some(0), ..cfg };\n',
+          'c.go':
+            '* opts = rpc.GetTransactionOpts{MaxSupportedTransactionVersion: &rpc.MaxSupportedTransactionVersion0}\n',
+        }),
+      ).toEqual(['a.ts:1', 'a.ts:3', 'a.ts:5', 'b.rs:1', 'c.go:1']);
+    });
+
+    it('does not take a path pattern such as src/*.ts for the start of a comment', () => {
+      expect(
+        lines('glob', {
+          'a.ts': `const files = glob('src/*.ts');\nget(sig, { maxSupportedTransactionVersion: 0 });\n`,
+        }),
+      ).toEqual(['a.ts:2']);
+    });
+
+    it('skips what sits inside a block comment, whether or not its lines start with a star', () => {
+      expect(
+        lines('inside-block', {
+          'a.ts': `/*\nget(sig, { maxSupportedTransactionVersion: 0 });\n*/\nconst ok = 1;\n`,
+        }),
+      ).toEqual([]);
     });
 
     it('does not apply to documentation: a rule for markdown means what it says', () => {

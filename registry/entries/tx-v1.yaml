@@ -71,7 +71,7 @@ detect:
       A transaction or block is read without maxSupportedTransactionVersion, which the RPC treats like the
       lowest version. Check that this is a Solana RPC call: libraries of other chains use the same method names.
     languages: [ts, js]
-    pattern: '\.(getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)(<[^>\n]{0,80}>)?\((?!\s*[{''"`)])(?![^,()\n]{1,80},\s*[A-Za-z_$][\w$.]*\s*\))(?!(?:(?!\n\s*\n)[^;]){0,400}maxSupportedTransactionVersion)'
+    pattern: '\.(getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)(<[^>\n]{0,80}>)?\((?!\s*[{''"`)])(?!(?:(?!\.(?:getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)\b)[^;]){0,400}maxSupportedTransactionVersion)'
   - rule: python-client-max-version-zero
     kind: code-pattern
     confidence: breaks

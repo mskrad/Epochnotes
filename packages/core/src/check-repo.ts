@@ -304,13 +304,36 @@ function lockedVersions(lockfile: string, raw: string, name: string): string[] {
 }
 
 /**
- * A line that is nothing but a comment, by the language of the file. Documentation is not code and has no
- * comments to skip: a rule for markdown means what it says.
+ * Tells whether a position in a file is commented out: inside a block comment, or on a line that is a line
+ * comment from its start. Code after a comment closes on the same line is code; so is a line that starts with
+ * a star because it multiplies or dereferences. A comment after code on the same line, and a string, are not
+ * told apart and stay reported. Documentation is not code: for markdown nothing is a comment.
  */
-function commentLine(extension: string): RegExp {
-  if (EXTENSIONS.markdown.includes(extension)) return /^(?!)/;
-  // `*` opens a continuation line of a block comment only when a blank or a slash follows: `*p = 0` is code.
-  return EXTENSIONS.python.includes(extension) ? /^#/ : /^(\/\/|\/\*|\*(\s|\/|$))/;
+function commentedOut(
+  extension: string,
+  text: string,
+  lineStarts: number[],
+): (offset: number, line: number) => boolean {
+  if (EXTENSIONS.markdown.includes(extension)) return () => false;
+  const lineComment = EXTENSIONS.python.includes(extension) ? '#' : '//';
+  const blocks: [number, number][] = [];
+  if (lineComment === '//') {
+    // An opening counts only where a comment can start: not inside a word or a path such as src/*.ts.
+    const opening = /(^|[\s;{}(),])\/\*/gm;
+    for (let open = opening.exec(text); open !== null; open = opening.exec(text)) {
+      const start = open.index + (open[1] ?? '').length;
+      const close = text.indexOf('*/', start + 2);
+      const end = close === -1 ? text.length : close + 2;
+      blocks.push([start, end]);
+      opening.lastIndex = end;
+    }
+  }
+  return (offset, line) => {
+    const start = lineStarts[line] as number;
+    if (text.slice(start, offset).trimStart().startsWith(lineComment)) return true;
+    // few blocks per file; a linear look is enough
+    return blocks.some(([from, to]) => offset >= from && offset < to);
+  };
 }
 
 export interface CheckLimits {
@@ -405,6 +428,7 @@ export function checkDirectory(
       };
       const lineText = (line: number) =>
         text.slice(lineStarts[line], (lineStarts[line + 1] ?? text.length + 1) - 1).trim();
+      const isComment = commentedOut(extname(path), text, lineStarts);
       matching.forEach(({ entry, rule, regex }, order) => {
         let lastLine = -1;
         regex.lastIndex = 0;
@@ -412,9 +436,8 @@ export function checkDirectory(
           if (match[0] === '') regex.lastIndex += 1; // an empty match must not loop forever
           const line = lineOf(match.index);
           if (line === lastLine) continue; // one finding for a line and a rule, as before
-          // Commented-out code does not run. Only whole-line comments are told apart: what follows code on the
-          // same line, and what sits inside a string, is still reported.
-          if (commentLine(extname(path)).test(lineText(line))) continue;
+          // Commented-out code does not run.
+          if (isComment(match.index, line)) continue;
           lastLine = line;
           const last = lineOf(match.index + Math.max(match[0].length - 1, 0));
           let excerpt = lineText(line).slice(0, 200);

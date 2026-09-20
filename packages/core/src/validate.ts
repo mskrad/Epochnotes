@@ -171,12 +171,16 @@ function semanticIssues(entry: Entry): Issue[] {
 const PROBE_BYTES = 192 * 1024;
 const PROBE_BUDGET_MS = 400;
 
-/** The literal stretches of a pattern, unescaped: `\\.getBlock\\(` gives `.getBlock(`. */
+/**
+ * The literal stretches of a pattern, unescaped, with the simplest stand-in for what is not literal: a blank
+ * for \s, a digit for \d, a tab for \t, the first member for a class of alternatives such as [gG]. A
+ * quantifier does not end a stretch, so `await\s+conn\.getBlock\(` gives `await conn.getBlock(`.
+ */
 function literalsOf(pattern: string): string[] {
   const found: string[] = [];
   let current = '';
   const flush = () => {
-    if (current.length >= 3) found.push(current);
+    if (current.length >= 2) found.push(current);
     current = '';
   };
   for (let at = 0; at < pattern.length; at += 1) {
@@ -184,10 +188,20 @@ function literalsOf(pattern: string): string[] {
     if (char === '\\' && at + 1 < pattern.length) {
       const next = pattern[at + 1] as string;
       at += 1;
-      if (/[A-Za-z0-9]/.test(next))
-        flush(); // a class such as \s or \b
+      if (next === 's') current += ' ';
+      else if (next === 'd') current += '0';
+      else if (next === 't') current += '\t';
+      else if (/[A-Za-z0-9]/.test(next)) flush();
       else current += next;
-    } else if (/[\w"'\s,:=-]/.test(char)) current += char;
+    } else if (char === '[' && pattern[at + 1] !== '^') {
+      const close = pattern.indexOf(']', at);
+      const first = pattern[at + 1];
+      if (close === -1 || first === undefined || first === '\\') flush();
+      else current += first;
+      if (close !== -1) at = close;
+    } else if (/[+*?]/.test(char)) {
+      // a quantifier keeps the stretch going
+    } else if (/[\w"'\s,:=<>.-]/.test(char)) current += char;
     else flush();
   }
   flush();
@@ -198,23 +212,26 @@ function literalsOf(pattern: string): string[] {
  * A pattern is matched against whole files, so one that rescans the rest of the file from every start is
  * quadratic: harmless line by line, minutes on a large file. The probe runs the pattern over texts built to
  * provoke that — every literal stretch of the pattern itself and every word of it, repeated, bare and followed
- * by each kind of opening bracket, and long runs of blanks and of line breaks — and reports the first one that
- * blows the budget. A linear pattern needs a few milliseconds.
+ * by each kind of opening bracket, and long runs of blanks, tabs, digits and line breaks — and reports the
+ * first one that blows the budget. A linear pattern needs a few milliseconds.
  *
- * What it cannot do: stop a single match attempt that never returns. An exponential pattern hangs the
- * validation of the publisher who wrote it, which is a loud failure on the right desk.
+ * It is a net, not a proof: a pattern can be slow on a text the probe did not think of. And it cannot stop a
+ * single match attempt that never returns: an exponential pattern hangs the validation of the publisher who
+ * wrote it, which is a loud failure on the right desk.
  */
 export function slowPatternInput(pattern: string): string | undefined {
-  const words = pattern.match(/[A-Za-z_]{3,}/g) ?? [];
+  const words = pattern.match(/[A-Za-z_]{2,}/g) ?? [];
   const stems = [...new Set([...literalsOf(pattern), ...words, ...words.map((word) => `.${word}`)])].slice(
     0,
-    24,
+    32,
   );
-  const units = stems.flatMap((stem) => [stem, `${stem}(`, `${stem} {`, `${stem}"`, `${stem}[`]);
-  const probes = [...units, ' ', '\n', 'a'];
+  const tails = ['', '(', ' {', ': {', '"', '[', '<', ' => {', '='];
+  const units = stems.flatMap((stem) => tails.map((tail) => `${stem}${tail}`));
   const started = performance.now();
-  for (const unit of probes) {
-    const text = unit.repeat(Math.ceil(PROBE_BYTES / unit.length));
+  for (const unit of [...units, ' ', '\n', '\t', '0', 'a']) {
+    // The run ends in another character: a pattern anchored after the run then fails, and starts again one
+    // character later.
+    const text = `${unit.repeat(Math.ceil(PROBE_BYTES / unit.length))}\u0001`;
     const regex = new RegExp(pattern, 'gm');
     const probeStarted = performance.now();
     for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
@@ -223,8 +240,8 @@ export function slowPatternInput(pattern: string): string | undefined {
     }
     if (performance.now() - probeStarted > PROBE_BUDGET_MS)
       return `${JSON.stringify(unit.length > 40 ? `${unit.slice(0, 40)}…` : unit)} repeated`;
-    // the whole probing of one pattern stays short, whatever the number of units
-    if (performance.now() - started > 20 * PROBE_BUDGET_MS) return undefined;
+    // the probing of one pattern stays short, whatever the number of units
+    if (performance.now() - started > 30 * PROBE_BUDGET_MS) return undefined;
   }
   return undefined;
 }

@@ -310,7 +310,7 @@ function pick(random: () => number, count: number): number[] {
 export interface SampleOptions extends ScanOptions {
   /** Offset of a byte that is spread evenly over accounts: a byte of a key stored in the data. */
   offset: number;
-  /** How many of the 256 values of that byte to read. */
+  /** How many groups to draw from the 253 that are left to chance; three more are always read. */
   buckets: number;
   seed: number;
 }
@@ -340,7 +340,13 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
 
   // Read in full, counted as they are: the certain groups, then the accounts too short to be in any group.
   const exact = classify(known, options.schedule, rate);
-  for (const value of CERTAIN_GROUPS) for (const account of await group(value)) exact.add(account);
+  // The types met in the groups that are always read, kept apart: see `piled` below.
+  const certain = classify(known, options.schedule, rate);
+  for (const value of CERTAIN_GROUPS)
+    for (const account of await group(value)) {
+      exact.add(account);
+      certain.add(account);
+    }
   // An account of `offset` bytes or fewer has no byte at the offset. The RPC filters by exact size only; the
   // short sizes are few, so each is asked for.
   const shortSizes = options.offset + 1;
@@ -353,7 +359,8 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
         { encoding: 'base64', dataSlice: SLICE, filters: [{ dataSize: size }] },
       ]);
       // An endpoint that does not know the filter may answer with every account of the program.
-      if (accounts.some((account) => account.account.space !== size)) filterIgnored = true;
+      // (an answer without sizes at all is the other failure, and says so itself)
+      if (accounts.some((account) => spaceOf(account) !== BigInt(size))) filterIgnored = true;
       else for (const account of accounts) exact.add(account);
     }
   }
@@ -383,13 +390,16 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
   const scale = (value: bigint) => (value * BigInt(pool)) / drawn;
   const scaleCount = (value: number) => Math.round((value * pool) / chosen.length);
   const tooWide = (error: bigint, estimate: bigint) => error > 0n && error * 4n > estimate;
+  const countErrors = new Map<string, bigint>();
   const buckets = sampled.buckets().map((bucket) => {
     // Groups in which the type did not occur count as zero.
     const series = chosen.map((_, index) => perGroupByType.get(bucket.type)?.[index] ?? 0n);
     const counts = chosen.map((_, index) => countsByType.get(bucket.type)?.[index] ?? 0n);
     const error = standardError(series, pool);
     // A type whose very count is uncertain cannot have a trustworthy sum, even when that sum came out as zero.
-    const rare = tooWide(standardError(counts, pool), BigInt(scaleCount(bucket.accounts)));
+    const countError = standardError(counts, pool);
+    countErrors.set(bucket.type, countError);
+    const rare = tooWide(countError, BigInt(scaleCount(bucket.accounts)));
     return {
       ...bucket,
       accounts: scaleCount(bucket.accounts),
@@ -403,17 +413,27 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       unreliable: rare || tooWide(error, scale(bucket.excessNow)),
     };
   });
-  // Judged on the sampled part alone, before what was read in full is added: an empty sample says nothing about
-  // the groups that were not read, however many accounts the exact part holds.
+  // Emptiness is judged on the sampled part alone, before what was read in full is added: an empty sample says
+  // nothing about the groups that were not read, however many accounts the exact part holds.
   const sampledTotal = sum('sampled', buckets);
   const error = standardError(perGroup, pool);
   const everyGroupRead = chosen.length === pool;
   const emptySample = sampledTotal.accounts === 0 && !everyGroupRead;
-  const unreliable = emptySample || tooWide(error, sampledTotal.excessNow);
 
+  // A type met in the always-read groups and in none of the drawn ones is piled onto a few values of the byte.
+  // Its accounts on those three values were all counted; whether others sit on values that were not drawn, the
+  // sample cannot say, and the spread of the drawn groups (all zero for this type) will not show it.
+  const piled = new Set(
+    everyGroupRead
+      ? []
+      : certain
+          .buckets()
+          .map((bucket) => bucket.type)
+          .filter((type) => !buckets.some((bucket) => bucket.type === type)),
+  );
   for (const part of exact.buckets()) {
     const into = buckets.find((bucket) => bucket.type === part.type);
-    if (into === undefined) buckets.push({ ...part, standardError: 0n, unreliable: false });
+    if (into === undefined) buckets.push({ ...part, standardError: 0n, unreliable: piled.has(part.type) });
     else {
       into.accounts += part.accounts;
       into.fundedAtEarlierRate += part.fundedAtEarlierRate;
@@ -421,11 +441,24 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       into.aboveMinimumUpperBound += part.aboveMinimumUpperBound;
       for (const [step, value] of Object.entries(part.afterStep))
         into.afterStep[step] = (into.afterStep[step] ?? 0n) + value;
+      // What was read in full carries no error: the type is judged again on what it now holds.
+      into.unreliable =
+        tooWide(into.standardError ?? 0n, into.excessNow) ||
+        tooWide(countErrors.get(into.type) ?? 0n, BigInt(into.accounts));
     }
   }
   buckets.sort((a, b) => (a.excessNow < b.excessNow ? 1 : -1));
+  const total = sum('total', buckets);
+  // The width of the error is held against the figure that is reported, the whole total: what was read in full
+  // carries no error. And a total is no better than its large parts: an account type that is itself unreliable
+  // and makes up a twentieth of the total or more takes the total with it.
+  const tooWideTotal = tooWide(error, total.excessNow);
+  const shaky = buckets.filter(
+    (bucket) => bucket.unreliable && bucket.excessNow * 20n >= total.excessNow && bucket.excessNow > 0n,
+  );
+  const unreliable = emptySample || tooWideTotal || shaky.length > 0;
   const partial = !covered || filterIgnored;
-  const certain = CERTAIN_GROUPS.map((value) => `0x${value.toString(16).padStart(2, '0')}`).join(', ');
+  const always = CERTAIN_GROUPS.map((value) => `0x${value.toString(16).padStart(2, '0')}`).join(', ');
   return {
     target: { kind: 'program', program, ...(known === undefined ? {} : { name: known.name }) },
     endpoint: redactUrl(options.endpoint),
@@ -437,16 +470,16 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       steps,
     },
     method: [
-      `sample by the byte at offset ${options.offset}, seed ${options.seed}: groups ${certain} read always and counted as they are`,
+      `sample by the byte at offset ${options.offset}, seed ${options.seed}: groups ${always} read always and counted as they are`,
       `${chosen.length} of the other ${pool} groups read and scaled by ${pool}/${chosen.length}`,
-      covered
+      covered && !filterIgnored
         ? `${shortSizes} exact-size request(s) for accounts of ${options.offset} bytes or fewer, counted as they are`
         : `accounts of ${options.offset} bytes or fewer NOT covered`,
     ].join('; '),
     reliability: unreliable ? 'unreliable' : partial ? 'partial' : 'estimate',
     standardError: error,
     buckets,
-    total: sum('total', buckets),
+    total,
     notes: [
       ...(covered
         ? []
@@ -460,7 +493,13 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
         : []),
       ...(unreliable
         ? [
-            `UNRELIABLE: ${emptySample ? 'the sampled groups hold no accounts, which says nothing about the groups that were not read' : 'the standard error is more than a quarter of the sampled estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
+            `UNRELIABLE: ${
+              emptySample
+                ? 'the sampled groups hold no accounts, which says nothing about the groups that were not read'
+                : tooWideTotal
+                  ? 'the standard error is more than a quarter of the total'
+                  : `the estimate of ${shaky.map((bucket) => bucket.type).join(', ')} is unreliable${shaky.some((bucket) => piled.has(bucket.type)) ? ' (met only in the groups that are always read, so nothing is known about the groups that were not drawn)' : ''}, and that is a twentieth of the total or more`
+            }. The byte at offset ${options.offset} is not spread evenly over the accounts that matter: choose another offset or read more groups, and do not quote these figures.`,
           ]
         : []),
       ...(known?.note === undefined ? [] : [known.note]),

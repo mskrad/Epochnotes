@@ -248,20 +248,59 @@ describe('sampling a program', () => {
     expect(sample.standardError).toBe(0n);
   });
 
-  it('counts a type piled onto a zero byte exactly, which no spread of other groups could have revealed', async () => {
+  it('counts a type piled onto a zero byte, and says that it cannot vouch for it: nothing is known of the groups not drawn', async () => {
     // 568 accounts with a zero at the offset, as OpenBook v2 has at offset 40; the rest spread evenly
     const piled = spread('BookSide', Array(568).fill(0) as number[]);
-    const { options } = population([...piled, ...spread('OpenOrdersAccount', everyByte)]);
-    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 8, seed: 3 });
+    const members = [...piled, ...spread('OpenOrdersAccount', everyByte)];
+    const report = await sampleProgram(OPENBOOK, {
+      ...population(members).options,
+      offset: 8,
+      buckets: 8,
+      seed: 3,
+    });
     const byType = Object.fromEntries(report.buckets.map((bucket) => [bucket.type, bucket]));
     expect(byType.BookSide).toMatchObject({
       accounts: 568,
       excessNow: 56_800_000n,
       standardError: 0n,
-      unreliable: false,
+      unreliable: true,
     });
     expect(report.total.accounts).toBe(568 + 256);
-    expect(report.reliability).toBe('estimate');
+    expect(report.reliability).toBe('unreliable');
+    expect(report.notes[0]).toContain('met only in the groups that are always read');
+    // with every group read there is nothing left to wonder about
+    const all = await sampleProgram(OPENBOOK, {
+      ...population(members).options,
+      offset: 8,
+      buckets: 253,
+      seed: 3,
+    });
+    expect(all.reliability).toBe('estimate');
+    expect(all.buckets.find((bucket) => bucket.type === 'BookSide')?.unreliable).toBe(false);
+  });
+
+  it('is fooled no longer by a type half of which sits in a group that was not drawn', async () => {
+    const probe = population(spread('Market', everyByte));
+    await sampleProgram(OPENBOOK, { ...probe.options, offset: 8, buckets: 4, seed: 7 });
+    const read = new Set(probe.calls.map((call) => call.byte));
+    const unread = everyByte.find((byte) => !read.has(byte)) as number;
+    // EventHeap: 100 accounts on byte zero, 100 on a byte that seed 7 does not draw
+    const heaps = [
+      ...spread('EventHeap', Array(100).fill(0) as number[]),
+      ...spread('EventHeap', Array(100).fill(unread) as number[]),
+    ];
+    const members = [...heaps, ...spread('OpenOrdersAccount', everyByte)];
+    const report = await sampleProgram(OPENBOOK, {
+      ...population(members).options,
+      offset: 8,
+      buckets: 4,
+      seed: 7,
+    });
+    expect(report.buckets.find((bucket) => bucket.type === 'EventHeap')).toMatchObject({
+      accounts: 100,
+      unreliable: true,
+    });
+    expect(report.reliability).toBe('unreliable');
   });
 
   it('judges every account type on its own: a good total does not vouch for a rare type', async () => {
@@ -294,6 +333,91 @@ describe('sampling a program', () => {
     expect(report.standardError).toBeGreaterThan(report.total.excessNow / 2n);
     expect(report.reliability).toBe('unreliable');
     expect(report.notes[0]).toMatch(/^UNRELIABLE: /);
+  });
+
+  /** The byte of the first group that seed 7 draws from the pool, found by watching a run. */
+  const firstDrawn = async () => {
+    const probe = population(spread('Market', everyByte));
+    await sampleProgram(OPENBOOK, { ...probe.options, offset: 8, buckets: 4, seed: 7 });
+    return probe.calls.map((call) => call.byte).filter((byte) => byte !== undefined)[3] as number;
+  };
+
+  it('does not trust a zero: a rare type seen once with no excess is unreliable, though its sum has no spread', async () => {
+    const drawn = await firstDrawn();
+    const common = spread(
+      'OpenOrdersAccount',
+      everyByte.flatMap((byte) => Array(10).fill(byte) as number[]),
+    );
+    // one Market at today's minimum: nothing above it here, and that says nothing about the other groups
+    const { options } = population([
+      ...common,
+      { type: 'Market', lamports: 100_000, space: 72, byte: drawn },
+    ]);
+    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
+    const market = report.buckets.find((bucket) => bucket.type === 'Market');
+    expect(market).toMatchObject({ excessNow: 0n, standardError: 0n, unreliable: true });
+    expect(report.reliability).toBe('estimate'); // a type that holds nothing does not take the total with it
+  });
+
+  it('takes the total with it when an unreliable type is a large part of it', async () => {
+    const drawn = await firstDrawn();
+    const common = spread('OpenOrdersAccount', everyByte);
+    // a type that sits in one drawn group only, and is worth about a fifth of the total once scaled
+    const { options } = population([
+      ...common,
+      // ten of them, each at the legacy minimum
+      ...Array.from({ length: 10 }, () => ({ type: 'EventHeap', lamports: 200_000, space: 72, byte: drawn })),
+    ]);
+    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 64, seed: 7 });
+    const heap = report.buckets.find((bucket) => bucket.type === 'EventHeap');
+    expect(heap?.unreliable).toBe(true);
+    expect(report.reliability).toBe('unreliable');
+    expect(report.notes[0]).toContain(
+      'the estimate of EventHeap is unreliable, and that is a twentieth of the total or more',
+    );
+  });
+
+  it('holds the standard error against the whole total: a small, noisy sampled part beside a large exact part is an estimate', async () => {
+    const drawn = await firstDrawn();
+    // almost everything sits on byte zero, read in full; the sampled part is a few accounts in one group
+    const members = [
+      ...spread('Market', Array(2000).fill(0) as number[]),
+      ...spread('Market', [drawn, drawn, drawn]),
+    ];
+    const report = await sampleProgram(UNKNOWN, {
+      ...population(members).options,
+      offset: 8,
+      buckets: 4,
+      seed: 7,
+    });
+    expect(report.standardError * 4n).toBeLessThan(report.total.excessNow);
+    expect(report.reliability).toBe('estimate');
+  });
+
+  it('lists the account types by what they hold, also those that came from the exact part only', async () => {
+    const members = [
+      ...spread('OpenOrdersAccount', everyByte),
+      { type: 'Market', lamports: 136_000, space: 8, byte: 0 }, // too short for the byte: exact part only
+    ];
+    const report = await sampleProgram(OPENBOOK, {
+      ...population(members).options,
+      offset: 40,
+      buckets: 4,
+      seed: 7,
+    });
+    expect(report.buckets.map((bucket) => bucket.type)).toEqual(['OpenOrdersAccount', 'Market']);
+    // three short accounts hold more than the one sampled account, so their type comes first
+    const swapped = [
+      ...spread('OpenOrdersAccount', [5]),
+      ...Array.from({ length: 3 }, () => ({ type: 'Market', lamports: 136_000, space: 8, byte: 0 })),
+    ];
+    const other = await sampleProgram(OPENBOOK, {
+      ...population(swapped).options,
+      offset: 40,
+      buckets: 256,
+      seed: 7,
+    });
+    expect(other.buckets.map((bucket) => bucket.type)).toEqual(['Market', 'OpenOrdersAccount']);
   });
 
   it('does not trust an empty sample, whatever was read in full beside it', async () => {
@@ -404,6 +528,30 @@ describe('accounts too short to hold the sampled byte', () => {
     expect(report.reliability).toBe('partial');
     expect(report.total.accounts).toBe(honest.total.accounts - 1);
     expect(report.notes.join(' ')).toContain('does not apply the dataSize filter');
+    expect(report.method).toContain('accounts of 40 bytes or fewer NOT covered');
+    expect(report.method).not.toContain('exact-size request');
+  });
+
+  it('says that the endpoint returns no sizes when it does not, instead of blaming the size filter', async () => {
+    const sizeless: RentRpc = async (method) =>
+      method === 'getAccountInfo'
+        ? { result: sysvar(500n) }
+        : {
+            result: [
+              { pubkey: 'x', account: { lamports: 136_000, data: account('Market', 0, 0).account.data } },
+            ],
+          };
+    await expect(
+      sampleProgram(UNKNOWN, {
+        rpc: sizeless,
+        gates,
+        endpoint: 'https://rpc.example',
+        schedule,
+        offset: 40,
+        buckets: 4,
+        seed: 1,
+      }),
+    ).rejects.toThrow('does not return the size of accounts');
   });
 
   it('says what the standard error belongs to, and that the reads are not of one slot', async () => {

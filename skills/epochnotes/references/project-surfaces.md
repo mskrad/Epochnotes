@@ -29,6 +29,11 @@ anything, and show it to the person: they will know what you missed.
 | Reading code the rules do not cover, guided by the entry's `breaks` | **by reading, not by rule** | the entry names a surface and no `detect` rule covers it                            |
 | Nothing available                                                   | **cannot verify** and why   | closed third-party service, no credentials, no fixture on that cluster              |
 
+A rent scan says how far its figures go in `reliability`: `exact` is a full read; `estimate` is a sample with
+its standard error; `partial` leaves some accounts out and says which; `unreliable` must not be quoted. Even an
+`estimate` can miss by more than its error says when one unread group holds far more than the others: give the
+figure with its error and its method, never as a fact.
+
 The repository check lists under `skipped` every path it did not read, with the reason (a link that leaves
 the repository, a broken link, a file too large to read, a lockfile that could not be parsed). Carry that
 list into your report: a skipped path was not checked, and a skipped lockfile means the dependency versions of

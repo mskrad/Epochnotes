@@ -108,7 +108,11 @@ export function rentCommand(): Command {
         'with --sample: offset of an evenly spread byte, such as a byte of a stored key',
         '8',
       )
-      .option('--groups <n>', 'with --sample: how many of the 256 groups to read', '12')
+      .option(
+        '--groups <n>',
+        'with --sample: how many groups to draw from the 253 left to chance (three more are always read)',
+        '12',
+      )
       .option(
         '--seed <n>',
         'with --sample: seed of the random choice, so the run can be repeated',

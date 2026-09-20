@@ -8,3 +8,4 @@ Cargo.lock
 # corpus cases are kept byte for byte: some are about the line breaks a formatter would remove
 corpus/pairs/**/before.*
 corpus/pairs/**/after.*
+corpus/pairs/**/sample.*

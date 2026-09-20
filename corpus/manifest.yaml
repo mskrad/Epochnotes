@@ -40,10 +40,7 @@ cases:
     entry: tx-v1
     files: { before: before.rs, after: after.rs }
     expect: { rule: rpc-max-version-zero, confidence: breaks }
-    detected: false
-    gap: >-
-      The rule covers ts and js only, and its pattern does not allow the quote that a JSON key carries
-      before the colon. Rust code that builds the request with json! is not seen.
+    detected: true
     source:
       kind: repository
       repository: solana-foundation/rpc-latency-monitor
@@ -56,11 +53,8 @@ cases:
   - id: real-audius-api-go-constant
     entry: tx-v1
     files: { before: before.go, after: after.go }
-    expect: { rule: rpc-max-version-zero, confidence: breaks }
-    detected: false
-    gap: >-
-      Go clients name the value through a constant of the SDK (rpc.MaxSupportedTransactionVersion0) instead
-      of writing a number, and the rule covers ts and js only.
+    expect: { rule: go-client-max-version-zero, confidence: breaks }
+    detected: true
     source:
       kind: repository
       repository: AudiusProject/api
@@ -69,6 +63,31 @@ cases:
       before_commit: 1d398f977396bdd5bf5346a17c35be23c4f8dc5e
       after_commit: 53f7da590c9abd8be6ccfa9dfe5a0a146acca368
       license: Apache-2.0
+
+  - id: real-private-channels-json-macro
+    entry: tx-v1
+    files: { before: before.rs, after: after.rs }
+    expect: { rule: rpc-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: repository
+      repository: solana-foundation/solana-private-channels
+      pull_request: 303
+      path: indexer/src/indexer/datasource/rpc_polling/rpc.rs
+      before_commit: 46a8e243df3bf6668b79f01f492d8fe0b9535cf6
+      after_commit: a9802b18e86f3c482fdca5732798d39d3273678f
+      license: MIT
+
+  - id: synthetic-rust-client-config
+    entry: tx-v1
+    files: { before: before.rs, after: after.rs }
+    expect: { rule: rust-client-max-version-zero, confidence: breaks }
+    detected: true
+    source:
+      kind: synthetic
+      reason: >-
+        The shape of real fixes (sig-net/mpc#1215, and a cookbook example of solana-com found in the field);
+        the fix that shows it best is under AGPL-3.0 and is referred to, not copied.
 
   - id: synthetic-formatter-line-break
     entry: tx-v1
@@ -111,9 +130,8 @@ cases:
   - id: synthetic-omitted-parameter
     entry: tx-v1
     files: { before: before.ts, after: after.ts }
-    expect: { confidence: breaks }
-    detected: false
-    gap: No rule yet. The RPC treats a missing parameter like the lowest version; telling a read call without it needs more than a pattern on one line.
+    expect: { rule: rpc-read-without-max-version, confidence: check }
+    detected: true
     source:
       kind: synthetic
       reason: The entry states this break; no public fix of it was found that could be copied.
@@ -123,7 +141,16 @@ cases:
     files: { before: before.ts, after: after.ts }
     expect: { confidence: check }
     detected: false
-    gap: No rule yet. A hand-written decoder has no fixed shape to match.
+    gap: >-
+      No rule, on purpose. A decoder has no fixed shape, and a pattern loose enough to find the version byte
+      being read finds it in the fixed decoder as well: the after side would not be silent.
     source:
       kind: synthetic
       reason: The entry states this break (the version byte of version 1 has no branch in older decoders).
+
+# Code that looks like a case and is not one: every rule of the entry must stay silent on it.
+quiet:
+  - id: quiet-other-chain-same-method
+    entry: tx-v1
+    file: sample.ts
+    reason: Clients of other chains use the method names of the Solana RPC; seen in multi-chain projects of the field corpus.

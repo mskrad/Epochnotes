@@ -10,7 +10,10 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-const PINNED_TX_V1_REV_1 = '3eee2f55be5c13658f6196eb4e86715b7476d13c8e0a2fe54faf00ea362d3e76';
+// Changed on 2026-09-20 with the rules for Rust, Go and reads without the parameter. The entry stays at rev 1:
+// no version of the registry has been published yet, and the first published version must start every entry
+// at rev 1. After the first publication this value changes only together with `rev`.
+const PINNED_TX_V1_REV_1 = '35e086b6f58b1a226cbdb9009ee776612363e9311eca6d65b8e2037f317747e5';
 
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);

@@ -8,7 +8,7 @@ import { type Entry, entrySchema } from './schema.js';
 /** One validation problem: where it is, what is wrong, and what to do about it. */
 export interface Issue {
   /** Stable identifier for problems that code reacts to; absent for plain schema violations. */
-  code?: 'unresolved-relation' | 'duplicate-id' | 'relation-cycle';
+  code?: 'unresolved-relation' | 'duplicate-id' | 'relation-cycle' | 'slow-pattern';
   path: string;
   message: string;
   hint: string;
@@ -79,6 +79,14 @@ function semanticIssues(entry: Entry): Issue[] {
       // Patterns are executed by this engine (JavaScript) whatever language they search, so that is the dialect checked.
       try {
         new RegExp(rule.pattern);
+        const slow = slowPatternInput(rule.pattern);
+        if (slow !== undefined)
+          issues.push({
+            code: 'slow-pattern',
+            path: `${at}.pattern`,
+            message: `Pattern takes too long on ${slow}: it is run over whole files of up to one MiB`,
+            hint: 'Bound what may cross lines: use [^\\n]* or a counted repetition such as [^;]{0,400} instead of an open-ended negated class.',
+          });
       } catch (error) {
         issues.push({
           path: `${at}.pattern`,
@@ -160,6 +168,35 @@ function semanticIssues(entry: Entry): Issue[] {
 }
 
 /** Validates one parsed entry: shape first, then the checks a schema cannot express. */
+const PROBE_BYTES = 192 * 1024;
+const PROBE_BUDGET_MS = 400;
+
+/**
+ * A pattern is matched against whole files, so one that rescans the rest of the file from every start is
+ * quadratic: harmless line by line, minutes on a large file. The probe runs the pattern over texts built to
+ * provoke that — each word of the pattern itself repeated with an opening bracket, and long runs of blanks and
+ * of line breaks — and reports the first one that blows the budget. A linear pattern needs a few milliseconds.
+ */
+export function slowPatternInput(pattern: string): string | undefined {
+  const words = [...new Set(pattern.match(/[A-Za-z_]{4,}/g) ?? [])].slice(0, 6);
+  const probes: [string, string][] = [
+    ...words.map((word): [string, string] => [`"${word}(" repeated`, `${word}(`]),
+    ['a long run of spaces', ' '],
+    ['a long run of line breaks', '\n'],
+  ];
+  for (const [name, unit] of probes) {
+    const text = unit.repeat(Math.ceil(PROBE_BYTES / unit.length));
+    const regex = new RegExp(pattern, 'gm');
+    const started = performance.now();
+    for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
+      if (match[0] === '') regex.lastIndex += 1;
+      if (performance.now() - started > PROBE_BUDGET_MS) return name;
+    }
+    if (performance.now() - started > PROBE_BUDGET_MS) return name;
+  }
+  return undefined;
+}
+
 export function validateEntry(raw: unknown): ValidationResult {
   const parsed = entrySchema.safeParse(raw);
   if (!parsed.success) {

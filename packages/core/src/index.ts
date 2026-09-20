@@ -20,6 +20,7 @@ export { ENTRY_SCHEMA_VERSION, type Entry, entryJsonSchema, entrySchema } from '
 export {
   type Issue,
   type ValidationResult,
+  slowPatternInput,
   validateEntry,
   validateEntryYaml,
   validateRegistry,

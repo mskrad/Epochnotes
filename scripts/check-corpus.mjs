@@ -7,6 +7,7 @@ for (const row of report.rows)
   console.log(
     `${row.detected ? 'found ' : 'MISSED'}  ${row.id.padEnd(40)} expects ${row.expected}; reported ${row.reported.join(', ') || 'nothing'}`,
   );
+for (const item of report.quiet) console.log(`${item.silent ? 'quiet ' : 'NOISY '}  ${item.id}`);
 const { recall } = report;
 console.log(
   `\nrecall on this corpus: ${recall.detected} of ${recall.of} cases; ${recall.repository.detected} of ${recall.repository.of} among the cases taken from repositories. Every miss has its reason in the manifest.`,

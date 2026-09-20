@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Entry, validateEntry, validateEntryYaml, validateRegistry } from '../src/index.js';
+import {
+  type Entry,
+  slowPatternInput,
+  validateEntry,
+  validateEntryYaml,
+  validateRegistry,
+} from '../src/index.js';
 import { brokenEntries, reference, referenceYaml } from './helpers.js';
 
 function issuesOf(raw: unknown) {
@@ -100,5 +106,26 @@ describe('registry-wide checks', () => {
     expect(validateRegistry([a, b]).map((issue) => issue.message)).toContainEqual(
       expect.stringContaining('Cycle in "requires"'),
     );
+  });
+});
+
+describe('patterns that would be slow on a whole file', () => {
+  const withPattern = (pattern: string) => {
+    const raw = reference();
+    raw.detect[0].pattern = pattern;
+    return issuesOf(raw).filter((issue) => issue.code === 'slow-pattern');
+  };
+
+  it('refuses a pattern that rescans the rest of the file from every start, and says how to bound it', () => {
+    const [issue] = withPattern('getTransaction\\([^)]*\\)');
+    expect(issue).toMatchObject({ path: 'detect[0].pattern' });
+    expect(issue?.message).toContain('"getTransaction(" repeated');
+    expect(issue?.hint).toContain('[^;]{0,400}');
+  });
+
+  it('accepts the same idea once it is bounded, and every pattern of the registry', () => {
+    expect(withPattern('getTransaction\\([^)]{0,400}\\)')).toEqual([]);
+    for (const rule of reference().detect)
+      if (rule.kind === 'code-pattern') expect(slowPatternInput(rule.pattern), rule.rule).toBeUndefined();
   });
 });

@@ -50,8 +50,28 @@ detect:
     kind: code-pattern
     confidence: breaks
     summary: RPC read call pins maxSupportedTransactionVersion to the literal 0; it fails as soon as the result contains a version 1 transaction.
+    languages: [ts, js, rust, go, python]
+    pattern: 'maxSupportedTransactionVersion"?\s*:\s*0\b'
+  - rule: rust-client-max-version-zero
+    kind: code-pattern
+    confidence: breaks
+    summary: The Rust RPC client config pins max_supported_transaction_version to Some(0); reads fail as soon as the result contains a version 1 transaction.
+    languages: [rust]
+    pattern: 'max_supported_transaction_version\s*:\s*Some\(\s*0\s*\)'
+  - rule: go-client-max-version-zero
+    kind: code-pattern
+    confidence: breaks
+    summary: The Go RPC client names version 0 through the SDK constant or a uint64(0) value; reads fail as soon as the result contains a version 1 transaction.
+    languages: [go]
+    pattern: 'MaxSupportedTransactionVersion0\b|[mM]axSupportedTransactionVersion\s*:?=\s*uint64\(0\)'
+  - rule: rpc-read-without-max-version
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      A transaction or block is read without maxSupportedTransactionVersion, which the RPC treats like the
+      lowest version. Check that this is a Solana RPC call: libraries of other chains use the same method names.
     languages: [ts, js]
-    pattern: 'maxSupportedTransactionVersion\s*:\s*0\b'
+    pattern: '\.(getTransaction|getParsedTransaction|getParsedTransactions|getBlock|getParsedBlock)\((?!\s*[{''"`)])(?![^;]{0,400}maxSupportedTransactionVersion)'
   - rule: rpc-max-version-dynamic
     kind: code-pattern
     confidence: check
@@ -95,6 +115,9 @@ fix:
     for_rules:
       [
         rpc-max-version-zero,
+        rust-client-max-version-zero,
+        go-client-max-version-zero,
+        rpc-read-without-max-version,
         rpc-max-version-dynamic,
         docs-teach-max-version-zero,
         web3js-below-1-99,

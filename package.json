@@ -21,7 +21,8 @@
     "schema:write": "npm run build && node scripts/write-schema.mjs && prettier --write registry/schema.json",
     "typecheck:tests": "tsc -p tsconfig.tests.json",
     "e2e": "npm run build && node scripts/e2e.mjs",
-    "corpus:check": "npm run build && node scripts/check-corpus.mjs"
+    "corpus:check": "npm run build && node scripts/check-corpus.mjs",
+    "corpus:eval": "npm run corpus:check"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",

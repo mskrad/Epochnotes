@@ -37,7 +37,17 @@ const caseSchema = z.strictObject({
     z.strictObject({ kind: z.literal('synthetic'), reason: z.string().min(1) }),
   ]),
 });
-const manifestSchema = z.strictObject({ cases: z.array(caseSchema).min(1) });
+/** Code that looks like a case and is not one: every rule of the entry must stay silent on it. */
+const quietSchema = z.strictObject({
+  id: z.string().regex(/^quiet-[a-z0-9-]+$/),
+  entry: z.string().min(1),
+  file: fileName,
+  reason: z.string().min(1),
+});
+const manifestSchema = z.strictObject({
+  cases: z.array(caseSchema).min(1),
+  quiet: z.array(quietSchema).default([]),
+});
 
 export type CorpusCase = z.infer<typeof caseSchema>;
 
@@ -53,6 +63,8 @@ export interface CorpusRow {
 export interface CorpusReport {
   problems: string[];
   rows: CorpusRow[];
+  /** Samples that must not be reported, and whether they were left alone. */
+  quiet: { id: string; silent: boolean }[];
   /** Of the cases a correct engine must report, how many today's engine does. */
   recall: { detected: number; of: number; repository: { detected: number; of: number } };
 }
@@ -69,7 +81,12 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
   if (!registry.ok) problems.push('the registry is not valid: run `epochnotes registry validate`');
 
-  const empty = { problems, rows, recall: { detected: 0, of: 0, repository: { detected: 0, of: 0 } } };
+  const empty = {
+    problems,
+    rows,
+    quiet: [],
+    recall: { detected: 0, of: 0, repository: { detected: 0, of: 0 } },
+  };
   if (!existsSync(join(corpusDir, 'manifest.yaml'))) {
     problems.push('there is no manifest.yaml');
     return empty;
@@ -99,6 +116,12 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
     if (!onDisk.delete(`${item.entry}/${item.id}`))
       problems.push(`${item.id}: no directory pairs/${item.entry}/${item.id}`);
   }
+  for (const item of parsed.data.quiet) {
+    if (ids.has(item.id)) problems.push(`${item.id}: listed twice`);
+    ids.add(item.id);
+    if (!onDisk.delete(`${item.entry}/${item.id}`))
+      problems.push(`${item.id}: no directory pairs/${item.entry}/${item.id}`);
+  }
   for (const orphan of onDisk) problems.push(`pairs/${orphan}: not in the manifest`);
   for (const item of cases) {
     const directory = join(corpusDir, 'pairs', item.entry, item.id);
@@ -109,7 +132,26 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
   }
 
   const scratch = mkdtempSync(join(tmpdir(), 'epochnotes-corpus-'));
+  const quiet: { id: string; silent: boolean }[] = [];
   try {
+    for (const item of parsed.data.quiet) {
+      const entry = entries.find((candidate) => candidate.id === item.entry);
+      const directory = join(corpusDir, 'pairs', item.entry, item.id);
+      if (entry === undefined || !existsSync(join(directory, item.file))) {
+        problems.push(`${item.id}: its entry or its file is missing`);
+        continue;
+      }
+      for (const name of readdirSync(directory))
+        if (name !== item.file) problems.push(`${item.id}: ${name} is not its sample file`);
+      const target = join(scratch, item.id);
+      cpSync(join(directory, item.file), join(target, item.file), { recursive: true });
+      const found = checkDirectory(target, [entry]).findings;
+      quiet.push({ id: item.id, silent: found.length === 0 });
+      for (const finding of found)
+        problems.push(
+          `${item.id}: must stay silent, ${finding.rule} reports line ${finding.line}: ${finding.excerpt}`,
+        );
+    }
     for (const item of cases) {
       const entry = entries.find((candidate) => candidate.id === item.entry);
       const directory = join(corpusDir, 'pairs', item.entry, item.id);
@@ -223,6 +265,7 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
   return {
     problems,
     rows,
+    quiet,
     recall: { ...count(rows), repository: count(rows.filter((row) => row.kind === 'repository')) },
   };
 }

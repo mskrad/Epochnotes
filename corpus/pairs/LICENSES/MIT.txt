@@ -2,6 +2,7 @@ MIT License
 
 Copyright (c) 2026 0base.vc contributors (https://github.com/0base-vc/whoearns-live)
 Copyright (c) 2026 Altude (https://github.com/AltudePlatform/altude-js)
+Copyright (c) 2022-2025 (https://github.com/solana-foundation/solana-private-channels)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

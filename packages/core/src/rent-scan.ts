@@ -288,9 +288,19 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Values of the sampled byte that are read always, not by chance. A byte that is a flag, a counter, padding or
+ * the start of an unset key piles a whole account type onto zero, one or 0xff; when such a group is not drawn,
+ * nothing in the groups that were read betrays it. Read in full, they are counted as they are.
+ */
+const CERTAIN_GROUPS = [0, 1, 255];
+
+/** `count` of the values that are left to chance, in an order fixed by the seed. */
 function pick(random: () => number, count: number): number[] {
-  const all = Array.from({ length: 256 }, (_, index) => index);
-  for (let index = 255; index > 0; index -= 1) {
+  const all = Array.from({ length: 256 }, (_, index) => index).filter(
+    (value) => !CERTAIN_GROUPS.includes(value),
+  );
+  for (let index = all.length - 1; index > 0; index -= 1) {
     const other = Math.floor(random() * (index + 1));
     [all[index], all[other]] = [all[other] as number, all[index] as number];
   }
@@ -306,32 +316,60 @@ export interface SampleOptions extends ScanOptions {
 }
 
 /**
- * For programs too large for one request: accounts are split into 256 groups by one byte of their data, a
- * random subset of groups is read in full, and the sums are scaled by 256 / subset. The estimate is unbiased
- * however uneven the groups are; its standard error comes from the spread between the groups read.
+ * For programs too large for one request. Accounts are split into 256 groups by one byte of their data. Three
+ * groups are always read (see CERTAIN_GROUPS); of the other 253 a random subset is read in full and its sums
+ * are scaled by 253 / subset. The estimate is unbiased however uneven the groups are; its standard error comes
+ * from the spread between the sampled groups. Accounts too short to have the byte are in no group: they are
+ * asked for by exact size.
  */
 export async function sampleProgram(program: string, options: SampleOptions): Promise<RentScanReport> {
   const { rate, slot, steps, notes } = await context(options.rpc, options.gates, options.schedule);
   const known = knownProgram(program);
-  const chosen = pick(mulberry32(options.seed), options.buckets);
+  const pool = 256 - CERTAIN_GROUPS.length;
+  const chosen = pick(mulberry32(options.seed), Math.min(options.buckets, pool));
+  const group = (value: number) =>
+    result<RpcAccount[]>(options.rpc, 'getProgramAccounts', [
+      program,
+      // memcmp takes base58; the byte is encoded on its own
+      {
+        encoding: 'base64',
+        dataSlice: SLICE,
+        filters: [{ memcmp: { offset: options.offset, bytes: base58OfByte(value) } }],
+      },
+    ]);
+
+  // Read in full, counted as they are: the certain groups, then the accounts too short to be in any group.
+  const exact = classify(known, options.schedule, rate);
+  for (const value of CERTAIN_GROUPS) for (const account of await group(value)) exact.add(account);
+  // An account of `offset` bytes or fewer has no byte at the offset. The RPC filters by exact size only; the
+  // short sizes are few, so each is asked for.
+  const shortSizes = options.offset + 1;
+  const covered = shortSizes <= MAX_SHORT_SIZE_REQUESTS;
+  let filterIgnored = false;
+  if (covered) {
+    for (let size = 0; size < shortSizes; size += 1) {
+      const accounts = await result<RpcAccount[]>(options.rpc, 'getProgramAccounts', [
+        program,
+        { encoding: 'base64', dataSlice: SLICE, filters: [{ dataSize: size }] },
+      ]);
+      // An endpoint that does not know the filter may answer with every account of the program.
+      if (accounts.some((account) => account.account.space !== size)) filterIgnored = true;
+      else for (const account of accounts) exact.add(account);
+    }
+  }
+
   const perGroup: bigint[] = [];
   const perGroupByType = new Map<string, bigint[]>();
   const countsByType = new Map<string, bigint[]>();
-  const split = classify(known, options.schedule, rate);
+  const sampled = classify(known, options.schedule, rate);
   for (const value of chosen) {
-    // memcmp takes base58; one byte padded to a key would not match, so the byte is encoded on its own.
-    const bytes = base58OfByte(value);
-    const accounts = await result<RpcAccount[]>(options.rpc, 'getProgramAccounts', [
-      program,
-      { encoding: 'base64', dataSlice: SLICE, filters: [{ memcmp: { offset: options.offset, bytes } }] },
-    ]);
-    const group = classify(known, options.schedule, rate);
-    for (const account of accounts) {
-      group.add(account);
-      split.add(account);
+    const one = classify(known, options.schedule, rate);
+    for (const account of await group(value)) {
+      one.add(account);
+      sampled.add(account);
     }
-    perGroup.push(sum('group', group.buckets()).excessNow);
-    for (const bucket of group.buckets()) {
+    perGroup.push(sum('group', one.buckets()).excessNow);
+    for (const bucket of one.buckets()) {
       const series = perGroupByType.get(bucket.type) ?? [];
       series[perGroup.length - 1] = bucket.excessNow;
       perGroupByType.set(bucket.type, series);
@@ -340,20 +378,22 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       countsByType.set(bucket.type, counts);
     }
   }
-  const scale = (value: bigint) => (value * 256n) / BigInt(chosen.length);
+
+  const drawn = BigInt(chosen.length);
+  const scale = (value: bigint) => (value * BigInt(pool)) / drawn;
+  const scaleCount = (value: number) => Math.round((value * pool) / chosen.length);
   const tooWide = (error: bigint, estimate: bigint) => error > 0n && error * 4n > estimate;
-  const buckets = split.buckets().map((bucket) => {
+  const buckets = sampled.buckets().map((bucket) => {
     // Groups in which the type did not occur count as zero.
     const series = chosen.map((_, index) => perGroupByType.get(bucket.type)?.[index] ?? 0n);
     const counts = chosen.map((_, index) => countsByType.get(bucket.type)?.[index] ?? 0n);
-    const error = standardError(series);
-    const scaledAccounts = (BigInt(bucket.accounts) * 256n) / BigInt(chosen.length);
+    const error = standardError(series, pool);
     // A type whose very count is uncertain cannot have a trustworthy sum, even when that sum came out as zero.
-    const rare = tooWide(standardError(counts), scaledAccounts);
+    const rare = tooWide(standardError(counts, pool), BigInt(scaleCount(bucket.accounts)));
     return {
       ...bucket,
-      accounts: Math.round((bucket.accounts * 256) / chosen.length),
-      fundedAtEarlierRate: Math.round((bucket.fundedAtEarlierRate * 256) / chosen.length),
+      accounts: scaleCount(bucket.accounts),
+      fundedAtEarlierRate: scaleCount(bucket.fundedAtEarlierRate),
       excessNow: scale(bucket.excessNow),
       aboveMinimumUpperBound: scale(bucket.aboveMinimumUpperBound),
       afterStep: Object.fromEntries(
@@ -363,36 +403,29 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       unreliable: rare || tooWide(error, scale(bucket.excessNow)),
     };
   });
-  // An account of `offset` bytes or fewer has no byte at the offset, so it is in none of the 256 groups, and
-  // no number of groups brings it back. The RPC filters by exact size only; the short sizes are few, so each
-  // is asked for. What they hold is counted as it is: it was read in full, not sampled.
-  const shortSizes = options.offset + 1;
-  const covered = shortSizes <= MAX_SHORT_SIZE_REQUESTS;
-  const short = classify(known, options.schedule, rate);
-  if (covered) {
-    for (let size = 0; size < shortSizes; size += 1) {
-      const accounts = await result<RpcAccount[]>(options.rpc, 'getProgramAccounts', [
-        program,
-        { encoding: 'base64', dataSlice: SLICE, filters: [{ dataSize: size }] },
-      ]);
-      for (const account of accounts) short.add(account);
-    }
-  }
-  for (const exact of short.buckets()) {
-    const sampled = buckets.find((bucket) => bucket.type === exact.type);
-    if (sampled === undefined) buckets.push({ ...exact, standardError: 0n, unreliable: false });
+  // Judged on the sampled part alone, before what was read in full is added: an empty sample says nothing about
+  // the groups that were not read, however many accounts the exact part holds.
+  const sampledTotal = sum('sampled', buckets);
+  const error = standardError(perGroup, pool);
+  const everyGroupRead = chosen.length === pool;
+  const emptySample = sampledTotal.accounts === 0 && !everyGroupRead;
+  const unreliable = emptySample || tooWide(error, sampledTotal.excessNow);
+
+  for (const part of exact.buckets()) {
+    const into = buckets.find((bucket) => bucket.type === part.type);
+    if (into === undefined) buckets.push({ ...part, standardError: 0n, unreliable: false });
     else {
-      sampled.accounts += exact.accounts;
-      sampled.fundedAtEarlierRate += exact.fundedAtEarlierRate;
-      sampled.excessNow += exact.excessNow;
-      sampled.aboveMinimumUpperBound += exact.aboveMinimumUpperBound;
-      for (const [step, value] of Object.entries(exact.afterStep))
-        sampled.afterStep[step] = (sampled.afterStep[step] ?? 0n) + value;
+      into.accounts += part.accounts;
+      into.fundedAtEarlierRate += part.fundedAtEarlierRate;
+      into.excessNow += part.excessNow;
+      into.aboveMinimumUpperBound += part.aboveMinimumUpperBound;
+      for (const [step, value] of Object.entries(part.afterStep))
+        into.afterStep[step] = (into.afterStep[step] ?? 0n) + value;
     }
   }
-  const total = sum('total', buckets);
-  const error = standardError(perGroup);
-  const unreliable = total.accounts === 0 || tooWide(error, total.excessNow);
+  buckets.sort((a, b) => (a.excessNow < b.excessNow ? 1 : -1));
+  const partial = !covered || filterIgnored;
+  const certain = CERTAIN_GROUPS.map((value) => `0x${value.toString(16).padStart(2, '0')}`).join(', ');
   return {
     target: { kind: 'program', program, ...(known === undefined ? {} : { name: known.name }) },
     endpoint: redactUrl(options.endpoint),
@@ -403,27 +436,39 @@ export async function sampleProgram(program: string, options: SampleOptions): Pr
       legacyRate: options.schedule.legacyRate,
       steps,
     },
-    method: `sample: ${chosen.length} of 256 groups by the byte at offset ${options.offset}, seed ${options.seed}; sums scaled by 256/${chosen.length}${covered ? `; plus ${shortSizes} exact-size requests for accounts of ${options.offset} bytes or fewer, counted unscaled` : ''}`,
-    reliability: unreliable ? 'unreliable' : covered ? 'estimate' : 'partial',
+    method: [
+      `sample by the byte at offset ${options.offset}, seed ${options.seed}: groups ${certain} read always and counted as they are`,
+      `${chosen.length} of the other ${pool} groups read and scaled by ${pool}/${chosen.length}`,
+      covered
+        ? `${shortSizes} exact-size request(s) for accounts of ${options.offset} bytes or fewer, counted as they are`
+        : `accounts of ${options.offset} bytes or fewer NOT covered`,
+    ].join('; '),
+    reliability: unreliable ? 'unreliable' : partial ? 'partial' : 'estimate',
     standardError: error,
     buckets,
-    total,
+    total: sum('total', buckets),
     notes: [
       ...(covered
         ? []
         : [
             `PARTIAL: accounts of ${options.offset} bytes or fewer are not covered. They have no byte at the offset and sit in no group, and asking for every size up to ${options.offset} would take more than ${MAX_SHORT_SIZE_REQUESTS} requests. Choose an offset nearer the start of the data, or treat the figures as covering larger accounts only.`,
           ]),
+      ...(filterIgnored
+        ? [
+            'PARTIAL: the endpoint answered a request for accounts of one exact size with accounts of other sizes, so it does not apply the dataSize filter. Nothing from those answers was counted, and accounts too short to hold the sampled byte are not covered. Use another endpoint.',
+          ]
+        : []),
       ...(unreliable
         ? [
-            `UNRELIABLE: ${total.accounts === 0 ? 'the groups read hold no accounts' : 'the standard error is more than a quarter of the estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
+            `UNRELIABLE: ${emptySample ? 'the sampled groups hold no accounts, which says nothing about the groups that were not read' : 'the standard error is more than a quarter of the sampled estimate'}, so the byte at offset ${options.offset} is not spread evenly over the accounts that matter. Choose another offset or read more groups; do not quote these figures.`,
           ]
         : []),
       ...(known?.note === undefined ? [] : [known.note]),
       splitNote(known),
-      'The standard error belongs to excessNow of the sampled part. The other figures of a sample (accounts, later steps, the upper bound) are scaled the same way and carry an error of the same relative order, which is not computed.',
-      'A sample can be good for the total and useless for a small account type: each bucket carries its own standard error, and a type that occurs in none of the groups read is missing from the report, not zero.',
+      'The standard error belongs to excessNow of the sampled part. The other figures of a sample (accounts, later steps, the upper bound) are scaled the same way and their error is not computed; it can be larger.',
+      'A sample can be good for the total and useless for a small account type: each bucket carries its own standard error, and a type that occurs in none of the groups read is missing from the report, not zero. The spread of the groups that were read cannot reveal a group that was not read and holds far more than the others.',
       'The byte must be spread evenly over accounts (a byte of a stored key). A byte of a flag or a counter gives empty groups and a useless estimate: check that the standard error is small next to excessNow.',
+      `The requests of a sample are answered at different slots; the slot given is that of the first read.`,
       ...notes,
     ],
   };
@@ -437,14 +482,14 @@ function base58OfByte(value: number): string {
     : `${alphabet[Math.floor(value / 58)]}${alphabet[value % 58]}`;
 }
 
-/** Standard error of the scaled total, from the spread of the groups read (finite population of 256). */
-function standardError(groups: bigint[]): bigint {
+/** Standard error of the scaled total, from the spread of the groups read out of a finite pool of groups. */
+function standardError(groups: bigint[], pool: number): bigint {
   const count = groups.length;
   if (count < 2) return 0n;
   const values = groups.map(Number);
   const mean = values.reduce((a, b) => a + b, 0) / count;
   const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / (count - 1);
-  return BigInt(Math.round(256 * Math.sqrt((variance / count) * (1 - count / 256))));
+  return BigInt(Math.round(pool * Math.sqrt((variance / count) * (1 - count / pool))));
 }
 
 /** The accounts of known programs that name this wallet as their owner. */

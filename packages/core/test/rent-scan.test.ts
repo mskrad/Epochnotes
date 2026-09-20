@@ -43,24 +43,12 @@ const account = (type: string, lamports: number, space: number) => ({
   },
 });
 
-/** Whether a request asks for accounts of one exact size, and which. */
-const sizeAsked = (params: unknown[]): number | undefined =>
-  (params[1] as { filters?: { dataSize?: number }[] }).filters?.find(
-    (filter) => filter.dataSize !== undefined,
-  )?.dataSize;
-
-/** In the fakes below the callback answers the sampled groups; exact-size requests find nothing unless `short` says otherwise. */
-function fake(
-  accounts: (params: unknown[]) => unknown,
-  rate = 500n,
-  short: (size: number) => unknown[] = () => [],
-) {
+function fake(accounts: (params: unknown[]) => unknown, rate = 500n) {
   const calls: { method: string; params: unknown[] }[] = [];
   const rpc: RentRpc = async (method, params) => {
     calls.push({ method, params });
     if (method === 'getAccountInfo') return { result: sysvar(rate) };
-    const size = method === 'getProgramAccounts' ? sizeAsked(params) : undefined;
-    return { result: size === undefined ? accounts(params) : short(size) };
+    return { result: accounts(params) };
   };
   return { rpc, calls, options: { rpc, gates, endpoint: 'https://rpc.example/?api-key=secret', schedule } };
 }
@@ -184,35 +172,110 @@ describe('scanning a program', () => {
   });
 });
 
+/**
+ * One population of accounts behind an RPC that applies the filters the way a node does: memcmp compares the
+ * byte at the offset (an account too short for it matches nothing), dataSize compares the size exactly.
+ */
+interface Member {
+  type: string;
+  lamports: number;
+  space: number;
+  /** The byte at the sampled offset; ignored when the account is too short to have one. */
+  byte: number;
+}
+const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const byteOf = (base58: string) =>
+  [...base58].reduce((value, char) => value * 58 + ALPHABET.indexOf(char), 0);
+
+function population(members: Member[], { ignoresDataSize = false, rate = 500n } = {}) {
+  const calls: { offset?: number; byte?: number; size?: number }[] = [];
+  const rpc: RentRpc = async (method, params) => {
+    if (method === 'getAccountInfo') return { result: sysvar(rate) };
+    const config = params[1] as {
+      withContext?: boolean;
+      filters?: { memcmp?: { offset: number; bytes: string }; dataSize?: number }[];
+    };
+    const filter = config.filters?.[0];
+    const matching = members.filter((member) => {
+      if (filter?.memcmp !== undefined)
+        return member.space > filter.memcmp.offset && member.byte === byteOf(filter.memcmp.bytes);
+      if (filter?.dataSize !== undefined) return ignoresDataSize || member.space === filter.dataSize;
+      return true;
+    });
+    if (filter?.memcmp !== undefined)
+      calls.push({ offset: filter.memcmp.offset, byte: byteOf(filter.memcmp.bytes) });
+    if (filter?.dataSize !== undefined) calls.push({ size: filter.dataSize });
+    const value = matching.map((member) => account(member.type, member.lamports, member.space));
+    return { result: config.withContext ? { context: { slot: 11 }, value } : value };
+  };
+  return { calls, options: { rpc, gates, endpoint: 'https://rpc.example', schedule } };
+}
+
+/** `count` accounts at the legacy minimum (100 000 above today's), one in each of the byte values given. */
+const spread = (type: string, bytes: number[]): Member[] =>
+  bytes.map((byte) => ({ type, lamports: 200_000, space: 72, byte }));
+const everyByte = Array.from({ length: 256 }, (_, byte) => byte);
+const UNKNOWN = '11111111111111111111111111111111';
+
 describe('sampling a program', () => {
-  it('reads the chosen groups, scales by 256 / groups, and is repeatable with the same seed', async () => {
-    // Every group holds exactly one account at the legacy minimum: the estimate must be exact, with no spread.
-    const { options, calls } = fake(() => [account('OpenOrdersAccount', 200_000, 72)]);
+  it('reads three groups always and a seeded choice of the others, and scales only what was left to chance', async () => {
+    const { options, calls } = population(spread('OpenOrdersAccount', everyByte));
     const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
-    expect(report.reliability).toBe('estimate');
+    // one account in every group: 3 read for certain, 253 estimated from 4
     expect(report.total).toMatchObject({ accounts: 256, excessNow: 25_600_000n });
-    expect(report.standardError).toBe(0n);
-    const filters = calls
-      // the sampled groups; the exact-size requests for short accounts have a test of their own
-      .filter((call) => call.method === 'getProgramAccounts' && sizeAsked(call.params) === undefined)
-      .map((call) => JSON.stringify(call.params[1]));
-    expect(filters).toHaveLength(4);
-    expect(new Set(filters).size).toBe(4);
-    const again = fake(() => [account('OpenOrdersAccount', 200_000, 72)]);
+    expect(report).toMatchObject({ reliability: 'estimate', standardError: 0n });
+    const groups = calls.filter((call) => call.byte !== undefined).map((call) => call.byte);
+    expect(groups.slice(0, 3)).toEqual([0, 1, 255]);
+    expect(new Set(groups).size).toBe(7);
+    const again = population(spread('OpenOrdersAccount', everyByte));
     await sampleProgram(OPENBOOK, { ...again.options, offset: 8, buckets: 4, seed: 7 });
-    expect(again.calls.map((call) => JSON.stringify(call.params))).toEqual(
-      calls.map((call) => JSON.stringify(call.params)),
-    );
+    expect(again.calls).toEqual(calls);
+    const other = population(spread('OpenOrdersAccount', everyByte));
+    await sampleProgram(OPENBOOK, { ...other.options, offset: 8, buckets: 4, seed: 8 });
+    expect(other.calls).not.toEqual(calls);
+  });
+
+  it('gives the full scan when every group is read, whatever the spread', async () => {
+    const members = [...spread('Market', [0, 0, 0, 9, 200]), ...spread('OpenOrdersAccount', [1, 77, 255])];
+    const full = await scanProgram(OPENBOOK, population(members).options);
+    const sample = await sampleProgram(OPENBOOK, {
+      ...population(members).options,
+      offset: 8,
+      buckets: 256,
+      seed: 1,
+    });
+    expect(sample.total).toEqual(full.total);
+    expect(sample.standardError).toBe(0n);
+  });
+
+  it('counts a type piled onto a zero byte exactly, which no spread of other groups could have revealed', async () => {
+    // 568 accounts with a zero at the offset, as OpenBook v2 has at offset 40; the rest spread evenly
+    const piled = spread('BookSide', Array(568).fill(0) as number[]);
+    const { options } = population([...piled, ...spread('OpenOrdersAccount', everyByte)]);
+    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 8, seed: 3 });
+    const byType = Object.fromEntries(report.buckets.map((bucket) => [bucket.type, bucket]));
+    expect(byType.BookSide).toMatchObject({
+      accounts: 568,
+      excessNow: 56_800_000n,
+      standardError: 0n,
+      unreliable: false,
+    });
+    expect(report.total.accounts).toBe(568 + 256);
+    expect(report.reliability).toBe('estimate');
   });
 
   it('judges every account type on its own: a good total does not vouch for a rare type', async () => {
-    // OpenOrdersAccount occurs evenly; Market occurs in one group only.
-    let group = 0;
-    const { options } = fake(() => {
-      group += 1;
-      const even = Array.from({ length: 10 }, () => account('OpenOrdersAccount', 200_000, 72));
-      return group === 1 ? [...even, account('Market', 200_000, 72)] : even;
-    });
+    // seed 7 draws byte 77 first among the sampled groups: the only Market sits there
+    const probe = population(spread('OpenOrdersAccount', everyByte));
+    await sampleProgram(OPENBOOK, { ...probe.options, offset: 8, buckets: 4, seed: 7 });
+    const drawn = probe.calls.map((call) => call.byte).filter((byte) => byte !== undefined)[3] as number;
+    const { options } = population([
+      ...spread(
+        'OpenOrdersAccount',
+        everyByte.flatMap((byte) => Array(10).fill(byte) as number[]),
+      ),
+      ...spread('Market', [drawn]),
+    ]);
     const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
     const byType = Object.fromEntries(report.buckets.map((bucket) => [bucket.type, bucket]));
     expect(report.reliability).toBe('estimate');
@@ -222,106 +285,136 @@ describe('sampling a program', () => {
     expect(report.notes.join(' ')).toContain('missing from the report, not zero');
   });
 
-  it('does not trust a zero: a rare type with no excess in the groups read, and a sample that found nothing', async () => {
-    let group = 0;
-    const { options } = fake(() => {
-      group += 1;
-      const even = Array.from({ length: 10 }, () => account('OpenOrdersAccount', 200_000, 72));
-      // One Market at today's minimum: its excess is zero here, and says nothing about the other 255 groups.
-      return group === 1 ? [...even, account('Market', 100_000, 72)] : even;
-    });
-    const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
-    const market = report.buckets.find((bucket) => bucket.type === 'Market');
-    expect(market).toMatchObject({ excessNow: 0n, unreliable: true });
-
-    const empty = fake(() => []);
-    const nothing = await sampleProgram(OPENBOOK, { ...empty.options, offset: 8, buckets: 4, seed: 7 });
-    expect(nothing.reliability).toBe('unreliable');
-    expect(nothing.notes[0]).toContain('the groups read hold no accounts');
-  });
-
-  it('shows a large standard error when the groups are uneven', async () => {
-    let group = 0;
-    const { options } = fake(() => {
-      group += 1;
-      return group === 1 ? Array.from({ length: 50 }, () => account('Market', 200_000, 72)) : [];
-    });
+  it('shows a large standard error, and says unreliable, when the sampled groups are uneven', async () => {
+    const probe = population(spread('Market', everyByte));
+    await sampleProgram(OPENBOOK, { ...probe.options, offset: 8, buckets: 4, seed: 7 });
+    const drawn = probe.calls.map((call) => call.byte).filter((byte) => byte !== undefined)[3] as number;
+    const { options } = population(spread('Market', Array(50).fill(drawn) as number[]));
     const report = await sampleProgram(OPENBOOK, { ...options, offset: 8, buckets: 4, seed: 7 });
     expect(report.standardError).toBeGreaterThan(report.total.excessNow / 2n);
     expect(report.reliability).toBe('unreliable');
     expect(report.notes[0]).toMatch(/^UNRELIABLE: /);
   });
+
+  it('does not trust an empty sample, whatever was read in full beside it', async () => {
+    // fifty accounts in a group that is not drawn, one in a group that is always read, one too short for any group
+    const probe = population(spread('Market', everyByte));
+    await sampleProgram(UNKNOWN, { ...probe.options, offset: 40, buckets: 4, seed: 7 });
+    const read = new Set(probe.calls.map((call) => call.byte));
+    const unread = everyByte.find((byte) => !read.has(byte)) as number;
+    const members = [
+      ...spread('Market', Array(50).fill(unread) as number[]),
+      ...spread('Market', [0]),
+      { type: 'Market', lamports: 136_000, space: 8, byte: 0 },
+    ];
+    const report = await sampleProgram(UNKNOWN, {
+      ...population(members).options,
+      offset: 40,
+      buckets: 4,
+      seed: 7,
+    });
+    expect(report.total.accounts).toBe(2);
+    expect(report.reliability).toBe('unreliable');
+    expect(report.notes[0]).toContain(
+      'the sampled groups hold no accounts, which says nothing about the groups that were not read',
+    );
+  });
 });
 
 describe('accounts too short to hold the sampled byte', () => {
-  // The audit's fixture: one account of 8 bytes, one of 72, sampled by the byte at offset 40.
-  const long = account('Market', 200_000, 72);
-  const tiny = {
-    pubkey: 'tiny',
-    account: { lamports: 136_000, space: 8, data: [Buffer.alloc(8).toString('base64'), 'base64'] },
-  };
-  const byByte = (params: unknown[]) =>
-    (params[1] as { filters: { memcmp: { bytes: string } }[] }).filters[0]?.memcmp.bytes === '1'
-      ? [long]
-      : [];
+  // The audit's fixture: one account of 8 bytes, one of 72 with a zero at offset 40.
+  const audit: Member[] = [
+    { type: 'Market', lamports: 136_000, space: 8, byte: 0 },
+    { type: 'Market', lamports: 200_000, space: 72, byte: 0 },
+  ];
 
-  it('are read by exact size and added unscaled: all groups plus the short sizes give the full scan', async () => {
-    const { options, calls } = fake(byByte, 500n, (size) => (size === 8 ? [tiny] : []));
-    const report = await sampleProgram('11111111111111111111111111111111', {
-      ...options,
+  it('are read by exact size: every group plus the short sizes give the full scan (the audit case)', async () => {
+    const { options, calls } = population(audit);
+    const full = await scanProgram(UNKNOWN, population(audit).options);
+    const report = await sampleProgram(UNKNOWN, { ...options, offset: 40, buckets: 256, seed: 1 });
+    expect(full.total).toMatchObject({ accounts: 2, excessNow: 168_000n });
+    expect(report.total).toEqual(full.total);
+    expect(report.reliability).toBe('estimate');
+    expect(calls.filter((call) => call.size !== undefined).map((call) => call.size)).toEqual(
+      Array.from({ length: 41 }, (_, size) => size),
+    );
+    expect(report.method).toContain('41 exact-size request(s) for accounts of 40 bytes or fewer');
+  });
+
+  it('draw the line where the byte begins: 40 bytes is short, 41 bytes is in a group, and nothing is counted twice', async () => {
+    const members: Member[] = [
+      { type: 'Market', lamports: 200_000, space: 40, byte: 5 },
+      { type: 'Market', lamports: 200_000, space: 41, byte: 5 },
+    ];
+    const full = await scanProgram(UNKNOWN, population(members).options);
+    const report = await sampleProgram(UNKNOWN, {
+      ...population(members).options,
       offset: 40,
       buckets: 256,
       seed: 1,
     });
-    expect(report.total).toMatchObject({ accounts: 2, excessNow: 168_000n });
-    expect(report.reliability).toBe('estimate');
-    const sizes = calls.map((call) =>
-      call.method === 'getProgramAccounts' ? sizeAsked(call.params) : undefined,
-    );
-    expect(sizes.filter((size) => size !== undefined)).toEqual(Array.from({ length: 41 }, (_, size) => size));
-    expect(report.method).toContain('41 exact-size requests');
+    expect(report.total).toEqual(full.total);
+    expect(report.total.accounts).toBe(2);
   });
 
-  it('are not scaled with the sample: with a fraction of the groups read, the short accounts count once', async () => {
-    const { options } = fake(
-      () => [long],
-      500n,
-      (size) => (size === 8 ? [tiny] : []),
-    );
-    const report = await sampleProgram('11111111111111111111111111111111', {
-      ...options,
-      offset: 40,
-      buckets: 4,
-      seed: 1,
-    });
-    // 4 groups with one long account each, scaled by 64, plus the one short account as it is
+  it('are not scaled with the sample: with a fraction of the groups read, they count once', async () => {
+    const { options } = population([
+      ...spread('Market', everyByte),
+      { type: 'Market', lamports: 136_000, space: 8, byte: 0 },
+    ]);
+    const report = await sampleProgram(UNKNOWN, { ...options, offset: 40, buckets: 4, seed: 1 });
     expect(report.total).toMatchObject({ accounts: 257, excessNow: 256n * 100_000n + 68_000n });
   });
 
   it('are declared uncovered, and the result partial, when the offset is too far in to ask for every size', async () => {
-    const { options, calls } = fake(() => [long]);
-    const report = await sampleProgram('11111111111111111111111111111111', {
-      ...options,
-      offset: 300,
+    const { options, calls } = population(
+      spread('Market', everyByte).map((member) => ({ ...member, space: 400 })),
+    );
+    const report = await sampleProgram(UNKNOWN, { ...options, offset: 300, buckets: 4, seed: 1 });
+    expect(report.reliability).toBe('partial');
+    expect(report.notes[0]).toContain('accounts of 300 bytes or fewer are not covered');
+    expect(report.method).toContain('NOT covered');
+    expect(calls.some((call) => call.size !== undefined)).toBe(false);
+    const edge = await sampleProgram(UNKNOWN, {
+      ...population(spread('Market', everyByte).map((member) => ({ ...member, space: 400 }))).options,
+      offset: 128,
+      buckets: 4,
+      seed: 1,
+    });
+    expect(edge.reliability).toBe('estimate');
+  });
+
+  it('counts nothing from an endpoint that ignores the size filter, and says the result is partial', async () => {
+    const members = [
+      ...spread('Market', everyByte),
+      { type: 'Market', lamports: 136_000, space: 8, byte: 0 },
+    ];
+    const honest = await sampleProgram(UNKNOWN, {
+      ...population(members).options,
+      offset: 40,
+      buckets: 4,
+      seed: 1,
+    });
+    const report = await sampleProgram(UNKNOWN, {
+      ...population(members, { ignoresDataSize: true }).options,
+      offset: 40,
       buckets: 4,
       seed: 1,
     });
     expect(report.reliability).toBe('partial');
-    expect(report.notes[0]).toContain('accounts of 300 bytes or fewer are not covered');
-    expect(
-      calls.some((call) => call.method === 'getProgramAccounts' && sizeAsked(call.params) !== undefined),
-    ).toBe(false);
+    expect(report.total.accounts).toBe(honest.total.accounts - 1);
+    expect(report.notes.join(' ')).toContain('does not apply the dataSize filter');
   });
 
-  it('says what the standard error belongs to', async () => {
-    const { options } = fake(() => [long]);
-    const report = await sampleProgram('11111111111111111111111111111111', {
-      ...options,
+  it('says what the standard error belongs to, and that the reads are not of one slot', async () => {
+    const report = await sampleProgram(UNKNOWN, {
+      ...population(spread('Market', everyByte)).options,
       offset: 40,
       buckets: 4,
       seed: 1,
     });
     expect(report.notes.join(' ')).toContain('The standard error belongs to excessNow of the sampled part');
+    expect(report.notes.join(' ')).toContain('answered at different slots');
   });
 });
 

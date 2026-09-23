@@ -551,7 +551,9 @@ export function checkDirectory(
       notRun.push({
         entry: entry.id,
         rule: rule.rule,
-        reason: `no file this rule reads (${rule.languages.join(', ')}) was found in this repository`,
+        // "read", not "found": a file of that language may be here and still unread — too large, unreadable,
+        // or outside what this scan covers, each of which the report says elsewhere.
+        reason: `no file this rule reads (${rule.languages.join(', ')}) was read in this repository`,
       });
   for (const { entry, rule, read } of lockRules)
     if (read === 0)

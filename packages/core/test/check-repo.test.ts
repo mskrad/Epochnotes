@@ -748,6 +748,21 @@ describe('check repo', () => {
     expect(reasons.get('web3js-below-1-99')).toMatch(/no npm lockfile/);
     expect(reasons.has('rpc-max-version-zero')).toBe(false);
     expect(report.notRun.every((rule) => rule.entry === 'tx-v1')).toBe(true);
+    // One line per rule: a rule is named once, however many files were read for the others.
+    expect(report.notRun).toHaveLength(reasons.size);
+    const many = check(
+      repo('empty-many', Object.fromEntries([1, 2, 3, 4].map((n) => [`f${n}.ts`, 'export {};\n']))),
+    );
+    expect(many.notRun.map(({ rule }) => rule)).toEqual(report.notRun.map(({ rule }) => rule));
+  });
+
+  it('says a file of the rule was not read, not that none is here, when one was skipped', () => {
+    const big = repo('big-rust', { 'big.rs': `// ${'x'.repeat(2 * 1024 * 1024)}\n` });
+    const report = check(big);
+    expect(report.skipped).toMatchObject([{ file: 'big.rs', reason: 'too-large' }]);
+    const skippedLanguage = report.notRun.find((rule) => rule.rule === 'rust-client-max-version-zero');
+    expect(skippedLanguage?.reason).toMatch(/was read in this repository/);
+    expect(skippedLanguage?.reason).not.toMatch(/was found/);
   });
 
   it('holds a rule for answered only when a file it reads was read, findings or none', () => {

@@ -241,9 +241,22 @@ describe('epochnotes registry read / check rpc', () => {
     vi.stubEnv('EPOCHNOTES_VERSIONS', versions);
     vi.stubEnv('EPOCHNOTES_PUBLISHERS', publishers);
     try {
+      // Every command that reads the log, including verify: the README promises the variables, not a list.
+      for (const args of [
+        ['registry', 'read', 'tx-v1'],
+        ['registry', 'verify', 'tx-v1'],
+        ['check', 'repo', join(dir, 'repo')],
+      ]) {
+        const result = await run(...args, '--json');
+        expect(result.code, args.join(' ')).not.toBe(2);
+        expect(result.stdout, args.join(' ')).not.toContain('there is no version log');
+      }
       const read = await run('registry', 'read', 'tx-v1', '--json');
       expect(read.code).toBe(0);
       expect(JSON.parse(read.stdout)).toMatchObject({ provenance: { verified: true, version: 1 } });
+      const verified = await run('registry', 'verify', 'tx-v1', '--json');
+      expect(verified.code).toBe(0);
+      expect(JSON.parse(verified.stdout)).toMatchObject({ ok: true });
     } finally {
       vi.unstubAllEnvs();
     }

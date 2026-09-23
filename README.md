@@ -2,7 +2,9 @@
 
 A signed registry of Solana network changes — and the checks built on it: what breaks in your code, where, and how to fix it.
 
-Status: early development. Nothing here is ready for use yet.
+An upgrade lands, a call that worked for a year starts failing, and the answer lives in a SIMD, a client changelog and a feature gate account — three places, none of them your code. Epochnotes keeps that answer as a signed entry, tells you where it applies in your repository, and reads the activation status from the network at the moment you ask. When it cannot verify what it reads, it refuses to answer rather than guess; when it had nothing to check something against, it says so instead of reporting a clean result.
+
+Status: pre-release. The first signed version of the registry is published after release, so today every reader signs a log of their own — [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) walks through it end to end in about ten minutes. Nothing here has been audited.
 
 ## Layout
 

@@ -6,7 +6,7 @@ import {
   readTrustedPublishers,
   verifyEntry,
 } from '@epochnotes/core';
-import type { Command } from 'commander';
+import { type Command, Option } from 'commander';
 
 import { clusterOf, clusterOption, EXIT, rpcUrlOption } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
@@ -82,12 +82,19 @@ export function addVersionCommands(registry: Command): void {
     .command('verify')
     .description('Prove that an entry belongs to the latest signed version, without trusting the server.')
     .argument('<entry-id>', 'id of the entry, for example tx-v1')
-    .option(
-      '--versions <dir-or-url>',
-      'directory of the version log, or the base URL of a host that serves it',
-      'registry/versions',
+    .addOption(
+      new Option(
+        '--versions <dir-or-url>',
+        'directory of the version log, or the base URL of a host that serves it',
+      )
+        .default('registry/versions')
+        .env('EPOCHNOTES_VERSIONS'),
     )
-    .option('--publishers <file>', 'trusted publishers', 'registry/publishers.json')
+    .addOption(
+      new Option('--publishers <file>', 'trusted publishers')
+        .default('registry/publishers.json')
+        .env('EPOCHNOTES_PUBLISHERS'),
+    )
     .option('--mirror <url...>', 'hash-addressed mirrors tried after the manifest uri')
     .option('--pin <n:root>', 'the version seen last time; detects a rolled-back or rewritten log')
     .option('--onchain', 'also compare the log with the chain: catches a truncated or rewritten log')

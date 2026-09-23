@@ -95,7 +95,8 @@ npx epochnotes check repo corpus/pairs/tx-v1/real-altude-js-gettransaction ; ech
 Exit 1 with one `BREAKS` finding — the file, the line, the rule, the fix. Then read the lines below the
 count, which are the point of the demo:
 
-- `not run: …` — a rule whose language or lockfile never turned up here. It was not answered, so it is named.
+- `not run: …` — a rule none of the files it reads was read for. It was not answered, so it is named, and the
+  reason says whether the language never turned up or the file was skipped (`skipped:` lines say which).
 - `not checked: …` — an entry that carries no rule a static check can run. Nothing in this code was compared
   against it. Silence about it would read as a clean result, so the report refuses to be silent.
 

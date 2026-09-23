@@ -389,13 +389,18 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       expect(prose.out).not.toContain('not used');
     });
 
-    it('does not probe an endpoint with the rules of the revoked entry', async () => {
-      const probe = await run(
+    it('does not probe an endpoint with the rules of the revoked entry, and does not call that a pass', async () => {
+      const args = [
         ...['check', 'rpc', '--rpc-url', 'http://127.0.0.1:8899', ...source],
-        ...['--onchain', '--registry-cluster', 'localnet', '--json'],
-      );
+        ...['--onchain', '--registry-cluster', 'localnet'],
+      ];
+      const probe = await run(...args, '--json');
       expect(JSON.parse(probe.stdout)).toMatchObject({ probes: [], revoked: [{ id: 'tx-v1' }] });
-      expect(probe.code).toBe(0);
+      // The only entry with a probe was withdrawn, so this run observed nothing: exit 0 would read as
+      // "the endpoint was checked and is fine".
+      expect(probe.code).toBe(2);
+      const prose = await run(...args);
+      expect(prose.stdout).toContain('no entry of this version carries a probe to run');
     });
   });
 });

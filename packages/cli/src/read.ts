@@ -228,7 +228,9 @@ export function addRpcCheckCommand(check: Command): void {
           );
           if (report.observed === 0)
             console.log(
-              'nothing was learned about this endpoint: do not read this run as a clean bill of health',
+              report.probes.length === 0
+                ? 'nothing was learned about this endpoint: no entry of this version carries a probe to run, so nothing was asked of it'
+                : 'nothing was learned about this endpoint: do not read this run as a clean bill of health',
             );
           for (const probe of report.probes) {
             console.log(

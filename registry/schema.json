@@ -254,7 +254,9 @@
                     "minLength": 1
                   },
                   "fixture": {
-                    "type": "string"
+                    "description": "The transaction a probe reads, as <cluster>:<signature>. The probe runs only against an endpoint that serves that cluster.",
+                    "type": "string",
+                    "pattern": "^(mainnet-beta|testnet|devnet):[1-9A-HJ-NP-Za-km-z]{64,128}$"
                   },
                   "expect": {
                     "type": "string",

@@ -356,13 +356,20 @@ export function checkDirectory(
   const maxLockfileBytes = limits.maxLockfileBytes ?? MAX_LOCKFILE_BYTES;
   const findings: Finding[] = [];
   const notRun: { entry: string; rule: string; reason: string }[] = [];
+  // `read` counts the files a rule was actually run over: a rule that never met one was not answered, and
+  // silence about it would read as a clean result.
   const patterns: {
     entry: Entry;
     rule: Extract<DetectRule, { kind: 'code-pattern' }>;
     extensions: Set<string>;
     regex: RegExp;
+    read: number;
   }[] = [];
-  const lockRules: { entry: Entry; rule: Extract<DetectRule, { kind: 'lockfile-version' }> }[] = [];
+  const lockRules: {
+    entry: Entry;
+    rule: Extract<DetectRule, { kind: 'lockfile-version' }>;
+    read: number;
+  }[] = [];
   for (const entry of entries) {
     for (const rule of entry.detect) {
       if (rule.kind === 'code-pattern') {
@@ -373,8 +380,9 @@ export function checkDirectory(
           // Over the whole text, so that a line break inside the match does not hide it; `m` keeps ^ and $ meaning
           // a line, as they did when patterns ran line by line.
           regex: new RegExp(rule.pattern, 'gm'),
+          read: 0,
         });
-      } else if (rule.kind === 'lockfile-version') lockRules.push({ entry, rule });
+      } else if (rule.kind === 'lockfile-version') lockRules.push({ entry, rule, read: 0 });
       else
         notRun.push({
           entry: entry.id,
@@ -448,6 +456,7 @@ export function checkDirectory(
       const lineText = (line: number) =>
         text.slice(lineStarts[line], (lineStarts[line + 1] ?? text.length + 1) - 1).trim();
       const isComment = commentedOut(extname(path), text, lineStarts);
+      for (const item of matching) item.read += 1;
       matching.forEach(({ entry, rule, regex }, order) => {
         let lastLine = -1;
         regex.lastIndex = 0;
@@ -494,11 +503,13 @@ export function checkDirectory(
         }
       });
     }
-    for (const { entry, rule } of locking) {
+    for (const item of locking) {
+      const { entry, rule } = item;
       let versions: string[];
       try {
         versions = lockedVersions(lockfile as string, raw, rule.package.name);
         covered = true;
+        item.read += 1;
       } catch (error) {
         if (!(error instanceof UnparsableLockfile)) throw error;
         // Not a finding, and not silence either: nothing is known about the packages of this project.
@@ -534,6 +545,21 @@ export function checkDirectory(
       findings.push(finding);
     }
   }
+  // A rule that met no file of its own is as unanswered as one this check cannot run at all.
+  for (const { entry, rule, read } of patterns)
+    if (read === 0)
+      notRun.push({
+        entry: entry.id,
+        rule: rule.rule,
+        reason: `no file this rule reads (${rule.languages.join(', ')}) was found in this repository`,
+      });
+  for (const { entry, rule, read } of lockRules)
+    if (read === 0)
+      notRun.push({
+        entry: entry.id,
+        rule: rule.rule,
+        reason: `no ${rule.package.ecosystem} lockfile was read in this repository`,
+      });
   return { ok: true, root, filesScanned, findings, skipped, notRun, entriesNotChecked };
 }
 

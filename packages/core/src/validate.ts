@@ -3,7 +3,7 @@ import semver from 'semver';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 import type { z } from 'zod';
 
-import { type Entry, entrySchema } from './schema.js';
+import { type Entry, entrySchema, PROBE_CLUSTERS } from './schema.js';
 
 /** One validation problem: where it is, what is wrong, and what to do about it. */
 export interface Issue {
@@ -57,6 +57,8 @@ function hintFor(issue: z.core.$ZodIssue): string {
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
   if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
+  if (field === 'fixture')
+    return `Name the cluster the transaction lives on and its signature, as <cluster>:<signature>, with the cluster one of ${PROBE_CLUSTERS.join(', ')}. A probe runs only against an endpoint whose genesis hash says it serves that cluster, so a cluster no endpoint is recognised by would be probed on every endpoint that could not be placed.`;
   if (issue.code === 'invalid_type' && issue.input === undefined) return `Add the required field "${field}".`;
   return 'See registry/schema.json for the expected shape of this field.';
 }

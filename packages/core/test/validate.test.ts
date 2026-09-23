@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CLUSTER_GENESIS,
   type Entry,
+  PROBE_CLUSTERS,
   slowPatternInput,
   validateEntry,
   validateEntryYaml,
@@ -53,6 +55,28 @@ describe('checks a schema cannot express', () => {
     const raw = reference();
     raw.detect[1].rule = raw.detect[0].rule;
     expect(issuesOf(raw).map((issue) => issue.path)).toContain('detect[1].rule');
+  });
+
+  it('a probe fixture names a cluster an endpoint can be recognised by', () => {
+    const raw = reference();
+    const index = raw.detect.findIndex((rule: { kind: string }) => rule.kind === 'runtime-probe');
+    const [, signature] = (raw.detect[index].probe.fixture as string).split(':');
+    // `unknown` is what the probe calls an endpoint whose genesis hash it does not know: a fixture that
+    // named it would be run against every such endpoint and answer for a cluster nobody identified.
+    for (const cluster of ['unknown', 'mainnet', 'localnet', '']) {
+      raw.detect[index].probe.fixture = `${cluster}:${signature}`;
+      const issues = issuesOf(raw);
+      expect(issues, cluster).toMatchObject([{ path: `detect[${index}].probe.fixture` }]);
+      expect(issues[0]?.hint ?? '').toMatch(/mainnet-beta, testnet, devnet/);
+    }
+    for (const cluster of ['mainnet-beta', 'testnet', 'devnet']) {
+      raw.detect[index].probe.fixture = `${cluster}:${signature}`;
+      expect(issuesOf(raw), cluster).toEqual([]);
+    }
+  });
+
+  it('the clusters a fixture may name are the clusters a genesis hash is known for', () => {
+    expect([...PROBE_CLUSTERS].sort()).toEqual(Object.keys(CLUSTER_GENESIS).sort());
   });
 
   it('code patterns must compile', () => {

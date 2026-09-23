@@ -740,8 +740,33 @@ describe('check repo', () => {
   });
 
   it('says which rules it could not run', () => {
-    expect(check(repo('empty', { 'a.ts': 'export {};\n' })).notRun).toMatchObject([
-      { entry: 'tx-v1', rule: 'rpc-reads-v1-transaction' },
-    ]);
+    const report = check(repo('empty', { 'a.ts': 'export {};\n' }));
+    const reasons = new Map(report.notRun.map((rule) => [rule.rule, rule.reason]));
+    expect(reasons.get('rpc-reads-v1-transaction')).toMatch(/runtime probes/);
+    // A TypeScript file answers the rules of its own language, and no other: the rest were not asked.
+    expect(reasons.get('rust-client-max-version-zero')).toMatch(/no file this rule reads \(rust\)/);
+    expect(reasons.get('web3js-below-1-99')).toMatch(/no npm lockfile/);
+    expect(reasons.has('rpc-max-version-zero')).toBe(false);
+    expect(report.notRun.every((rule) => rule.entry === 'tx-v1')).toBe(true);
+  });
+
+  it('holds a rule for answered only when a file it reads was read, findings or none', () => {
+    const ran = (files: Record<string, string>, rule: string) =>
+      check(repo(`ran-${rule}-${Object.keys(files).join('-')}`, files)).notRun.every(
+        (item) => item.rule !== rule,
+      );
+    // The same rule: a file of its language answers it, whether or not the answer is a finding.
+    expect(ran({ 'a.ts': after }, 'rpc-max-version-zero')).toBe(true);
+    expect(ran({ 'a.ts': before }, 'rpc-max-version-zero')).toBe(true);
+    // A rule of one language only: a TypeScript file leaves it unanswered, a Rust file answers it.
+    expect(ran({ 'a.ts': before }, 'rust-client-max-version-zero')).toBe(false);
+    expect(ran({ 'a.rs': 'fn main() {}\n' }, 'rust-client-max-version-zero')).toBe(true);
+    // A lockfile rule needs a lockfile of its own ecosystem, and a Cargo.lock is not one.
+    expect(ran({ 'package-lock.json': '{"lockfileVersion":3,"packages":{}}\n' }, 'web3js-below-1-99')).toBe(
+      true,
+    );
+    expect(ran({ 'Cargo.lock': '[[package]]\nname = "x"\nversion = "1.0.0"\n' }, 'web3js-below-1-99')).toBe(
+      false,
+    );
   });
 });

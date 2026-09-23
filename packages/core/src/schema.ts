@@ -21,6 +21,14 @@ const versionRange = z.strictObject({
   range: text,
 });
 
+/**
+ * The clusters a probe fixture may name. An endpoint is recognised by its genesis hash, and one it does not
+ * recognise is called `unknown`: a fixture free to name any cluster could therefore say `unknown` and be run
+ * against every unrecognised endpoint, which would answer for a cluster nobody identified. Kept in step with
+ * the genesis hashes by a test.
+ */
+export const PROBE_CLUSTERS = ['mainnet-beta', 'testnet', 'devnet'] as const;
+
 const ruleBase = {
   rule: slug,
   confidence: z.enum(['breaks', 'check', 'likely-ok']),
@@ -44,7 +52,20 @@ const detectRule = z.discriminatedUnion('kind', [
   z.strictObject({
     ...ruleBase,
     kind: z.literal('runtime-probe'),
-    probe: z.strictObject({ method: text, fixture: z.string().optional(), expect: text }),
+    probe: z.strictObject({
+      method: text,
+      fixture: z
+        .string()
+        .regex(
+          new RegExp(`^(${PROBE_CLUSTERS.join('|')}):[1-9A-HJ-NP-Za-km-z]{64,128}$`),
+          `A fixture names the cluster it lives on and the signature of a transaction there, as <cluster>:<signature>. The cluster is one of ${PROBE_CLUSTERS.join(', ')}: a name no endpoint can be recognised by would be run against every endpoint whose genesis hash is not known.`,
+        )
+        .optional()
+        .describe(
+          'The transaction a probe reads, as <cluster>:<signature>. The probe runs only against an endpoint that serves that cluster.',
+        ),
+      expect: text,
+    }),
   }),
 ]);
 

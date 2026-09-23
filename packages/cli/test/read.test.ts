@@ -1,7 +1,10 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { CLUSTER_GENESIS } from '@epochnotes/core';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { writeTestKey } from '../../core/test/keys.js';
 import { root, run, scratch } from './run.js';
@@ -100,6 +103,82 @@ describe('epochnotes registry read / check rpc', () => {
     expect(JSON.parse(probe.stdout)).toMatchObject({ probes: [{ verdict: 'unreachable' }] });
   });
 
+  describe('what the probe report makes of an endpoint', () => {
+    let fake: Server;
+    let url = '';
+    // The cluster the endpoint claims, and how it answers getTransaction: a probe runs only when the
+    // fixture of the entry belongs to the cluster the endpoint serves.
+    let genesis: string = CLUSTER_GENESIS.devnet;
+    let getTransaction: (config: { maxSupportedTransactionVersion?: number }) => unknown = () => null;
+
+    beforeAll(async () => {
+      fake = createServer((request, response) => {
+        let body = '';
+        request.on('data', (chunk: Buffer) => {
+          body += chunk.toString();
+        });
+        request.on('end', () => {
+          const { id, method, params } = JSON.parse(body) as {
+            id: number;
+            method: string;
+            params: unknown[];
+          };
+          const answer =
+            method === 'getGenesisHash'
+              ? { result: genesis }
+              : getTransaction((params[1] ?? {}) as { maxSupportedTransactionVersion?: number });
+          response
+            .writeHead(200, { 'content-type': 'application/json' })
+            .end(JSON.stringify({ jsonrpc: '2.0', id, ...(answer as object) }));
+        });
+      });
+      await new Promise<void>((resolve) => fake.listen(0, '127.0.0.1', resolve));
+      url = `http://127.0.0.1:${(fake.address() as AddressInfo).port}`;
+    });
+    afterAll(() => fake.close());
+
+    // The fixtures of the entries live on mainnet-beta: against devnet nothing is observed, and exit 0
+    // would let such a run pass for a checked endpoint.
+    it('exits 2 and says nothing was learned, rather than pass for a checked endpoint', async () => {
+      genesis = CLUSTER_GENESIS.devnet;
+      const probe = await run('check', 'rpc', '--rpc-url', url, ...source, '--json');
+      expect(probe.code).toBe(2);
+      expect(JSON.parse(probe.stdout)).toMatchObject({
+        cluster: 'devnet',
+        observed: 0,
+        probes: [{ verdict: 'not-applicable' }],
+      });
+      const prose = await run('check', 'rpc', '--rpc-url', url, ...source);
+      expect(prose.code).toBe(2);
+      expect(prose.stdout).toContain('nothing was learned about this endpoint');
+    });
+
+    it('still exits 0 for an endpoint that was observed and behaves as the entry expects', async () => {
+      genesis = CLUSTER_GENESIS['mainnet-beta'];
+      getTransaction = (config) =>
+        config.maxSupportedTransactionVersion === 1
+          ? { result: { version: 1 } }
+          : { error: { code: -32015, message: 'Transaction version (1) is not supported' } };
+      const probe = await run('check', 'rpc', '--rpc-url', url, ...source, '--json');
+      expect(probe.code).toBe(0);
+      expect(JSON.parse(probe.stdout)).toMatchObject({
+        observed: 1,
+        probes: [{ verdict: 'reads' }],
+      });
+      expect(probe.stdout).not.toContain('nothing was learned');
+    });
+
+    it('exits 1 when the endpoint was observed and cannot read what the entry pins', async () => {
+      genesis = CLUSTER_GENESIS['mainnet-beta'];
+      getTransaction = () => ({
+        error: { code: -32015, message: 'Transaction version (1) is not supported' },
+      });
+      const probe = await run('check', 'rpc', '--rpc-url', url, ...source, '--json');
+      expect(probe.code).toBe(1);
+      expect(JSON.parse(probe.stdout)).toMatchObject({ observed: 1, probes: [{ verdict: 'cannot-read' }] });
+    });
+  });
+
   it('requires the endpoint to probe: a usage error, exit 2', async () => {
     const probe = await run('check', 'rpc', ...source);
     expect(probe.code).toBe(2);
@@ -119,6 +198,20 @@ describe('epochnotes registry read / check rpc', () => {
       provenance: { verified: true, version: 1 },
       findings: [{ entry: 'tx-v1', rule: 'rpc-max-version-zero', file: 'reader.ts' }],
     });
+  });
+
+  it('names, in both output forms, the entries the repository was never compared against', async () => {
+    const repo = join(dir, 'repo');
+    const json = await run('check', 'repo', repo, ...source, '--json');
+    const report = JSON.parse(json.stdout) as { entriesNotChecked: { entry: string }[] };
+    expect(report.entriesNotChecked.map((item) => item.entry)).toEqual([
+      'alpenglow',
+      'rent-simd-0437',
+      'slot-duration',
+    ]);
+    const prose = await run('check', 'repo', repo, ...source);
+    expect(prose.stdout).toContain('not checked: alpenglow@');
+    expect(prose.stdout).toContain('never compared against it');
   });
 
   it('labels a repository check that used unsigned rules, in both output forms', async () => {

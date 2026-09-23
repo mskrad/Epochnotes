@@ -37,11 +37,15 @@ figure with its error and its method, never as a fact.
 The repository check lists under `skipped` every path it did not read, with the reason (a link that leaves
 the repository, a broken link, a file too large to read, a lockfile that could not be parsed). Carry that
 list into your report: a skipped path was not checked, and a skipped lockfile means the dependency versions of
-that project are unknown.
+that project are unknown. It lists under `entriesNotChecked` the entries that carry no rule a static check can
+run, and under `notRun` the single rules it could not run. Those changes were not looked for in the code at
+all: say so, then take them yourself along the row above — read the entry's `breaks` and the project, and
+label what you find **by reading, not by rule**.
 
 The probe reports observations (`calls`) and quotes what the entry expects (`expect`). Compare them yourself
-and say what you concluded. The command exits with success even when `observed` is zero: read that field, not the exit code. A `fixture-missing` or `not-applicable` verdict means the behaviour was **not**
-observed; it is not a pass.
+and say what you concluded. When `observed` is zero the command exits 2 and nothing was learned about the
+endpoint. A `fixture-missing` or `not-applicable` verdict means the behaviour was **not** observed; it is not
+a pass.
 
 For a third-party API that only the provider can fix, the useful output is the question to send them. Draft
 it from the entry: the change, the symptom, the primary source.

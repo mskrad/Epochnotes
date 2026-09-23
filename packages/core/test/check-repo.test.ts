@@ -56,6 +56,51 @@ describe('check repo', () => {
     expect(report.findings[0]?.fix.join(' ')).toContain('maxSupportedTransactionVersion 1');
   });
 
+  it('names the entries it never asked about, so that silence is not read as a clean result', () => {
+    const registryFiles = validatePath(registry);
+    if (!registryFiles.ok) throw new Error('the committed registry is not valid');
+    const all = registryFiles.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
+    const staticless = all.filter(
+      (entry) =>
+        !entry.detect.some((rule) => rule.kind === 'code-pattern' || rule.kind === 'lockfile-version'),
+    );
+    const report = check(repo('coverage', { 'src/reader.ts': after }));
+    expect(report.findings).toEqual([]);
+    expect(report.entriesNotChecked).toEqual(
+      staticless.map((entry) => ({
+        entry: entry.id,
+        rev: entry.rev,
+        reason: 'the entry carries no detect rule',
+      })),
+    );
+  });
+
+  it('holds an entry against the code only when it carries a rule this check can run', () => {
+    const registryFiles = validatePath(registry);
+    if (!registryFiles.ok) throw new Error('the committed registry is not valid');
+    const txV1 = registryFiles.files
+      .flatMap((file) => (file.entry === undefined ? [] : [file.entry]))
+      .find((entry) => entry.id === 'tx-v1');
+    if (txV1 === undefined) throw new Error('tx-v1 is not in the registry');
+    const withKinds = (id: string, detect: typeof txV1.detect) => ({ ...txV1, id, detect });
+    const report = checkDirectory(repo('coverage-kinds', { 'src/reader.ts': before }), [
+      withKinds(
+        'probe-only',
+        txV1.detect.filter((rule) => rule.kind === 'runtime-probe'),
+      ),
+      withKinds(
+        'with-patterns',
+        txV1.detect.filter((rule) => rule.kind === 'code-pattern'),
+      ),
+      withKinds('no-rules', []),
+    ]);
+    expect(report.findings.map((finding) => finding.entry)).toEqual(['with-patterns']);
+    expect(report.entriesNotChecked).toEqual([
+      { entry: 'probe-only', rev: txV1.rev, reason: 'the entry carries no rule a static check can run' },
+      { entry: 'no-rules', rev: txV1.rev, reason: 'the entry carries no detect rule' },
+    ]);
+  });
+
   it('is silent on the code after the fix', () => {
     expect(check(repo('after', { 'src/reader.ts': after })).findings).toEqual([]);
   });

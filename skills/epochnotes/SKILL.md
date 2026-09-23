@@ -83,8 +83,14 @@ program lives on one cluster, which is not necessarily the cluster the project r
 `check repo` take it as `--cluster`, while `check rpc` and `rent scan` take it as `--registry-cluster`. Ask
 the person which cluster their registry is anchored on if the CLI default does not answer.
 
-In the probe report, `observed` counts the probes that actually saw the endpoint behave. Zero means nothing
-was learned about that endpoint, even though the command exits with success: report it as "cannot verify".
+A check that could not ask its question is not a check that found nothing, and the reports say which case they
+are. In the probe report, `observed` counts the probes that actually saw the endpoint behave; zero means
+nothing was learned about that endpoint (the command exits 2) and is reported as "cannot verify", never as
+"the provider is fine". In the repository report, `entriesNotChecked` names the entries that carry no rule
+this check can run: say which changes were therefore not looked for in the code, and reach for another method
+from [references/project-surfaces.md](references/project-surfaces.md) — reading the entry and the project
+yourself — rather than leaving them unanswered. Label what you find that way as read by you, not as a finding
+of the tool.
 
 ## 5. Hard limits
 

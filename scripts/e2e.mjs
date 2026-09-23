@@ -138,6 +138,12 @@ try {
   step('finds the break in code before the fix', ['check', 'repo', broken], 1, has('reader.ts:1'));
   step('is silent on code after the fix', ['check', 'repo', fixed], 0, has('0 finding(s)'));
   step(
+    'names the entries the repository was never compared against',
+    ['check', 'repo', fixed, '--versions', versions, '--publishers', publishers],
+    0,
+    has('not checked: '),
+  );
+  step(
     'treats a usage error as 2, not as findings',
     ['registry', 'verify'],
     2,
@@ -162,6 +168,17 @@ try {
           ? undefined
           : 'gates are missing a status';
       },
+    );
+    step(
+      // The probe of the entry is pinned to a mainnet-beta transaction: against devnet nothing can be observed,
+      // and the run must not pass for a checked endpoint.
+      'refuses to pass an endpoint no probe could speak about',
+      [
+        ...['check', 'rpc', '--rpc-url', 'https://api.devnet.solana.com'],
+        ...['--versions', versions, '--publishers', publishers, '--json'],
+      ],
+      2,
+      (_all, stdout) => (JSON.parse(stdout).observed === 0 ? undefined : 'a probe observed the endpoint'),
     );
     step(
       'plans the close of a real OpenBook v2 account on mainnet and asks the cluster what it would do, sending nothing',

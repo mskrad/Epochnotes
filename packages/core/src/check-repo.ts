@@ -65,6 +65,11 @@ export type CheckReport =
       /** Paths that were not read, and why. A path missing from both the findings and this list was checked. */
       skipped: Skipped[];
       notRun: { entry: string; rule: string; reason: string }[];
+      /**
+       * Entries whose changes this run never looked for, because they carry no rule a static check can run.
+       * No finding for such an entry means nothing was asked, not that the repository is clear of it.
+       */
+      entriesNotChecked: { entry: string; rev: number; reason: string }[];
     }
   | { ok: false; issues: Issue[] };
 
@@ -378,6 +383,20 @@ export function checkDirectory(
         });
     }
   }
+  // An entry the static check cannot ask about at all: silence about it would read as "nothing found".
+  const entriesNotChecked = entries
+    .filter(
+      (entry) =>
+        !entry.detect.some((rule) => rule.kind === 'code-pattern' || rule.kind === 'lockfile-version'),
+    )
+    .map((entry) => ({
+      entry: entry.id,
+      rev: entry.rev,
+      reason:
+        entry.detect.length === 0
+          ? 'the entry carries no detect rule'
+          : 'the entry carries no rule a static check can run',
+    }));
   const fixesFor = (entry: Entry, rule: string) =>
     entry.fix
       .filter((fix) => fix.for_rules === undefined || fix.for_rules.includes(rule))
@@ -515,7 +534,7 @@ export function checkDirectory(
       findings.push(finding);
     }
   }
-  return { ok: true, root, filesScanned, findings, skipped, notRun };
+  return { ok: true, root, filesScanned, findings, skipped, notRun, entriesNotChecked };
 }
 
 /** Checks a repository against every entry of a registry directory. */

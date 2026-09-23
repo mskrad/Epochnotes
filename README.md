@@ -40,6 +40,8 @@ A publisher withdraws an entry with a record on chain, which the signed log alon
 
 `--versions` and `--publishers` default to the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. `--working-copy <dir>` reads unsigned entry files, and the output says so.
 
+A check that could not ask its question says so instead of passing. `check repo` lists, under `entriesNotChecked`, every entry that carries no rule a static check can run: no finding for such an entry means nothing was looked for. `check rpc` exits 2, not 0, when no probe observed the endpoint — the probes of an entry are pinned to the cluster of their fixture, so an endpoint of another cluster is left unexamined, and a check that runs it in CI must not go green on that.
+
 ## Rent held above the minimum
 
 The staged rent reduction lowers the minimum balance of every account, and returns nothing by itself. `rent scan` measures, read-only, what is left above the minimum:

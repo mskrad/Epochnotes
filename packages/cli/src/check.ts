@@ -40,6 +40,10 @@ function print(report: Extract<CheckReport, { ok: true }>): void {
   );
   for (const item of report.skipped) console.log(`skipped: ${item.file} — ${item.reason}`);
   for (const rule of report.notRun) console.log(`not run: ${rule.entry} ${rule.rule} — ${rule.reason}`);
+  for (const item of report.entriesNotChecked)
+    console.log(
+      `not checked: ${item.entry}@${item.rev} — ${item.reason}, so this repository was never compared against it`,
+    );
 }
 
 export function checkCommand(): Command {

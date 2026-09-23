@@ -226,6 +226,10 @@ export function addRpcCheckCommand(check: Command): void {
           console.log(
             `endpoint ${report.endpoint} serves ${report.cluster}; ${report.observed} probe(s) observed its behaviour`,
           );
+          if (report.observed === 0)
+            console.log(
+              'nothing was learned about this endpoint: do not read this run as a clean bill of health',
+            );
           for (const probe of report.probes) {
             console.log(
               `\n${probe.verdict}  ${probe.entry} ${probe.rule}\n  expects: ${probe.expect}\n  ${probe.explanation}`,
@@ -236,11 +240,15 @@ export function addRpcCheckCommand(check: Command): void {
               );
           }
         }
+        // A run that observed nothing is an environment that could not answer the question, not a pass:
+        // exit 0 here would let a devnet endpoint, for which no entry has a fixture, keep a check green.
         process.exitCode = report.probes.some((probe) => probe.verdict === 'unreachable')
           ? EXIT.environment
           : report.probes.some((probe) => probe.verdict === 'cannot-read')
             ? EXIT.findings
-            : EXIT.ok;
+            : report.observed === 0
+              ? EXIT.environment
+              : EXIT.ok;
       } catch (error) {
         reportError(options.json, 'probe the endpoint', error);
       }

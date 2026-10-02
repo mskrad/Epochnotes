@@ -15,6 +15,8 @@ const ETHEREUM_GENESIS = EVM_GENESIS['eip155:1'] as string;
 function endpoint(options: {
   chainId?: string;
   genesis?: string | 'pruned';
+  /** The raw answer to the request for block 0, when a test needs one the other options cannot make. */
+  genesisAnswer?: Awaited<ReturnType<JsonRpc>>;
   head: { number: number; timestamp: number; fields?: Record<string, unknown> };
 }) {
   const asked: string[] = [];
@@ -22,6 +24,7 @@ function endpoint(options: {
     asked.push(`${method} ${JSON.stringify(params)}`);
     if (method === 'eth_chainId') return { result: options.chainId ?? '0x1' };
     if (method === 'eth_getBlockByNumber' && params[0] === '0x0') {
+      if (options.genesisAnswer !== undefined) return options.genesisAnswer;
       if (options.genesis === 'pruned')
         return { error: { code: 4444, message: 'pruned history unavailable' } };
       return { result: { number: '0x0', timestamp: '0x0', hash: options.genesis ?? ETHEREUM_GENESIS } };
@@ -70,6 +73,35 @@ describe('reading a fork by time on an EVM chain', () => {
       since: { time: '100' },
       confirmedBy: 'header',
     });
+  });
+
+  it('is active from the very second of the fork: a head at exactly the fork time is on the new rules', async () => {
+    expect(
+      await stateOf(fork(200, 'requestsHash'), {
+        number: 5,
+        timestamp: 200,
+        fields: { requestsHash: '0x1' },
+      }),
+    ).toMatchObject({
+      state: 'active',
+    });
+    expect(await stateOf(fork(201, 'requestsHash'), { number: 5, timestamp: 200 })).toEqual({
+      state: 'scheduled',
+    });
+  });
+
+  it('does not take an empty header value for the field: it shows nothing', async () => {
+    for (const empty of ['', '0x'])
+      expect(
+        await stateOf(fork(100, 'requestsHash'), {
+          number: 5,
+          timestamp: 200,
+          fields: { requestsHash: empty },
+        }),
+        empty,
+      ).toMatchObject({
+        state: 'unknown',
+      });
   });
 
   it('is active by time only, and says so, when the entry names no header field', async () => {
@@ -141,7 +173,7 @@ describe('which EVM chain an endpoint serves', () => {
   it('refuses an endpoint whose genesis block is not the pinned one: a chain id can be reused, a genesis cannot', async () => {
     const impostor = endpoint({ genesis: `0x${'1'.repeat(64)}`, head: { number: 1, timestamp: 1 } });
     await expect(evmActivationReader(impostor.rpc).identify()).rejects.toThrow(
-      /says it serves eip155:1, but its genesis block is 0x1{64}/,
+      /says it serves eip155:1, but its genesis block is "0x1{64}"/,
     );
   });
 
@@ -151,6 +183,31 @@ describe('which EVM chain an endpoint serves', () => {
       chain: 'eip155:8453',
       by: 'chain-id',
     });
+  });
+
+  it('refuses a block 0 with a foreign hash however broken the rest of it is: no way round the pin', async () => {
+    const foreign = `0x${'2'.repeat(64)}`;
+    for (const result of [
+      { hash: foreign, number: 'zz' },
+      { hash: foreign },
+      { number: '0x0' },
+      { hash: 42 },
+    ]) {
+      const impostor = endpoint({ genesisAnswer: { result }, head: { number: 1, timestamp: 1 } });
+      await expect(evmActivationReader(impostor.rpc).identify(), JSON.stringify(result)).rejects.toThrow(
+        /says it serves eip155:1, but its genesis block is/,
+      );
+    }
+  });
+
+  it('reads by chain id only when the endpoint says it has no block 0, by an error or by no block', async () => {
+    for (const answer of [{ error: { code: -32000, message: 'missing trie node' } }, { result: null }, {}]) {
+      const pruned = endpoint({ genesisAnswer: answer, head: { number: 1, timestamp: 1 } });
+      expect(await evmActivationReader(pruned.rpc).identify(), JSON.stringify(answer)).toEqual({
+        chain: 'eip155:1',
+        by: 'chain-id',
+      });
+    }
   });
 
   it('knows a chain it pins no genesis for by its chain id only', async () => {

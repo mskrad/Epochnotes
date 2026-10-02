@@ -38,6 +38,9 @@ describe('which chain a command reads', () => {
     for (const name of ['bitcoin', 'eip155:', 'EIP155:1', 'eip155:1:2', ''])
       expect(() => resolveChain(name), name).toThrow(UsageError);
     expect(() => resolveChain('solana:4uhcVJyU9pJkvQyS88uRDiswHXSCk000')).toThrow(/pass one with --rpc-url/);
+    expect(() => resolveChain('eip155:10')).toThrow(/no public endpoint is known for eip155:10/);
+    expect(resolveChain('ethereum')).toMatchObject({ chain: 'eip155:1' });
+    expect(resolveChain('base')).toMatchObject({ chain: 'eip155:8453' });
     expect(resolveChain('solana:4uhcVJyU9pJkvQyS88uRDiswHXSCk000', 'http://127.0.0.1:8899')).toEqual({
       chain: 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCk000',
       rpcUrl: 'http://127.0.0.1:8899',

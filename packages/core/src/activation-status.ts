@@ -135,9 +135,40 @@ export function unsupportedReader(chain: string): ActivationReader {
  * can hold chains read differently (bip122 holds Bitcoin and Zcash). Solana is the exception that proves it:
  * every Solana cluster is read the same way, and which one an endpoint serves is learned from the endpoint.
  */
+/**
+ * For an endpoint given without a chain: it is asked as Solana, then as an EVM chain, and read as the one it
+ * answers to. The report names the chain it found; when it answers to neither, both reasons are given.
+ */
+export function detectingReader(rpcUrl: string): ActivationReader {
+  const candidates = [
+    solanaActivationReader(rpcFeatureAccountSource(rpcUrl)),
+    evmActivationReader(httpJsonRpc(rpcUrl)),
+  ];
+  let found: ActivationReader | undefined;
+  return {
+    async identify() {
+      const reasons: string[] = [];
+      for (const reader of candidates) {
+        try {
+          const identity = await reader.identify();
+          found = reader;
+          return identity;
+        } catch (error) {
+          reasons.push(error instanceof Error ? error.message : String(error));
+        }
+      }
+      throw new Error(`the endpoint answers neither as Solana nor as an EVM chain: ${reasons.join('; ')}`);
+    },
+    read(activations) {
+      if (found === undefined) return Promise.reject(new Error('the endpoint was not identified'));
+      return found.read(activations);
+    },
+  };
+}
+
 export function activationReaderFor(chain: string | undefined, rpcUrl: string): ActivationReader {
-  if (chain === undefined || namespaceOf(chain) === 'solana')
-    return solanaActivationReader(rpcFeatureAccountSource(rpcUrl));
+  if (chain === undefined) return detectingReader(rpcUrl);
+  if (namespaceOf(chain) === 'solana') return solanaActivationReader(rpcFeatureAccountSource(rpcUrl));
   // Every EVM chain is read the same way; the genesis block is checked where this library pins it.
   if (namespaceOf(chain) === 'eip155') return evmActivationReader(httpJsonRpc(rpcUrl));
   return unsupportedReader(chain);

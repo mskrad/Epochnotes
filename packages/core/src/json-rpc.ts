@@ -22,9 +22,8 @@ export function httpJsonRpc(rpcUrl: string): JsonRpc {
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `${redactUrl(rpcUrl)} did not answer ${method}: ${reason.split(rpcUrl).join('<endpoint>')}`,
-      );
+      const hidden = rpcUrl === '' ? reason : reason.split(rpcUrl).join('<endpoint>');
+      throw new Error(`${redactUrl(rpcUrl)} did not answer ${method}: ${hidden}`);
     }
     if (!response.ok) throw new Error(`${redactUrl(rpcUrl)} answered ${method} with HTTP ${response.status}`);
     return (await response.json()) as Awaited<ReturnType<JsonRpc>>;

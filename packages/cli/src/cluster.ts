@@ -106,8 +106,8 @@ export function resolveChain(name: string, rpcUrl?: string): { chain?: string; r
       `"${name}" is not a chain: pass a CAIP-2 id such as eip155:1, or one of ${Object.keys(CHAIN_ALIASES).join(', ')}`,
     );
   const endpoint = rpcUrl ?? DEFAULT_ENDPOINTS[name];
-  // A Solana cluster this tool has no public endpoint for (a private one) is read only where the user says.
-  if (endpoint === undefined && name.startsWith('solana:'))
+  // A chain this tool can read but knows no public endpoint for is read only where the user says.
+  if (endpoint === undefined && (name.startsWith('solana:') || name.startsWith('eip155:')))
     throw new UsageError(`no public endpoint is known for ${name}: pass one with --rpc-url`);
   return { chain: name, ...(endpoint === undefined ? {} : { rpcUrl: endpoint }) };
 }

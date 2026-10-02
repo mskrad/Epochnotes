@@ -40,9 +40,11 @@ async function block(rpc: JsonRpc, tag: string): Promise<Block | undefined> {
   };
 }
 
-/** Whether a block carries a header field: present and not null. */
-const carries = (head: Block, field: string) =>
-  head.fields[field] !== undefined && head.fields[field] !== null;
+/** Whether a block carries a header field: a value, not null and not empty. */
+const carries = (head: Block, field: string) => {
+  const value = head.fields[field];
+  return value !== undefined && value !== null && value !== '' && value !== '0x';
+};
 
 /**
  * The state of one activation against the head of the chain. A fork by time is a fact the entry states, taken
@@ -86,19 +88,16 @@ export function evmActivationReader(rpc: JsonRpc): ActivationReader {
       const chain = `eip155:${quantity(await call(rpc, 'eth_chainId'), 'eth_chainId').toString()}`;
       const pinned = EVM_GENESIS[chain];
       if (pinned === undefined) return { chain, by: 'chain-id' };
-      let genesis: Block | undefined;
-      try {
-        genesis = await block(rpc, '0x0');
-      } catch {
-        // Endpoints that prune history cannot return block 0. The chain id is then all there is, and the
-        // reading says so instead of failing.
+      // Only an endpoint that says it has no block 0 — an error, or no block — is read by its chain id: that is
+      // what a node that prunes history answers. A block 0 it does return must carry the pinned hash, whatever
+      // else is wrong with it, so that an impostor cannot pass by sending a broken one.
+      const answer = await rpc('eth_getBlockByNumber', ['0x0', false]);
+      if (answer.error !== undefined || answer.result === null || answer.result === undefined)
         return { chain, by: 'chain-id' };
-      }
-      const hash = genesis?.fields.hash;
-      if (genesis === undefined || typeof hash !== 'string') return { chain, by: 'chain-id' };
-      if (hash.toLowerCase() !== pinned)
+      const hash = (answer.result as { hash?: unknown }).hash;
+      if (typeof hash !== 'string' || hash.toLowerCase() !== pinned)
         throw new Error(
-          `the endpoint says it serves ${chain}, but its genesis block is ${hash}, not ${pinned}`,
+          `the endpoint says it serves ${chain}, but its genesis block is ${JSON.stringify(hash)}, not ${pinned}`,
         );
       return { chain, by: 'genesis' };
     },

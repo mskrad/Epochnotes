@@ -73,6 +73,7 @@ export {
   activationStateOfFeature,
   appliesTo,
   type ChainReading,
+  detectingReader,
   readActivations,
   type ReadingPoint,
   solanaActivationReader,

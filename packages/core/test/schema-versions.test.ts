@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,10 +7,13 @@ import { parse } from 'yaml';
 
 import {
   activationsOf,
+  buildVersion,
   type Entry,
+  loadPublisherKey,
   probeRpc,
   publishVersion,
   readRegistry,
+  signManifest,
   SOLANA_CHAINS,
   subjectOf,
   validateEntry,
@@ -49,28 +52,74 @@ function v2With(activations: unknown[]): Record<string, unknown> {
   };
 }
 
+/**
+ * Signs a log the way the publisher did before schema 2, which it no longer does: build, sign, then the content
+ * file and the manifest next to it.
+ */
+async function signAsBefore(entries: Entry[], versions: string, keyFile: string) {
+  const key = await loadPublisherKey(keyFile);
+  const built = buildVersion({
+    entries,
+    publisher: key.address,
+    uri: join(versions, '{root}.jsonl'),
+    published: '2026-09-20',
+  });
+  if (!built.ok || built.unchanged) throw new Error(JSON.stringify(built));
+  const manifest = await signManifest(built.manifest, key.privateKey);
+  mkdirSync(versions, { recursive: true });
+  writeFileSync(join(versions, `${manifest.merkle_root}.jsonl`), built.content.bytes);
+  writeFileSync(join(versions, '1.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  return manifest;
+}
+
 describe('a version signed in schema 1', () => {
+  const versions = join(dir, 'v1-log');
+  const keyFile = writeTestKey(join(dir, 'v1-key.json'));
+
   it('verifies with the reader of schema 2, under the root it was signed with', async () => {
-    const versions = join(dir, 'v1-log');
-    const published = await publishVersion({
-      entriesDir: v1Dir,
-      versionsDir: versions,
-      keyFile: writeTestKey(join(dir, 'v1-key.json')),
-      uri: join(versions, '{root}.jsonl'),
-      published: '2026-09-20',
-    });
-    if (!published.ok) throw new Error(JSON.stringify(published.issues));
+    const manifest = await signAsBefore(entriesIn(v1Dir), versions, keyFile);
     // The root of the four schema-1 entries that every log signed between 2026-09-20 and 2026-10-02 holds.
-    expect(published.manifest.merkle_root).toBe(
-      'fa7d2f5fc66c67bf2ea200014283346620cb5953a7475ad2385d11fff5a4471e',
-    );
+    expect(manifest.merkle_root).toBe('fa7d2f5fc66c67bf2ea200014283346620cb5953a7475ad2385d11fff5a4471e');
     const reading = await readRegistry({
-      log: { versionsDir: versions, trustedPublishers: [published.manifest.publisher] },
+      log: { versionsDir: versions, trustedPublishers: [manifest.publisher] },
     });
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
     expect(reading.provenance).toMatchObject({ verified: true, version: 1 });
     expect(reading.entries.map(({ entry }) => entry.schema_version)).toEqual([1, 1, 1, 1]);
     expect(readdirSync(versions).filter((name) => name.endsWith('.jsonl'))).toHaveLength(1);
+  });
+
+  it('is not signed again: the publisher refuses a schema-1 entry, and names what to do', async () => {
+    const refused = await publishVersion({
+      entriesDir: v1Dir,
+      versionsDir: join(dir, 'refused'),
+      keyFile,
+      uri: '{root}.jsonl',
+      published: '2026-10-02',
+      dryRun: true,
+    });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) throw new Error('unreachable');
+    expect(refused.issues).toHaveLength(4);
+    expect(refused.issues[0]).toMatchObject({
+      path: 'alpenglow: schema_version',
+      message: 'Entry is in schema_version 1, which is read but no longer published',
+      hint: expect.stringMatching(/Move it to schema_version 2\. If this log already holds it, raise rev/),
+    });
+  });
+
+  it('moves on to schema 2 in the same log only with rev raised, since its content changes', async () => {
+    const same = await publishVersion({
+      entriesDir: v2Dir,
+      versionsDir: versions,
+      keyFile,
+      uri: join(versions, '{root}.jsonl'),
+      published: '2026-10-02',
+      dryRun: true,
+    });
+    expect(same.ok).toBe(false);
+    if (same.ok) throw new Error('unreachable');
+    expect(same.issues.map((issue) => issue.message).join(' ')).toMatch(/Content changed but rev is 1/);
   });
 });
 

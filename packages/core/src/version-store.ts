@@ -6,6 +6,7 @@ import { createKeyPairFromBytes, getAddressFromPublicKey } from '@solana/kit';
 
 import { type ContentAttempt, ContentUnavailableError, fetchCommittedContent } from './content-source.js';
 import { validatePath } from './load.js';
+import { ENTRY_SCHEMA_VERSION } from './schema.js';
 import { verifyMerkleProof } from './merkle.js';
 import type { Issue } from './validate.js';
 import {
@@ -300,6 +301,17 @@ export async function publishVersion(options: {
     return { ok: false, issues: [...issues, ...registry.registryIssues] };
   }
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
+  // An older format is read forever, so that what was signed in it keeps verifying; it is not signed again.
+  const outdated = entries.filter((entry) => entry.schema_version !== ENTRY_SCHEMA_VERSION);
+  if (outdated.length > 0)
+    return {
+      ok: false,
+      issues: outdated.map((entry) => ({
+        path: `${entry.id}: schema_version`,
+        message: `Entry is in schema_version ${entry.schema_version}, which is read but no longer published`,
+        hint: `Move it to schema_version ${ENTRY_SCHEMA_VERSION}. If this log already holds it, raise rev as well: its content changes.`,
+      })),
+    };
   const key = await loadPublisherKey(options.keyFile);
 
   const rawLog = readRawLog(options.versionsDir);

@@ -44,11 +44,11 @@ function formatPath(path: PropertyKey[]): string {
     .replace(/^\./, '');
 }
 
-function hintFor(issue: z.core.$ZodIssue): string {
+function hintFor(issue: z.core.$ZodIssue, rawVersion?: unknown): string {
   const field = String(issue.path.at(-1) ?? '');
   if (issue.code === 'unrecognized_keys') {
     return issue.keys.some((key) => STATUS_KEYS.test(key))
-      ? 'Remove it: activation status is never stored in an entry, it is read from the feature gate account at check time.'
+      ? 'Remove it: activation status is never stored in an entry, it is read from the chain at check time.'
       : 'Remove the field or check its spelling against registry/schema.json.';
   }
   if (issue.code === 'too_small' && field === 'sources') {
@@ -61,7 +61,12 @@ function hintFor(issue: z.core.$ZodIssue): string {
     return 'List at least one item, or remove the empty list.';
   }
   if (field === 'applies')
-    return 'Add applies.activations (schema 2: where and how the change activates, per chain) and/or applies.versions (semver ranges).';
+    return rawVersion === 1
+      ? 'Add applies.gates (feature gate addresses) and/or applies.versions (semver ranges).'
+      : 'Add applies.activations (where and how the change activates, per chain) and/or applies.versions (semver ranges).';
+  if (field === 'chain')
+    return 'Name the chain by its CAIP-2 id: solana for a Solana feature account, eip155:<chain id> for an EVM fork by time, <namespace>:<reference> for a block height.';
+  if (field === 'address') return 'Copy the feature account address, in base58, from the client source code.';
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
   if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
@@ -286,7 +291,7 @@ export function validateEntry(raw: unknown): ValidationResult {
       issues: parsed.error.issues.map((issue) => ({
         path: formatPath(issue.path),
         message: issue.message,
-        hint: hintFor(issue),
+        hint: hintFor(issue, version),
       })),
     };
   }

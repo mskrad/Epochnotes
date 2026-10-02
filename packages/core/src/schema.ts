@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { CAIP2_PATTERN, SOLANA_CHAINS } from './chains.js';
+import { SOLANA_CHAINS } from './chains.js';
 
 /** The registry entry format this library writes. */
 export const ENTRY_SCHEMA_VERSION = 2;
@@ -194,8 +194,9 @@ const activation = z.discriminatedUnion('kind', [
     kind: z.literal('timestamp'),
     chain: z
       .string()
+      // No leading zero: eip155:01 would be a second name of eip155:1.
       .regex(
-        /^eip155:[0-9]{1,32}$/,
+        /^eip155:[1-9][0-9]{0,31}$/,
         'A fork by time names one EVM chain by its CAIP-2 id, as eip155:<chain id>.',
       ),
     at: z.int().min(0).describe('Unix time, in seconds, of the first block that carries the change.'),
@@ -216,8 +217,11 @@ const activation = z.discriminatedUnion('kind', [
     kind: z.literal('block-height'),
     chain: z
       .string()
-      .regex(CAIP2_PATTERN, 'Name the chain by its CAIP-2 id.')
-      .refine((chain) => !chain.startsWith('solana:'), 'A Solana change activates by a feature account.'),
+      // In the pattern rather than a refinement, so that the published JSON Schema refuses it too.
+      .regex(
+        /^(?!solana:)[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$/,
+        'Name the chain by its CAIP-2 id; a Solana change activates by a feature account, not by a height.',
+      ),
     at: z.int().min(0).describe('The first block that carries the change.'),
     label,
     effect: z.string().optional(),

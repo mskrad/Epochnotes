@@ -91,9 +91,13 @@ export function evmActivationReader(rpc: JsonRpc): ActivationReader {
       // Only an endpoint that says it has no block 0 — an error, or no block — is read by its chain id: that is
       // what a node that prunes history answers. A block 0 it does return must carry the pinned hash, whatever
       // else is wrong with it, so that an impostor cannot pass by sending a broken one.
-      const answer = await rpc('eth_getBlockByNumber', ['0x0', false]);
-      if (answer.error !== undefined || answer.result === null || answer.result === undefined)
-        return { chain, by: 'chain-id' };
+      // Public endpoints balance requests over nodes with and without full history: one more request often
+      // reaches a node that has block 0.
+      const noBlock = (answer: Awaited<ReturnType<JsonRpc>>) =>
+        answer.error !== undefined || answer.result === null || answer.result === undefined;
+      let answer = await rpc('eth_getBlockByNumber', ['0x0', false]);
+      if (noBlock(answer)) answer = await rpc('eth_getBlockByNumber', ['0x0', false]);
+      if (noBlock(answer)) return { chain, by: 'chain-id' };
       const hash = (answer.result as { hash?: unknown }).hash;
       if (typeof hash !== 'string' || hash.toLowerCase() !== pinned)
         throw new Error(

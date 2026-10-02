@@ -210,6 +210,22 @@ describe('which EVM chain an endpoint serves', () => {
     }
   });
 
+  it('asks once more for block 0, so that a balanced endpoint that first reaches a pruned node is still checked', async () => {
+    let calls = 0;
+    const genesis: JsonRpc = async (method, params) => {
+      if (method === 'eth_chainId') return { result: '0x1' };
+      if (params[0] === '0x0') {
+        calls += 1;
+        return calls === 1
+          ? { error: { code: 4444, message: 'pruned' } }
+          : { result: { hash: ETHEREUM_GENESIS } };
+      }
+      return { result: null };
+    };
+    expect(await evmActivationReader(genesis).identify()).toEqual({ chain: 'eip155:1', by: 'genesis' });
+    expect(calls).toBe(2);
+  });
+
   it('knows a chain it pins no genesis for by its chain id only', async () => {
     const other = endpoint({ chainId: '0xa', head: { number: 1, timestamp: 1 } });
     expect(await evmActivationReader(other.rpc).identify()).toEqual({ chain: 'eip155:10', by: 'chain-id' });

@@ -18,6 +18,7 @@ const EXTENSIONS: Record<Language, string[]> = {
   python: ['.py'],
   go: ['.go'],
   markdown: ['.md', '.mdx'],
+  solidity: ['.sol'],
 };
 /** Used only when the directory is not a git work tree: names that are dependencies or VCS data everywhere. */
 const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);

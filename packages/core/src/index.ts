@@ -16,7 +16,30 @@ export {
 } from './check-repo.js';
 export { canonicalize, CanonicalizationError, entryLeafHash, toHex } from './canonical.js';
 export { type FileReport, type RegistryReport, validatePath } from './load.js';
-export { ENTRY_SCHEMA_VERSION, type Entry, entryJsonSchema, entrySchema, PROBE_CLUSTERS } from './schema.js';
+export {
+  type Activation,
+  activationsOf,
+  ENTRY_SCHEMA_VERSION,
+  type Entry,
+  entryJsonSchema,
+  entrySchema,
+  entrySchemaV1,
+  entrySchemaV2,
+  type EntryV1,
+  type EntryV2,
+  featureGatesOf,
+  PROBE_CLUSTERS,
+  READABLE_SCHEMA_VERSIONS,
+  subjectOf,
+} from './schema.js';
+export {
+  CAIP2_PATTERN,
+  namespaceOf,
+  SOLANA_CHAINS,
+  type SolanaCluster,
+  solanaChainId,
+  solanaClusterOf,
+} from './chains.js';
 export {
   type Issue,
   type ValidationResult,

@@ -1,4 +1,5 @@
-import { GENESIS, redactUrl } from './onchain.js';
+import { GENESIS, solanaClusterOf } from './chains.js';
+import { redactUrl } from './onchain.js';
 import type { Entry } from './schema.js';
 
 export interface ProbeCall {
@@ -86,7 +87,12 @@ export async function probeRpc(
     for (const rule of entry.detect) {
       if (rule.kind !== 'runtime-probe') continue;
       const fixture = rule.probe.fixture ?? '';
-      const [fixtureCluster, signature] = fixture.split(':');
+      // <chain>:<signature>, where the chain is a cluster name (schema 1) or a CAIP-2 id, which has a colon
+      // of its own (schema 2): the signature is what follows the last colon.
+      const split = fixture.lastIndexOf(':');
+      const fixtureChain = split === -1 ? fixture : fixture.slice(0, split);
+      const signature = split === -1 ? undefined : fixture.slice(split + 1);
+      const fixtureCluster = solanaClusterOf(fixtureChain) ?? fixtureChain;
       const base = { entry: entry.id, rule: rule.rule, fixture, expect: rule.probe.expect };
       if (rule.probe.method !== 'getTransaction' || signature === undefined) {
         probes.push({

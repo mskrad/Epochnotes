@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { checkDirectory, checkRepository, validatePath } from '../src/index.js';
+import { checkDirectory, checkRepository, type Entry, validatePath } from '../src/index.js';
 
 const registry = new URL('../../../registry/entries', import.meta.url).pathname;
 const root = mkdtempSync(join(tmpdir(), 'epochnotes-check-'));
@@ -92,7 +92,8 @@ describe('check repo', () => {
       .flatMap((file) => (file.entry === undefined ? [] : [file.entry]))
       .find((entry) => entry.id === 'tx-v1');
     if (txV1 === undefined) throw new Error('tx-v1 is not in the registry');
-    const withKinds = (id: string, detect: typeof txV1.detect) => ({ ...txV1, id, detect });
+    // A spread loses which schema the detect list belongs to; the entry is the same shape either way.
+    const withKinds = (id: string, detect: typeof txV1.detect) => ({ ...txV1, id, detect }) as Entry;
     const report = checkDirectory(repo('coverage-kinds', { 'src/reader.ts': before }), [
       withKinds(
         'probe-only',
@@ -640,7 +641,7 @@ describe('check repo', () => {
       const entry = entries.find((item) => item.id === 'tx-v1');
       const rule = entry?.detect.find((item) => item.kind === 'code-pattern');
       if (entry === undefined || rule?.kind !== 'code-pattern') throw new Error('no pattern rule to borrow');
-      return [{ ...entry, detect: [{ ...rule, rule: 'borrowed', pattern }] }];
+      return [{ ...entry, detect: [{ ...rule, rule: 'borrowed', pattern }] } as Entry];
     };
 
     it('keeps ^ and $ meaning a line: a pattern is written for lines', () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
@@ -10,10 +12,13 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-// Changed on 2026-09-20 with the rules for Rust, Go and reads without the parameter. The entry stays at rev 1:
-// no version of the registry has been published yet, and the first published version must start every entry
-// at rev 1. After the first publication this value changes only together with `rev`.
-const PINNED_TX_V1_REV_1 = 'b599952c254ae6bfb1437ea32eb927c0b6a2c7f381b6a0a21ed44830858d7ea9';
+// Changed on 2026-10-02 with the move to schema 2 (activations per chain). The entry stays at rev 1: no version
+// of the registry has been published yet, and the first published version must start every entry at rev 1.
+// After the first publication this value changes only together with `rev`.
+const PINNED_TX_V1_REV_1 = '10b9c1e2f2666b6e0bf657dc35cfa99e0dc7ea11879df825cad9a7afd3468beb';
+// The same entry in schema 1, as versions signed before 2026-10-02 hold it. It must never change: those
+// versions verify only while the reader hashes a schema-1 entry exactly as it did.
+const PINNED_TX_V1_SCHEMA_1 = 'b599952c254ae6bfb1437ea32eb927c0b6a2c7f381b6a0a21ed44830858d7ea9';
 
 function reverseKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(reverseKeys);
@@ -89,5 +94,11 @@ describe('canonical form', () => {
   it('pins the leaf of tx-v1 rev 1: changing the entry without raising rev must be a conscious act', () => {
     expect(parse(referenceYaml)).toMatchObject({ id: 'tx-v1', rev: 1 });
     expect(leafOfYaml(referenceYaml)).toBe(PINNED_TX_V1_REV_1);
+  });
+
+  it('hashes a schema-1 entry exactly as it did before schema 2', () => {
+    const v1 = readFileSync(new URL('./fixtures/schema-v1/tx-v1.yaml', import.meta.url), 'utf8');
+    expect(parse(v1)).toMatchObject({ schema_version: 1, id: 'tx-v1', rev: 1 });
+    expect(leafOfYaml(v1)).toBe(PINNED_TX_V1_SCHEMA_1);
   });
 });

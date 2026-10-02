@@ -7,6 +7,7 @@ import {
   type RentSchedule,
   rentScheduleFromEntry,
   validatePath,
+  featureGatesOf,
 } from '../src/index.js';
 
 const entries = validatePath(new URL('../../../registry/entries', import.meta.url).pathname).files.flatMap(
@@ -32,7 +33,9 @@ describe('the rent schedule of the registry entry', () => {
     const read = rentScheduleFromEntry(rentEntry);
     expect(read.legacyRate).toBe(6960n);
     expect(read.steps.map((step) => step.rate)).toEqual([6333n, 5080n, 2575n, 1322n, 696n]);
-    expect(read.steps.map((step) => step.gate)).toEqual(rentEntry.applies.gates?.map((gate) => gate.address));
+    expect(read.steps.map((step) => step.gate)).toEqual(
+      featureGatesOf(rentEntry).map((gate) => gate.address),
+    );
   });
 
   it('refuses an entry whose gates are not rent steps', () => {
@@ -42,9 +45,10 @@ describe('the rent schedule of the registry entry', () => {
   });
 
   it('refuses a schedule whose rates do not fall', () => {
-    const gates = [...(rentEntry.applies.gates ?? [])].reverse();
-    gates[0] = { ...(gates[0] as (typeof gates)[0]), effect: 'Step. (from 6960)' };
-    expect(() => rentScheduleFromEntry({ ...rentEntry, applies: { gates } })).toThrow('do not go down');
+    const activations = [...featureGatesOf(rentEntry)].reverse();
+    activations[0] = { ...(activations[0] as (typeof activations)[0]), effect: 'Step. (from 6960)' };
+    if (rentEntry.schema_version !== 2) throw new Error('the rent entry is expected in schema 2');
+    expect(() => rentScheduleFromEntry({ ...rentEntry, applies: { activations } })).toThrow('do not go down');
   });
 });
 

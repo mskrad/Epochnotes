@@ -3,7 +3,15 @@ import semver from 'semver';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 import type { z } from 'zod';
 
-import { type Entry, entrySchema, PROBE_CLUSTERS } from './schema.js';
+import { SOLANA_CHAINS } from './chains.js';
+import {
+  activationsOf,
+  type Entry,
+  entrySchemaV1,
+  entrySchemaV2,
+  PROBE_CLUSTERS,
+  READABLE_SCHEMA_VERSIONS,
+} from './schema.js';
 
 /** One validation problem: where it is, what is wrong, and what to do about it. */
 export interface Issue {
@@ -49,16 +57,16 @@ function hintFor(issue: z.core.$ZodIssue): string {
   if (issue.code === 'invalid_type' && field === 'sources') {
     return 'Add a sources list with at least one item: kind, ref and retrieved (YYYY-MM-DD).';
   }
-  if (issue.code === 'too_small' && (field === 'gates' || field === 'versions')) {
+  if (issue.code === 'too_small' && (field === 'gates' || field === 'activations' || field === 'versions')) {
     return 'List at least one item, or remove the empty list.';
   }
   if (field === 'applies')
-    return 'Add applies.gates (feature gate addresses) and/or applies.versions (semver ranges).';
+    return 'Add applies.activations (schema 2: where and how the change activates, per chain) and/or applies.versions (semver ranges).';
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
   if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
   if (field === 'fixture')
-    return `Name the cluster the transaction lives on and its signature, as <cluster>:<signature>, with the cluster one of ${PROBE_CLUSTERS.join(', ')}. A probe runs only against an endpoint whose genesis hash says it serves that cluster, so a cluster no endpoint is recognised by would be probed on every endpoint that could not be placed.`;
+    return `Name the chain the transaction lives on and its signature, as <chain>:<signature>. In schema_version 2 the chain is a CAIP-2 id, one of ${Object.values(SOLANA_CHAINS).join(', ')}; in schema_version 1 it is one of ${PROBE_CLUSTERS.join(', ')}. A probe runs only against an endpoint that serves that chain, so a chain no endpoint is recognised by would be probed on every endpoint that could not be placed.`;
   if (issue.code === 'invalid_type' && issue.input === undefined) return `Add the required field "${field}".`;
   return 'See registry/schema.json for the expected shape of this field.';
 }
@@ -106,10 +114,11 @@ function semanticIssues(entry: Entry): Issue[] {
     }
   });
 
-  entry.applies.gates?.forEach((gate, index) => {
-    if (!isAddress(gate.address)) {
+  const activations = entry.schema_version === 2 ? 'activations' : 'gates';
+  activationsOf(entry).forEach((gate, index) => {
+    if (gate.kind === 'feature-account' && !isAddress(gate.address)) {
       issues.push({
-        path: `applies.gates[${index}].address`,
+        path: `applies.${activations}[${index}].address`,
         message: `"${gate.address}" is not a 32-byte base58 address`,
         hint: 'Copy the feature gate address from the client source code.',
       });
@@ -249,7 +258,28 @@ export function slowPatternInput(pattern: string): string | undefined {
 }
 
 export function validateEntry(raw: unknown): ValidationResult {
-  const parsed = entrySchema.safeParse(raw);
+  // The format decides the schema; parsing against the right one gives errors at the right field instead of
+  // a union's "invalid input".
+  const version =
+    typeof raw === 'object' && raw !== null
+      ? (raw as { schema_version?: unknown }).schema_version
+      : undefined;
+  if (!READABLE_SCHEMA_VERSIONS.includes(version as 1 | 2)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          path: 'schema_version',
+          message:
+            version === undefined
+              ? 'Missing schema_version'
+              : `Unsupported schema_version ${JSON.stringify(version)}`,
+          hint: `This reader knows schema_version ${READABLE_SCHEMA_VERSIONS.join(' and ')}; write new entries in ${READABLE_SCHEMA_VERSIONS.at(-1)}. An entry from a newer format needs a newer epochnotes.`,
+        },
+      ],
+    };
+  }
+  const parsed = (version === 1 ? entrySchemaV1 : entrySchemaV2).safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,

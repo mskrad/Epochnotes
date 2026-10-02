@@ -1,5 +1,6 @@
 import { type FeatureAccountSource, type FeatureState, readFeatureStatus } from './feature-status.js';
 import { validatePath } from './load.js';
+import { featureGatesOf, subjectOf } from './schema.js';
 import type { Issue } from './validate.js';
 
 export interface GateStatus {
@@ -31,10 +32,10 @@ export async function registryStatus(
   }
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
   const gates = entries.flatMap((entry) =>
-    (entry.applies.gates ?? []).map((gate) => ({
+    featureGatesOf(entry).map((gate) => ({
       entry: entry.id,
       rev: entry.rev,
-      subject: entry.subject.name,
+      subject: subjectOf(entry).name,
       label: gate.label,
       address: gate.address,
     })),
@@ -56,6 +57,6 @@ export async function registryStatus(
         reason: 'no state returned for this gate',
       },
     })),
-    withoutGates: entries.filter((entry) => entry.applies.gates === undefined).map((entry) => entry.id),
+    withoutGates: entries.filter((entry) => featureGatesOf(entry).length === 0).map((entry) => entry.id),
   };
 }

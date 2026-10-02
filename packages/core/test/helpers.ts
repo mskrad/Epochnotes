@@ -16,6 +16,11 @@ export const committedSchema = JSON.parse(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LooseEntry = Record<string, any>;
 
+/** An entry as it was written in schema 1, before 2026-10-02: what signed versions of that time hold. */
+export function v1Yaml(id: string): string {
+  return readFileSync(new URL(`fixtures/schema-v1/${id}.yaml`, import.meta.url), 'utf8');
+}
+
 /** A fresh, mutable copy of the reference entry as plain data. */
 export function reference(): LooseEntry {
   return parse(referenceYaml) as LooseEntry;
@@ -63,13 +68,13 @@ export const brokenEntries: BrokenEntry[] = [
     name: 'empty-applies',
     yaml: edit(topLevelBlock('applies'), 'applies: {}\n'),
     path: 'applies',
-    hint: /applies\.gates/,
+    hint: /applies\.activations/,
     schemaCatches: true,
   },
   {
     name: 'empty-gates',
-    yaml: edit(topLevelBlock('applies'), 'applies:\n  gates: []\n'),
-    path: 'applies.gates',
+    yaml: edit(topLevelBlock('applies'), 'applies:\n  activations: []\n'),
+    path: 'applies.activations',
     hint: /at least one item/,
     schemaCatches: true,
   },
@@ -90,7 +95,7 @@ export const brokenEntries: BrokenEntry[] = [
   {
     name: 'activated-slot-in-gate',
     yaml: edit('      label: enable_tx_v1\n', '      label: enable_tx_v1\n      activated_slot: 447120000\n'),
-    path: 'applies.gates[0]',
+    path: 'applies.activations[0]',
     hint: /never stored in an entry/,
     schemaCatches: true,
   },

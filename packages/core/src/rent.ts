@@ -1,4 +1,4 @@
-import type { Entry } from './schema.js';
+import { type Entry, featureGatesOf } from './schema.js';
 
 /** Every account pays for 128 bytes of metadata on top of its data. */
 export const ACCOUNT_STORAGE_OVERHEAD = 128n;
@@ -17,7 +17,7 @@ export interface RentSchedule {
  * step's effect. An entry that does not follow this form does not describe a rent schedule.
  */
 export function rentScheduleFromEntry(entry: Entry): RentSchedule {
-  const gates = entry.applies.gates ?? [];
+  const gates = featureGatesOf(entry);
   const steps = gates.map((gate) => {
     const rate = /^set_lamports_per_byte_to_(\d+)$/.exec(gate.label)?.[1];
     if (rate === undefined)

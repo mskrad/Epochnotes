@@ -1,18 +1,16 @@
 # Alpenglow consensus (SIMD-0326). Each `breaks` item names its evidence as indexes into `sources`.
 # Activation status is not stored here: it is read from the feature gate account at check time.
-schema_version: 2
+schema_version: 1
 id: alpenglow
 rev: 1
 axis: protocol
 subject:
-  standard: simd
+  type: simd
   name: SIMD-0326
   title: Alpenglow
 applies:
-  activations:
-    - kind: feature-account
-      chain: solana
-      address: A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS
+  gates:
+    - address: A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS
       label: alpenglow
       effect: 'Feature gate registered in agave as "SIMD-0326: Alpenglow: new consensus algorithm".'
 relations:

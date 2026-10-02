@@ -1,33 +1,25 @@
 # Slot time reduction from 400 ms to 200 ms (SIMD-0525). Each `breaks` item names its evidence as indexes into `sources`.
 # Activation status is not stored here: it is read from the feature gate accounts at check time.
-schema_version: 2
+schema_version: 1
 id: slot-duration
 rev: 1
 axis: protocol
 subject:
-  standard: simd
+  type: simd
   name: SIMD-0525
   title: Reduce Slot Times
 applies:
-  activations:
-    - kind: feature-account
-      chain: solana
-      address: iBRL5RuWhw4yqaAZu96RUULHckHTZAoe2b77qaV38JZ
+  gates:
+    - address: iBRL5RuWhw4yqaAZu96RUULHckHTZAoe2b77qaV38JZ
       label: reduce_slot_time_to_350ms
       effect: Target slot time 350 ms. Takes effect one epoch after the gate is activated.
-    - kind: feature-account
-      chain: solana
-      address: iBRLL3k18HST852F1Mf3Lv83waTNQmmqvKDxvYGwQFL
+    - address: iBRLL3k18HST852F1Mf3Lv83waTNQmmqvKDxvYGwQFL
       label: reduce_slot_time_to_300ms
       effect: Target slot time 300 ms. Takes effect one epoch after the gate is activated.
-    - kind: feature-account
-      chain: solana
-      address: iBRLMc81UjRa8fn8A6eE8bJTnRbgQoPTynM51akENCV
+    - address: iBRLMc81UjRa8fn8A6eE8bJTnRbgQoPTynM51akENCV
       label: reduce_slot_time_to_250ms
       effect: Target slot time 250 ms. Takes effect one epoch after the gate is activated.
-    - kind: feature-account
-      chain: solana
-      address: iBRLjhJnkmDZgNoZRDMW11d8ZV7HvsL3vAyRjZB5npW
+    - address: iBRLjhJnkmDZgNoZRDMW11d8ZV7HvsL3vAyRjZB5npW
       label: reduce_slot_time_to_200ms
       effect: Target slot time 200 ms. Takes effect one epoch after the gate is activated.
 relations:

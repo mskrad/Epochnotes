@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 import {
   CLUSTER_GENESIS,
   type Entry,
   PROBE_CLUSTERS,
+  SOLANA_CHAINS,
   slowPatternInput,
   validateEntry,
   validateEntryYaml,
   validateRegistry,
 } from '../src/index.js';
-import { brokenEntries, reference, referenceYaml } from './helpers.js';
+import { brokenEntries, type LooseEntry, reference, referenceYaml, v1Yaml } from './helpers.js';
 
 function issuesOf(raw: unknown) {
   const result = validateEntry(raw);
@@ -57,13 +59,33 @@ describe('checks a schema cannot express', () => {
     expect(issuesOf(raw).map((issue) => issue.path)).toContain('detect[1].rule');
   });
 
-  it('a probe fixture names a cluster an endpoint can be recognised by', () => {
+  it('a probe fixture names a chain an endpoint can be identified as', () => {
     const raw = reference();
+    expect(raw.schema_version).toBe(2);
+    const index = raw.detect.findIndex((rule: { kind: string }) => rule.kind === 'runtime-probe');
+    const fixture = raw.detect[index].probe.fixture as string;
+    const signature = fixture.slice(fixture.lastIndexOf(':') + 1);
+    // `unknown` is what the probe calls an endpoint it cannot place: a fixture that named it would be run
+    // against every such endpoint and answer for a chain nobody identified. A schema-1 cluster name is not a
+    // CAIP-2 id, so schema 2 refuses it too.
+    for (const chain of ['unknown', 'solana:unknown', 'mainnet-beta', 'devnet', 'eip155:1', 'solana', '']) {
+      raw.detect[index].probe.fixture = `${chain}:${signature}`;
+      const issues = issuesOf(raw);
+      expect(issues, chain).toMatchObject([{ path: `detect[${index}].probe.fixture` }]);
+      expect(issues[0]?.hint ?? '').toMatch(new RegExp(Object.values(SOLANA_CHAINS).join(', ')));
+    }
+    for (const chain of Object.values(SOLANA_CHAINS)) {
+      raw.detect[index].probe.fixture = `${chain}:${signature}`;
+      expect(issuesOf(raw), chain).toEqual([]);
+    }
+  });
+
+  it('a schema-1 probe fixture keeps naming a cluster an endpoint can be recognised by', () => {
+    const raw = parse(v1Yaml('tx-v1')) as LooseEntry;
+    expect(raw.schema_version).toBe(1);
     const index = raw.detect.findIndex((rule: { kind: string }) => rule.kind === 'runtime-probe');
     const [, signature] = (raw.detect[index].probe.fixture as string).split(':');
-    // `unknown` is what the probe calls an endpoint whose genesis hash it does not know: a fixture that
-    // named it would be run against every such endpoint and answer for a cluster nobody identified.
-    for (const cluster of ['unknown', 'mainnet', 'localnet', '']) {
+    for (const cluster of ['unknown', 'mainnet', 'localnet', '', Object.values(SOLANA_CHAINS)[0]]) {
       raw.detect[index].probe.fixture = `${cluster}:${signature}`;
       const issues = issuesOf(raw);
       expect(issues, cluster).toMatchObject([{ path: `detect[${index}].probe.fixture` }]);
@@ -73,6 +95,14 @@ describe('checks a schema cannot express', () => {
       raw.detect[index].probe.fixture = `${cluster}:${signature}`;
       expect(issuesOf(raw), cluster).toEqual([]);
     }
+  });
+
+  it('the CAIP-2 ids of the Solana clusters are the first 32 characters of their genesis hashes', () => {
+    expect(SOLANA_CHAINS).toEqual({
+      'mainnet-beta': 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+      testnet: 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z',
+      devnet: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    });
   });
 
   it('the clusters a fixture may name are the clusters a genesis hash is known for', () => {
@@ -98,10 +128,13 @@ describe('checks a schema cannot express', () => {
     expect(issuesOf(raw)).toEqual([]);
   });
 
-  it('gate addresses must decode to 32 bytes', () => {
+  it('gate addresses must decode to 32 bytes, in either schema', () => {
     const raw = reference();
-    raw.applies.gates[0].address = '1'.repeat(40);
-    expect(issuesOf(raw)).toMatchObject([{ path: 'applies.gates[0].address' }]);
+    raw.applies.activations[0].address = '1'.repeat(40);
+    expect(issuesOf(raw)).toMatchObject([{ path: 'applies.activations[0].address' }]);
+    const old = parse(v1Yaml('tx-v1')) as LooseEntry;
+    old.applies.gates[0].address = '1'.repeat(40);
+    expect(issuesOf(old)).toMatchObject([{ path: 'applies.gates[0].address' }]);
   });
 
   it('reports YAML problems as issues instead of throwing', () => {

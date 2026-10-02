@@ -27,7 +27,10 @@ describe('exit codes', () => {
   it('--help and --version end with 0', async () => {
     expect((await run('--help')).code).toBe(0);
     expect((await run('registry', 'verify', '--help')).code).toBe(0);
-    expect(await run('--version')).toMatchObject({ code: 0, stdout: `${packageVersion} (entry schema 1)` });
+    expect(await run('--version')).toMatchObject({
+      code: 0,
+      stdout: `${packageVersion} (entry schema 2; reads 1, 2)`,
+    });
   });
 
   it('takes its version from package.json, not from a constant of its own', () => {

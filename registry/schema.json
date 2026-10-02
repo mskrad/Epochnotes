@@ -1,13 +1,13 @@
 {
   "$id": "https://github.com/mskrad/Epochnotes/registry/schema.json",
-  "title": "Registry entry (schema_version 1)",
-  "description": "Format of one registry entry. Activation status is never stored in an entry: it is read from the feature gate account at check time.",
+  "title": "Registry entry (schema_version 2)",
+  "description": "Format of one registry entry. Activation status is never stored in an entry: it is read from the chain at check time. Readers also accept schema_version 1, which versions signed before schema 2 contain.",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "schema_version": {
       "type": "number",
-      "const": 1
+      "const": 2
     },
     "id": {
       "type": "string",
@@ -26,45 +26,131 @@
     "subject": {
       "type": "object",
       "properties": {
-        "type": {
+        "standard": {
           "type": "string",
-          "enum": ["simd", "client-release", "package"]
+          "enum": ["simd", "eip", "bep", "bip", "aip", "sip", "client-release", "package"]
         },
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "The id people use for it: SIMD-0385, EIP-7702, @solana/kit."
         },
         "title": {
           "type": "string",
           "minLength": 1
         }
       },
-      "required": ["type", "name", "title"],
+      "required": ["standard", "name", "title"],
       "additionalProperties": false
     },
     "applies": {
       "type": "object",
       "properties": {
-        "gates": {
+        "activations": {
           "minItems": 1,
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "address": {
-                "type": "string",
-                "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "feature-account"
+                  },
+                  "chain": {
+                    "type": "string",
+                    "const": "solana",
+                    "description": "The namespace, not one cluster: a feature account has the same address on every Solana cluster, and its state is read from the cluster asked about."
+                  },
+                  "address": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The name the client source gives the change: a feature module, a fork name."
+                  },
+                  "effect": {
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "chain", "address", "label"],
+                "additionalProperties": false
               },
-              "label": {
-                "type": "string",
-                "minLength": 1
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "timestamp"
+                  },
+                  "chain": {
+                    "type": "string",
+                    "pattern": "^eip155:[0-9]{1,32}$"
+                  },
+                  "at": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Unix time, in seconds, of the first block that carries the change."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The name the client source gives the change: a feature module, a fork name."
+                  },
+                  "effect": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "description": "How a block shows the fork, so that its activation is observed rather than taken from the time.",
+                    "type": "object",
+                    "properties": {
+                      "header": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A block header field that exists only from this fork on, such as requestsHash."
+                      }
+                    },
+                    "required": ["header"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["kind", "chain", "at", "label"],
+                "additionalProperties": false
               },
-              "effect": {
-                "type": "string"
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "block-height"
+                  },
+                  "chain": {
+                    "type": "string",
+                    "pattern": "^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$"
+                  },
+                  "at": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The first block that carries the change."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The name the client source gives the change: a feature module, a fork name."
+                  },
+                  "effect": {
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "chain", "at", "label"],
+                "additionalProperties": false
               }
-            },
-            "required": ["address", "label"],
-            "additionalProperties": false
+            ]
           }
         },
         "versions": {
@@ -122,7 +208,8 @@
         "properties": {
           "surface": {
             "type": "string",
-            "enum": ["rpc", "decoder", "stream", "program", "sdk", "wallet", "economics"]
+            "enum": ["rpc", "decoder", "stream", "program", "sdk", "wallet", "economics"],
+            "description": "Where it breaks. `program` is code that runs on chain: a Solana program, an EVM contract."
           },
           "summary": {
             "type": "string",
@@ -171,7 +258,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "enum": ["ts", "js", "rust", "python", "go", "markdown"]
+                  "enum": ["ts", "js", "rust", "python", "go", "markdown", "solidity"]
                 }
               },
               "pattern": {
@@ -254,9 +341,9 @@
                     "minLength": 1
                   },
                   "fixture": {
-                    "description": "The transaction a probe reads, as <cluster>:<signature>. The probe runs only against an endpoint that serves that cluster.",
+                    "description": "The transaction a probe reads, as <CAIP-2 chain>:<signature>. The probe runs only against an endpoint that serves that chain.",
                     "type": "string",
-                    "pattern": "^(mainnet-beta|testnet|devnet):[1-9A-HJ-NP-Za-km-z]{64,128}$"
+                    "pattern": "^(solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z|solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1):[1-9A-HJ-NP-Za-km-z]{64,128}$"
                   },
                   "expect": {
                     "type": "string",
@@ -314,7 +401,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["simd", "source-code", "release", "rpc-observation", "issue", "docs"]
+            "enum": ["simd", "proposal", "source-code", "release", "rpc-observation", "issue", "docs"]
           },
           "ref": {
             "type": "string",

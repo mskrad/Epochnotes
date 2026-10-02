@@ -1,7 +1,7 @@
 import { type FeatureAccountSource, type FeatureState, readFeatureStatus } from './feature-status.js';
 import { validatePath } from './load.js';
 import { type Cluster, compareLogWithChain, fetchRevocation, type OnchainRevocation } from './onchain.js';
-import type { Entry } from './schema.js';
+import { type Entry, featureGatesOf } from './schema.js';
 import type { Issue } from './validate.js';
 import type { Manifest } from './version.js';
 import { type VerifyOptions, verifyLatestVersion } from './version-store.js';
@@ -186,14 +186,14 @@ export async function readRegistry(options: ReadOptions): Promise<RegistryReadin
   let network: { cluster: string; slot: string } | undefined;
   if (options.status !== undefined) {
     const addresses = readings.flatMap((reading) =>
-      (reading.entry.applies.gates ?? []).map((gate) => gate.address),
+      featureGatesOf(reading.entry).map((gate) => gate.address),
     );
     const report = await readFeatureStatus(options.status.source, addresses);
     // An unreachable cluster is an environment failure, not a finding about the registry: no status is ever guessed.
     if (!report.ok) throw new Error(`cluster ${options.status.cluster} did not answer: ${report.error}`);
     network = { cluster: options.status.cluster, slot: report.slot.toString() };
     for (const reading of readings) {
-      reading.gates = (reading.entry.applies.gates ?? []).map((gate) => ({
+      reading.gates = featureGatesOf(reading.entry).map((gate) => ({
         label: gate.label,
         address: gate.address,
         status: report.states.get(gate.address) ?? {

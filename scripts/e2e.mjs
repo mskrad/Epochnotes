@@ -74,7 +74,12 @@ try {
   ];
 
   const { version } = JSON.parse(readFileSync(join(root, 'packages/cli/package.json'), 'utf8'));
-  step('prints the version of its package.json', ['--version'], 0, has(`${version} (entry schema 1)`));
+  step(
+    'prints the version of its package.json',
+    ['--version'],
+    0,
+    has(`${version} (entry schema 2; reads 1, 2)`),
+  );
   step('validates the registry', ['registry', 'validate', 'registry/entries'], 0, has('tx-v1@'));
   step('dry-run publishes without writing', [...publishArgs, '--dry-run'], 0, () =>
     existsSync(versions) ? 'the versions directory was created' : undefined,

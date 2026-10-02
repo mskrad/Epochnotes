@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { validatePath } from '@epochnotes/core';
+import { activationsOf, validatePath } from '@epochnotes/core';
 import { describe, expect, it } from 'vitest';
 
 import { root } from './run.js';
@@ -50,7 +50,12 @@ describe('the skill carries no facts about changes', () => {
     for (const { entry } of report.files) {
       if (entry === undefined) throw new Error('the registry must be valid for this test to mean anything');
       literals.add(entry.id).add(entry.subject.name).add(entry.subject.title);
-      for (const gate of entry.applies.gates ?? []) literals.add(gate.address).add(gate.label);
+      for (const gate of activationsOf(entry)) {
+        literals.add(gate.label);
+        // A chain id is a fact; a namespace alone (solana) is the name of the platform.
+        if (gate.chain.includes(':')) literals.add(gate.chain);
+        if (gate.kind === 'feature-account') literals.add(gate.address);
+      }
       for (const range of entry.applies.versions ?? []) literals.add(range.name);
       for (const rule of entry.detect) literals.add(rule.rule);
       const everything = JSON.stringify(entry);

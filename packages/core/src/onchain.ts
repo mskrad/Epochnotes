@@ -38,6 +38,7 @@ import {
   signTransactionMessageWithSigners,
 } from '@solana/kit';
 
+import { GENESIS } from './chains.js';
 import type { Issue } from './validate.js';
 import { GENESIS_ROOT, type Manifest } from './version.js';
 
@@ -374,11 +375,7 @@ export async function fetchVersion(
 }
 
 /** Clusters by genesis hash: the name a user passes says nothing about where an endpoint leads. */
-export const GENESIS = {
-  'mainnet-beta': '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
-  testnet: '4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY',
-  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
-} as const;
+export { GENESIS };
 
 /** An endpoint URL that is safe to print: provider API keys usually travel in the path tail or the query. */
 export function redactUrl(url: string): string {

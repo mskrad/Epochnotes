@@ -120,10 +120,11 @@ describe('epochnotes registry publish / verify', () => {
     expect(untrusted.out).toContain('is not trusted');
 
     const manifestFile = join(versions, '1.json');
-    writeFileSync(
-      manifestFile,
-      readFileSync(manifestFile, 'utf8').replace('"entry_count": 4', '"entry_count": 5'),
-    );
+    // Whatever the number of entries: the edit must change the signed manifest, or this test proves nothing.
+    const signed = readFileSync(manifestFile, 'utf8');
+    const altered = signed.replace(/"entry_count": \d+/, '"entry_count": 999');
+    expect(altered).not.toBe(signed);
+    writeFileSync(manifestFile, altered);
     const tampered = await run(
       'registry',
       'verify',

@@ -54,6 +54,7 @@ describe('reading the registry for a consumer', () => {
     });
     expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
       'alpenglow',
+      'eip-7702',
       'rent-simd-0437',
       'slot-duration',
       'tx-v1',
@@ -138,7 +139,7 @@ describe('reading the registry for a consumer', () => {
     const reading = await readRegistry({ workingCopy: entries });
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
     expect(reading.provenance).toMatchObject({ verified: false, workingCopy: entries });
-    expect(reading.entries).toHaveLength(4);
+    expect(reading.entries).toHaveLength(5);
   });
 
   it('gives no entries from a publisher that is not trusted', async () => {
@@ -209,6 +210,7 @@ describe('entries the publisher withdrew', () => {
     expect(reading.provenance).toMatchObject({ chain: 'matches', revocations: 'checked' });
     expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
       'alpenglow',
+      'eip-7702',
       'rent-simd-0437',
       'slot-duration',
     ]);
@@ -304,7 +306,12 @@ describe('entries the publisher withdrew', () => {
     const reading = await read();
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
     expect(reading.provenance).toMatchObject({ version: 2 });
-    expect(reading.entries.map(({ entry }) => entry.id)).toEqual(['alpenglow', 'slot-duration', 'tx-v1']);
+    expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
+      'alpenglow',
+      'eip-7702',
+      'slot-duration',
+      'tx-v1',
+    ]);
     expect(await read({ ids: ['rent-simd-0437'] })).toMatchObject({
       ok: true,
       entries: [],

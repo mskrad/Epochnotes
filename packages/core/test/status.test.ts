@@ -24,7 +24,7 @@ const dir = mkdtempSync(join(tmpdir(), 'epochnotes-status-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('registry status', () => {
-  it('reports every activation of the four entries, with the chain and the point of the reading', async () => {
+  it('reports every activation of the Solana entries, with the chain and the point of the reading', async () => {
     const report = await registryStatus(
       registry,
       solanaActivationReader(nothingScheduled),
@@ -45,7 +45,10 @@ describe('registry status', () => {
     ]);
     expect(report.activations).toHaveLength(11);
     expect(report.activations.every((item) => item.status.state === 'absent')).toBe(true);
-    expect(report.withoutActivation).toEqual([]);
+    // The EVM entry is named, not dropped: it says nothing about a Solana cluster.
+    expect(report.withoutActivation).toEqual([
+      { entry: 'eip-7702', reason: 'no activation on this chain; it activates on eip155:1, eip155:8453' },
+    ]);
   });
 
   it('keeps every state a feature account can be in, in the one shape every chain shares', async () => {

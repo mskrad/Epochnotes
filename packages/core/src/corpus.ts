@@ -28,7 +28,8 @@ const caseSchema = z.strictObject({
     z.strictObject({
       kind: z.literal('repository'),
       repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
-      pull_request: z.number().int().positive(),
+      /** Absent when the fix was committed without a pull request; the commits then say it alone. */
+      pull_request: z.number().int().positive().optional(),
       path: z.string().min(1),
       before_commit: z.string().regex(/^[0-9a-f]{40}$/),
       after_commit: z.string().regex(/^[0-9a-f]{40}$/),
@@ -53,6 +54,8 @@ export type CorpusCase = z.infer<typeof caseSchema>;
 
 export interface CorpusRow {
   id: string;
+  /** The registry entry the case is about; recall is also given per entry, since entries cover different chains. */
+  entry: string;
   kind: 'repository' | 'synthetic';
   expected: string;
   /** What the engine reported on `before`, as `rule (confidence)`. */
@@ -205,7 +208,8 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
           const commit = item.source[`${side}_commit`].slice(0, 12);
           if (
             !head.includes(`Licensed under ${item.source.license} `) ||
-            !head.includes(`pull request #${item.source.pull_request}.`)
+            (item.source.pull_request !== undefined &&
+              !head.includes(`pull request #${item.source.pull_request}.`))
           )
             problems.push(
               `${item.id}: the ${side} file does not name the licence and the pull request of the manifest`,
@@ -253,6 +257,7 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
         );
       rows.push({
         id: item.id,
+        entry: item.entry,
         kind: item.source.kind,
         expected: `${item.expect.rule ?? 'no rule yet'} (${item.expect.confidence})`,
         reported,

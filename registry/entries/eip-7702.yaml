@@ -1,0 +1,181 @@
+# EIP-7702, set code for EOAs, on Ethereum (Prague) and Base (Isthmus). Each `breaks` item names its evidence as
+# indexes into `sources`. Activation status is not stored here: it is read from the head of each chain at check
+# time, and the fork is confirmed by the requestsHash field its blocks carry from the fork on.
+schema_version: 2
+id: eip-7702
+rev: 1
+axis: protocol
+subject:
+  standard: eip
+  name: EIP-7702
+  title: Set Code for EOAs
+applies:
+  activations:
+    - kind: timestamp
+      chain: 'eip155:1'
+      at: 1746612311
+      label: prague
+      effect: >-
+        Prague, the execution layer of the Pectra upgrade: go-ethereum sets PragueTime to this time for mainnet,
+        and EIP-7600 lists EIP-7702 and EIP-7685 among its EIPs.
+      evidence:
+        header: requestsHash
+    - kind: timestamp
+      chain: 'eip155:8453'
+      at: 1746806401
+      label: isthmus
+      effect: >-
+        Isthmus, the OP Stack upgrade that brings the Pectra execution layer, EIP-7702 included, to the chain;
+        on OP Stack chains requestsHash is always the hash of an empty list, so its presence marks the fork.
+      evidence:
+        header: requestsHash
+relations: []
+breaks:
+  - surface: program
+    summary: >-
+      EIP-7702 breaks the invariant that msg.sender == tx.origin holds only in the top frame of a transaction: a
+      delegated account can make several calls in one transaction. Reentrancy guards of the style
+      require(tx.origin == msg.sender) and atomic sandwich protections that rely on tx.origin no longer hold.
+      Using that check only to know that the sender is an EOA is, by the EIP's own reading, not affected.
+    evidence: [0]
+  - surface: program
+    summary: >-
+      An account delegated under EIP-7702 has code: the delegation indicator, 0xef0100 followed by the address of
+      the delegate, and EXTCODESIZE returns 23 for it. A check that reads code as "a contract" or no code as "an
+      EOA" — an isContract call, a test of code.length or extcodesize — now takes a delegated EOA for a contract.
+    evidence: [0, 13, 14]
+  - surface: program
+    summary: >-
+      OpenZeppelin's SignatureChecker.isValidSignatureNow checks an ECDSA signature only when the signer has no
+      code, and otherwise asks the signer for ERC-1271. A delegated EOA has code, so its ECDSA signature is not
+      checked as such: it is valid only if the delegate implements ERC-1271 and accepts it.
+    evidence: [0, 10]
+  - surface: wallet
+    summary: >-
+      OpenZeppelin's ERC721Utils.checkOnERC721Received calls onERC721Received on any recipient with code, and
+      reverts when the call fails or returns another value. A safe transfer or a safe mint to a delegated EOA
+      reverts unless its delegate implements the receiver.
+    evidence: [0, 11]
+  - surface: sdk
+    summary: >-
+      eth_getCode of a delegated EOA returns the 23-byte delegation indicator, and the account still sends
+      transactions. Telling contracts from EOAs by whether eth_getCode is empty no longer works.
+    evidence: [0, 13]
+detect:
+  - rule: tx-origin-equals-sender
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      Compares msg.sender with tx.origin. As a reentrancy guard or a sandwich protection it no longer holds after
+      EIP-7702; as a test that the sender is an EOA it does — a person has to tell which.
+    languages: [solidity]
+    pattern: '(?:\bmsg\.sender|\b_msgSender\(\))\s*[!=]=\s*tx\.origin\b|\btx\.origin\s*[!=]=\s*(?:\bmsg\.sender\b|\b_msgSender\(\))'
+  - rule: is-contract-call
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      Calls isContract, which tells contracts from EOAs by their code; a delegated EOA has code. Most calls only
+      check that an address set by an administrator is deployed, which EIP-7702 does not change: look at the ones
+      that decide how to treat a caller, a recipient or a signer.
+    languages: [solidity]
+    pattern: '(?<!function\s{1,8})\bisContract\s*\('
+  - rule: no-code-means-eoa
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      Treats an account without code as an EOA (code.length == 0): a delegated EOA has code and takes the other
+      branch — for a signature that is ERC-1271, for a recipient a receiver hook.
+    languages: [solidity]
+    pattern: '\.code\.length\s*==\s*0\b'
+fix:
+  - summary: >-
+      Do not rely on tx.origin == msg.sender to guard against reentrancy or sandwiching; the EIP points to a
+      transient storage variable or an ordinary reentrancy guard instead.
+    for_rules: [tx-origin-equals-sender]
+  - summary: >-
+      Where it matters whether an account is a delegated EOA, read the first three bytes of its code: 0xef0100
+      marks the delegation indicator (OpenZeppelin's EIP7702Utils.fetchDelegate returns the delegate), and decide
+      explicitly how such an account is treated — for a signature, ECDSA, ERC-1271, or both.
+    for_rules: [is-contract-call, no-code-means-eoa]
+  - summary: >-
+      A contract meant to be a delegate implements the receiver hooks the accounts that delegate to it rely on,
+      such as onERC721Received.
+sources:
+  - kind: proposal
+    ref: https://github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md
+    retrieved: '2026-10-02'
+    note: >-
+      Final. Delegation indicator (line 20); EXTCODESIZE returns 23 (line 153); the msg.sender == tx.origin
+      invariant (305-316, 558-559); the "sender is an EOA" use not affected (310-312); a delegated EOA may still
+      send transactions (194-195); transient storage as the replacement (336). Earlier drafts said EXTCODESIZE
+      returns 2: only the current text is used.
+  - kind: proposal
+    ref: https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7600.md
+    retrieved: '2026-10-02'
+    note: Pectra; requires EIP-7685 and EIP-7702; mainnet activation at timestamp 1746612311 (line 57).
+  - kind: proposal
+    ref: https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7685.md
+    retrieved: '2026-10-02'
+    note: Extends the block header with requests_hash (line 47), sha256("") when there are no requests (line 126).
+  - kind: source-code
+    ref: https://github.com/ethereum/go-ethereum/blob/c9a2bc73c847319a8faa57de59e42c0efc420682/params/config.go
+    retrieved: '2026-10-02'
+    note: 'MainnetChainConfig, PragueTime: newUint64(1746612311) (line 62).'
+  - kind: rpc-observation
+    ref: eip155:1 eth_getBlockByNumber 22431083 and 22431084
+    retrieved: '2026-10-02'
+    note: >-
+      Block 22431083 (time 1746612299) has no requestsHash; block 22431084 (time 1746612311, the Prague time) has
+      requestsHash 0xe3b0c442...b855.
+  - kind: docs
+    ref: https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/overview.md
+    retrieved: '2026-10-02'
+    note: Isthmus brings the Pectra execution layer, EIP-7702 among its EIPs (lines 15-16).
+  - kind: docs
+    ref: https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/exec-engine.md
+    retrieved: '2026-10-02'
+    note: >-
+      requestsHash is omitted before Isthmus (line 69) and is sha256('') from it on (lines 77, 186): EIP-7685 is
+      a no-op on OP Stack chains.
+  - kind: source-code
+    ref: https://github.com/base/base/blob/fa0f64d32012efa9b0934bfe1dd074a4aed329c7/crates/common/chains/src/config.rs
+    retrieved: '2026-10-02'
+    note: >-
+      The Base mainnet chain config (chain_id 8453, line 456) sets isthmus_timestamp to 1_746_806_401 (line 473).
+      base/base holds the components that run Base; the superchain-registry no longer lists Base.
+  - kind: source-code
+    ref: https://github.com/ethereum-optimism/superchain-registry/blob/5b055be4d294ce43814a44c8839d89b2436dc8aa/superchain/configs/mainnet/base.toml
+    retrieved: '2026-10-02'
+    note: >-
+      isthmus_time = 1746806401 (line 22), the same time. This is the last commit with Base: the next, 0d9aefc
+      (2026-04-27), removed it from the registry.
+  - kind: rpc-observation
+    ref: eip155:8453 eth_getBlockByNumber 30008526 and 30008527
+    retrieved: '2026-10-02'
+    note: >-
+      Block 30008526 (time 1746806399) has no requestsHash; block 30008527 (time 1746806401, the Isthmus time)
+      has requestsHash 0xe3b0c442...b855.
+  - kind: source-code
+    ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/utils/cryptography/SignatureChecker.sol
+    retrieved: '2026-10-02'
+    note: isValidSignatureNow recovers an ECDSA signature only if signer.code.length == 0 (line 33), else ERC-1271.
+  - kind: source-code
+    ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol
+    retrieved: '2026-10-02'
+    note: checkOnERC721Received calls onERC721Received when to.code.length > 0 (line 32) and reverts otherwise.
+  - kind: source-code
+    ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol
+    retrieved: '2026-10-02'
+    note: fetchDelegate returns the delegate of an account whose code is the 0xef0100 delegation indicator.
+  - kind: rpc-observation
+    ref: eip155:1 eth_getCode 0xc3ad9002556803615d2f5784c752c3277246c5e7
+    retrieved: '2026-10-02'
+    note: >-
+      Returns 0xef01007702cb554e6bfb442cb743a7df23154544a7176c, 23 bytes. The account sent the type-4 transaction
+      0x78bb8ba2326cf6fa5d38b964b62cff971effffafcd1c8d014b2a2d37181a1bb9 (block 26106929) to itself.
+  - kind: source-code
+    ref: https://github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11
+    retrieved: '2026-10-02'
+    note: >-
+      "remove isContract check for EIP-7702" (#20939) in the bridge; its test says that with EIP-7702 EOAs can
+      have code. The corpus holds the change.

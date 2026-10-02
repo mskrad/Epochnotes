@@ -12,6 +12,8 @@ in `LICENSES/`.
 | `real-rpc-latency-monitor-json-macro` | https://github.com/solana-foundation/rpc-latency-monitor     | Apache-2.0 | Copyright 2026 Solana Foundation                      |
 | `real-audius-api-go-constant`         | https://github.com/AudiusProject/api                         | Apache-2.0 | Copyright 2025 Open Audio Foundation                  |
 | `real-private-channels-json-macro`    | https://github.com/solana-foundation/solana-private-channels | MIT        | Copyright (c) 2022-2025 (its LICENSE names no holder) |
+| `real-taiko-bridge-is-contract`       | https://github.com/taikoxyz/taiko-mono                       | MIT        | Copyright (c) 2023–present Taiko Labs                 |
+| `real-p2flux-signature-checker`       | https://github.com/P2Flux/contracts                          | MIT        | Copyright (c) 2026 P2Flux                             |
 
 Neither Apache-2.0 repository ships a NOTICE file. The excerpts are not changed; the comment above each one is
 ours, and says so by naming the source. Only repositories whose licence allows copying are excerpted: a fix

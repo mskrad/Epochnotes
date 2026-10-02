@@ -157,9 +157,75 @@ cases:
       kind: synthetic
       reason: The entry states this break (the version byte of version 1 has no branch in older decoders).
 
+  - id: real-taiko-bridge-is-contract
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { rule: is-contract-call, confidence: check }
+    detected: true
+    source:
+      kind: repository
+      repository: taikoxyz/taiko-mono
+      pull_request: 20939
+      path: packages/protocol/contracts/shared/bridge/Bridge.sol
+      before_commit: 546351e428deb59417b2583ac5644f77db2c6c51
+      after_commit: 798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11
+      license: MIT
+
+  - id: real-p2flux-signature-checker
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { confidence: check }
+    detected: false
+    gap: >-
+      No rule, on purpose. The break is inside the library: SignatureChecker.isValidSignatureNow sends any signer
+      with code to ERC-1271, so a delegated EOA's ECDSA signature is refused. The call site looks the same before
+      and after delegation existed, and a pattern on it would flag every use of the library.
+    source:
+      kind: repository
+      repository: P2Flux/contracts
+      path: contracts/P2FluxRecurring.sol
+      before_commit: 11716cca0875a594030fca25ece996c0041d18e9
+      after_commit: a41e1c7b0dbed36f01ca7539bf5251634846aeaa
+      license: MIT
+
+  - id: synthetic-tx-origin-guard
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { rule: tx-origin-equals-sender, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: The EIP names reentrancy guards of the style require(tx.origin == msg.sender) as broken; no real fix of this shape under an open licence was found.
+
+  - id: synthetic-no-code-means-eoa
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { rule: no-code-means-eoa, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: The Solidity spelling of "no code means an EOA", which the rule reads.
+
+  - id: synthetic-no-code-in-assembly
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { confidence: check }
+    detected: false
+    gap: >-
+      Not read, on purpose. In assembly, iszero(extcodesize(x)) is nearly always a check that a contract is
+      deployed — a clone, a token, a precompile — which EIP-7702 does not change: on the field corpus of
+      2026-10-02 it gave 54 findings, 10 of them about an EOA. A pattern on it would bury the rest.
+    source:
+      kind: synthetic
+      reason: The assembly spelling of the same assumption, kept to show what the rule leaves out and why.
+
 # Code that looks like a case and is not one: every rule of the entry must stay silent on it.
 quiet:
   - id: quiet-other-chain-same-method
     entry: tx-v1
     file: sample.ts
     reason: Clients of other chains use the method names of the Solana RPC; seen in multi-chain projects of the field corpus.
+  - id: quiet-code-after-call
+    entry: eip-7702
+    file: sample.sol
+    reason: Reads tx.origin without comparing it with msg.sender, and checks for code after a call, where a delegated EOA running its delegate's code is a correct answer.

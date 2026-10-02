@@ -103,8 +103,8 @@ describe('a version log served over HTTP', () => {
         ? {
             status: 200,
             body: readFileSync(join(served, '2.json'), 'utf8').replace(
-              '"entry_count": 4',
-              '"entry_count": 9',
+              /"entry_count": \d+/,
+              '"entry_count": 999',
             ),
           }
         : undefined;

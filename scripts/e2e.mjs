@@ -109,7 +109,10 @@ try {
 
   const manifest = join(versions, '1.json');
   const original = readFileSync(manifest, 'utf8');
-  writeFileSync(manifest, original.replace('"entry_count": 4', '"entry_count": 5'));
+  const altered = original.replace(/"entry_count": \d+/, '"entry_count": 999');
+  // Whatever the number of entries: an edit that changes nothing would let this step pass for nothing.
+  if (altered === original) throw new Error('e2e: the manifest edit changed nothing');
+  writeFileSync(manifest, altered);
   step('refuses a manifest altered after signing', verifyArgs, 1, has('Signature does not match'));
   writeFileSync(manifest, original);
 

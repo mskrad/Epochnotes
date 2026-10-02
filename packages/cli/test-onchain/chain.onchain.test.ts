@@ -318,6 +318,7 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       expect(reading.provenance.revocations).toBe('checked');
       expect(reading.entries.map(({ entry }) => entry.id)).toEqual([
         'alpenglow',
+        'eip-7702',
         'rent-simd-0437',
         'slot-duration',
       ]);

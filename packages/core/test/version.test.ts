@@ -71,7 +71,7 @@ describe('publishing', () => {
     expect(result).toMatchObject({
       ok: true,
       published: true,
-      manifest: { n: 1, prev_root: GENESIS_ROOT, entry_count: 4, publisher },
+      manifest: { n: 1, prev_root: GENESIS_ROOT, entry_count: 5, publisher },
     });
     const verified = await verify();
     expect(verified).toMatchObject({ ok: true, versions: 1, proof: { entry: { id: 'tx-v1' } } });
@@ -197,7 +197,7 @@ describe('revision rules', () => {
     expect(messages(await publish())).toContain('Published entry is missing');
     expect(await publish({ revoke: ['tx-v1'] })).toMatchObject({
       ok: true,
-      manifest: { n: 2, entry_count: 3, revoked: ['tx-v1'] },
+      manifest: { n: 2, entry_count: 4, revoked: ['tx-v1'] },
     });
     expect(messages(await verify('tx-v1'))).toContain('revoked by its publisher');
     expect(await verify('alpenglow')).toMatchObject({ ok: true });
@@ -434,6 +434,7 @@ describe('content files', () => {
     const content = encodeContent(live().reverse());
     expect(content.entries.map((entry) => entry.id)).toEqual([
       'alpenglow',
+      'eip-7702',
       'rent-simd-0437',
       'slot-duration',
       'tx-v1',

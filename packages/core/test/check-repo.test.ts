@@ -775,7 +775,9 @@ describe('check repo', () => {
     expect(reasons.get('rust-client-max-version-zero')).toMatch(/no file this rule reads \(rust\)/);
     expect(reasons.get('web3js-below-1-99')).toMatch(/no npm lockfile/);
     expect(reasons.has('rpc-max-version-zero')).toBe(false);
-    expect(report.notRun.every((rule) => rule.entry === 'tx-v1')).toBe(true);
+    // A TypeScript repository answers no Solidity rule either.
+    expect([...new Set(report.notRun.map((rule) => rule.entry))].sort()).toEqual(['eip-7702', 'tx-v1']);
+    expect(reasons.get('no-code-means-eoa')).toMatch(/no file this rule reads \(solidity\)/);
     // One line per rule: a rule is named once, however many files were read for the others.
     expect(report.notRun).toHaveLength(reasons.size);
     const many = check(

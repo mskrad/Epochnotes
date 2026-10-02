@@ -12,6 +12,10 @@ const { recall } = report;
 console.log(
   `\nrecall on this corpus: ${recall.detected} of ${recall.of} cases; ${recall.repository.detected} of ${recall.repository.of} among the cases taken from repositories. Every miss has its reason in the manifest.`,
 );
+for (const entry of [...new Set(report.rows.map((row) => row.entry))].sort()) {
+  const rows = report.rows.filter((row) => row.entry === entry);
+  console.log(`  ${entry.padEnd(16)} ${rows.filter((row) => row.detected).length} of ${rows.length}`);
+}
 for (const problem of report.problems) console.error(`PROBLEM  ${problem}`);
 console.log(
   report.problems.length === 0

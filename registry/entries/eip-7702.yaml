@@ -26,7 +26,7 @@ applies:
       label: isthmus
       effect: >-
         Isthmus, the OP Stack upgrade that brings the Pectra execution layer, EIP-7702 included, to the chain;
-        on OP Stack chains requestsHash is always the hash of an empty list, so its presence marks the fork.
+        on OP Stack chains requestsHash is always sha256(''), the hash of no requests, so its presence marks the fork.
       evidence:
         header: requestsHash
 relations: []
@@ -86,11 +86,12 @@ detect:
       Treats an account without code as an EOA (code.length == 0): a delegated EOA has code and takes the other
       branch — for a signature that is ERC-1271, for a recipient a receiver hook.
     languages: [solidity]
-    pattern: '\.code\.length\s*==\s*0\b'
+    pattern: '\.code\.length\s*==\s*0\b|\b0\s*==\s*[\w.\[\]()]{1,80}\.code\.length\b'
 fix:
   - summary: >-
-      Do not rely on tx.origin == msg.sender to guard against reentrancy or sandwiching; the EIP points to a
-      transient storage variable or an ordinary reentrancy guard instead.
+      Replace a reentrancy guard built on tx.origin == msg.sender with one held in a transient storage variable,
+      as the EIP suggests. A sandwich protection built on tx.origin has no replacement in the EIP, which calls
+      relying on it a bad practice: it has to be designed again, not patched.
     for_rules: [tx-origin-equals-sender]
   - summary: >-
       Where it matters whether an account is a delegated EOA, read the first three bytes of its code: 0xef0100
@@ -99,7 +100,8 @@ fix:
     for_rules: [is-contract-call, no-code-means-eoa]
   - summary: >-
       A contract meant to be a delegate implements the receiver hooks the accounts that delegate to it rely on,
-      such as onERC721Received.
+      such as onERC721Received: OpenZeppelin's ERC721Utils calls it on every recipient with code.
+    for_rules: [no-code-means-eoa]
 sources:
   - kind: proposal
     ref: https://github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md
@@ -162,7 +164,9 @@ sources:
   - kind: source-code
     ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol
     retrieved: '2026-10-02'
-    note: checkOnERC721Received calls onERC721Received when to.code.length > 0 (line 32) and reverts otherwise.
+    note: >-
+      checkOnERC721Received calls onERC721Received when to.code.length > 0 (line 32) and reverts if that call
+      fails or returns another value; a recipient without code is not called.
   - kind: source-code
     ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol
     retrieved: '2026-10-02'

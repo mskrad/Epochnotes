@@ -204,7 +204,21 @@ cases:
     detected: true
     source:
       kind: synthetic
-      reason: The Solidity spelling of "no code means an EOA", which the rule reads.
+      reason: The Solidity spellings of "no code means an EOA", in both orders of the comparison, which the rule reads.
+
+  - id: synthetic-receiver-hook-on-code
+    entry: eip-7702
+    files: { before: before.sol, after: after.sol }
+    expect: { confidence: check }
+    detected: false
+    gap: >-
+      Not read, on purpose. code.length > 0 before a receiver hook is the same assumption seen from the other
+      side, but the same spelling is how libraries check that a call reached deployed code (OpenZeppelin's
+      Address after every call): a rule on it would bury the hooks under those checks. The entry names the
+      break; finding it is left to reading.
+    source:
+      kind: synthetic
+      reason: The break of OpenZeppelin's ERC721Utils (code.length > 0, then onERC721Received), which the entry states.
 
   - id: synthetic-no-code-in-assembly
     entry: eip-7702

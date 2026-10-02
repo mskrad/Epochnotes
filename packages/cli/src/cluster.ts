@@ -70,6 +70,29 @@ const DEFAULT_ENDPOINTS: Record<string, string> = Object.fromEntries(
 export const chainOption = (flag = '--chain <id>', what = 'chain to read') =>
   new Option(flag, `${what}: a CAIP-2 id, or one of ${Object.keys(CHAIN_ALIASES).join(', ')}`);
 
+/**
+ * The chain a command reads, from what the user typed. `--chain` and the older `--cluster` name the same thing
+ * and must not disagree. With neither, an endpoint given by `--rpc-url` is read as whatever chain it says it
+ * serves — the report names it — and without an endpoint the default is Solana mainnet-beta. An unknown name
+ * is a usage error, never a guess.
+ */
+export function chainFromOptions(options: { chain?: string; cluster?: string; rpcUrl?: string }): {
+  chain?: string;
+  rpcUrl?: string;
+} {
+  if (options.chain !== undefined && options.cluster !== undefined) {
+    const [a, b] = [resolveChain(options.chain).chain, resolveChain(options.cluster).chain];
+    if (a !== b || a === undefined)
+      throw new UsageError(
+        `--chain ${options.chain} and --cluster ${options.cluster} name different chains: pass one`,
+      );
+  }
+  const name = options.chain ?? options.cluster;
+  if (name === undefined)
+    return options.rpcUrl === undefined ? resolveChain('mainnet-beta') : { rpcUrl: options.rpcUrl };
+  return resolveChain(name, options.rpcUrl);
+}
+
 /** A chain name as the user typed it, resolved; an unknown name is a usage error, never a guess. */
 export function resolveChain(name: string, rpcUrl?: string): { chain?: string; rpcUrl?: string } {
   const alias = CHAIN_ALIASES[name];
@@ -79,6 +102,9 @@ export function resolveChain(name: string, rpcUrl?: string): { chain?: string; r
       `"${name}" is not a chain: pass a CAIP-2 id such as eip155:1, or one of ${Object.keys(CHAIN_ALIASES).join(', ')}`,
     );
   const endpoint = rpcUrl ?? DEFAULT_ENDPOINTS[name];
+  // A Solana cluster this tool has no public endpoint for (a private one) is read only where the user says.
+  if (endpoint === undefined && name.startsWith('solana:'))
+    throw new UsageError(`no public endpoint is known for ${name}: pass one with --rpc-url`);
   return { chain: name, ...(endpoint === undefined ? {} : { rpcUrl: endpoint }) };
 }
 

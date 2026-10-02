@@ -33,10 +33,12 @@ npm run corpus:check  # the corpus manifest, its files and the detection engine 
 `skills/epochnotes` is a Claude skill (copy the directory into `.claude/skills/`). It holds no facts about any change: it reads entries from the latest verified version, reads the activation status from the network, and refuses to answer when verification fails. The commands it uses work for any consumer:
 
 ```bash
-epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, gate status with cluster and slot
+epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, activation status with chain and slot
 epochnotes check repo <path> --versions <dir-or-url>    # detection rules taken from the verified version
 epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does this provider behave as the entry says
 ```
+
+Every chain is named by its [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id, and `--chain` (or `--status` for `registry read`) takes either that id or a cluster name such as `mainnet-beta`. The endpoint is asked which chain it serves: one that serves another chain than the one asked for is refused rather than read, and an endpoint given alone with `--rpc-url` is read as the chain it says it is. Every reading names the chain and the point it was taken at, and every state says what showed it.
 
 A publisher withdraws an entry with a record on chain, which the signed log alone does not show. With `--onchain`, `registry read`, `check repo`, `check rpc` and `rent scan` leave withdrawn entries out, name them under `revoked`, and refuse an entry asked for by name (exit 1), in the same words as `registry verify`. Without it the output says that revocations were not checked.
 

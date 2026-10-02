@@ -6,9 +6,9 @@ import {
   registryStatus,
   type StatusReport,
 } from '@epochnotes/core';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
-import { chainOption, clusterOption, EXIT, resolveChain, rpcUrlOption } from './cluster.js';
+import { chainFromOptions, chainOption, EXIT, rpcUrlOption } from './cluster.js';
 import { reportError } from './output.js';
 
 function point(at: ReadingPoint): string {
@@ -59,7 +59,7 @@ export function whereOf(activation: Activation): string {
 export function readingLine(reading: { chain: string; cluster?: string; point: ReadingPoint }): string {
   const name = reading.cluster === undefined ? '' : ` (${reading.cluster})`;
   const at = point(reading.point);
-  return `chain ${reading.chain}${name}${at === '' ? ', nothing to read on it' : `, read at ${at}`}`;
+  return `chain ${reading.chain}${name}${at === '' ? ', not read: see why below' : `, read at ${at}`}`;
 }
 
 function print(report: StatusReport): void {
@@ -89,21 +89,21 @@ export function statusCommand(): Command {
   return new Command('status')
     .description('Show, from the network itself, which registry changes are active on a chain.')
     .addOption(chainOption())
-    .addOption(clusterOption('mainnet-beta').hideHelp())
+    .addOption(new Option('--cluster <name>', 'the same as --chain, by cluster name').hideHelp())
     .addOption(rpcUrlOption())
     .option('--registry <path>', 'directory of registry entries', 'registry/entries')
     .option('--json', 'print the report as JSON')
     .action(
       async (options: {
         chain?: string;
-        cluster: string;
+        cluster?: string;
         rpcUrl?: string;
         registry: string;
         json?: boolean;
       }) => {
-        let asked: ReturnType<typeof resolveChain>;
+        let asked: ReturnType<typeof chainFromOptions>;
         try {
-          asked = resolveChain(options.chain ?? options.cluster, options.rpcUrl);
+          asked = chainFromOptions(options);
         } catch (error) {
           reportError(options.json, 'use --chain', error);
           return;

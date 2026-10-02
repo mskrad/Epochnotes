@@ -30,7 +30,7 @@ export async function registryStatus(
     return {
       ok: false,
       kind: 'network',
-      chain: asked ?? 'unknown',
+      chain: asked ?? 'behind that endpoint',
       error: error instanceof Error ? error.message : String(error),
     };
   }

@@ -71,7 +71,16 @@ export function activationStateOfFeature(state: FeatureState): ActivationState {
 /** Solana: the state of a feature account, read in one request. */
 export function solanaActivationReader(source: SolanaReadSource): ActivationReader {
   return {
-    identify: async () => solanaChainId(await source.getGenesisHash()),
+    async identify() {
+      const genesis: unknown = await source.getGenesisHash();
+      // What the endpoint says about itself decides which chain the report names: an answer that is not a
+      // genesis hash names none.
+      if (typeof genesis !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(genesis))
+        throw new Error(
+          `the endpoint answered getGenesisHash with ${JSON.stringify(genesis)}, not a genesis hash`,
+        );
+      return solanaChainId(genesis);
+    },
     async read(activations) {
       const addresses = activations.map((item) =>
         item.kind === 'feature-account' ? item.address : undefined,

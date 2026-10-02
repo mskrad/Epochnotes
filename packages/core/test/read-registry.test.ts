@@ -88,6 +88,32 @@ describe('reading the registry for a consumer', () => {
     expect(reading.entries[0]).not.toHaveProperty('noActivation');
   });
 
+  it('names an entry that has no activation on the chain asked about, instead of showing it bare', async () => {
+    const copy = join(dir, 'with-evm');
+    cpSync(entries, copy, { recursive: true });
+    writeFileSync(
+      join(copy, 'sample-fork.yaml'),
+      'schema_version: 2\nid: sample-fork\nrev: 1\naxis: protocol\nsubject: { standard: eip, name: EIP-0000, title: S }\n' +
+        "applies:\n  activations:\n    - { kind: timestamp, chain: 'eip155:1', at: 1, label: s }\n" +
+        'breaks: [{ surface: program, summary: s }]\nfix: [{ summary: f }]\n' +
+        "sources: [{ kind: proposal, ref: r, retrieved: '2026-10-02' }]\n",
+    );
+    const reading = await readRegistry({
+      workingCopy: copy,
+      ids: ['sample-fork', 'tx-v1'],
+      status: { reader: solanaActivationReader(nothingScheduled), chain: SOLANA_CHAINS.testnet },
+    });
+    if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
+    const [fork, txV1] = reading.entries;
+    expect(fork).toMatchObject({
+      entry: { id: 'sample-fork' },
+      activations: [],
+      noActivation: 'no activation on this chain; it activates on eip155:1',
+    });
+    expect(txV1?.activations).toHaveLength(1);
+    expect(txV1).not.toHaveProperty('noActivation');
+  });
+
   it('fails, rather than guess a status, when the cluster does not answer', async () => {
     const down: SolanaReadSource = {
       getGenesisHash: () => Promise.reject(new Error('fetch failed')),

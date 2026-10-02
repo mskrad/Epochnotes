@@ -90,6 +90,18 @@ describe('registry status', () => {
     });
   });
 
+  it('names no chain from an endpoint whose answer about itself is not a genesis hash', async () => {
+    for (const answer of [42, null, '', 'not base58 0OIl']) {
+      const odd = { ...nothingScheduled, getGenesisHash: async () => answer as unknown as string };
+      const report = await registryStatus(registry, solanaActivationReader(odd));
+      expect(report, String(answer)).toMatchObject({
+        ok: false,
+        kind: 'network',
+        error: `the endpoint answered getGenesisHash with ${JSON.stringify(answer)}, not a genesis hash`,
+      });
+    }
+  });
+
   it('refuses an endpoint that serves another chain than the one asked for, rather than answer for it', async () => {
     const report = await registryStatus(
       registry,

@@ -54,8 +54,9 @@ What to look at, in this order:
 
 - the first line: **verified**, which version, which publisher, which root, and that revocations were not
   checked because `--onchain` was not passed;
-- `status read from mainnet-beta at slot N` — the activation state comes from the feature gate accounts at
-  the moment you ask, not from the entry;
+- `status: chain solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp (mainnet-beta), read at slot N` — the chain is named
+  by the endpoint itself (its genesis hash), and the activation state comes from the feature gate accounts at
+  the moment you ask, not from the entry. Each state says what showed it;
 - `breaks` items with the surface they belong to, and the `fix` for each;
 - `sources` with the date each one was read.
 
@@ -150,7 +151,7 @@ exported, and ask something the assistant would otherwise answer from memory:
 - "check this project against recent Solana network changes"
 
 The skill holds no facts about any change: it runs the commands above, and its answer carries the version,
-the publisher, the gate status with cluster and slot, and the sources. If verification fails, it refuses to
+the publisher, the activation status with the chain and the point it was read at, and the sources. If verification fails, it refuses to
 answer instead of falling back to memory — `corpus/skill-scenarios/` records what each case must look like.
 
 ## 8. The on-chain part (optional, needs Rust, Solana CLI 4.x and Anchor 0.32.1)

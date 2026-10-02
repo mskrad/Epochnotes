@@ -1,25 +1,29 @@
 import {
-  CLUSTERS,
+  type ActivationReader,
+  activationReaderFor,
   parsePin,
   probeRpc,
   type ReadOptions,
   readRegistry,
   readTrustedPublishers,
   type RegistryReading,
-  rpcFeatureAccountSource,
+  subjectOf,
 } from '@epochnotes/core';
 import { type Command, Option } from 'commander';
 
 import {
+  chainOption,
   clusterOf,
   clusterOption,
   EXIT,
   registryClusterOf,
   registryClusterOption,
   registryRpcUrlOption,
+  resolveChain,
   rpcUrlOption,
 } from './cluster.js';
 import { reportError, reportIssues } from './output.js';
+import { describeActivation, readingLine } from './status.js';
 
 /** Options of commands that can ask the registry program, and keep `--cluster` / `--rpc-url` for something else. */
 export interface ChainOptions {
@@ -102,6 +106,15 @@ export function printRevoked(reading: Extract<RegistryReading, { ok: true }>): v
   }
 }
 
+/** The reader `--status` asks: the chain resolved from what the user typed, at its endpoint. */
+function statusOf(name: string, rpcUrl?: string): { reader: ActivationReader; chain?: string } {
+  const asked = resolveChain(name, rpcUrl);
+  return {
+    reader: activationReaderFor(asked.chain, asked.rpcUrl ?? ''),
+    ...(asked.chain === undefined ? {} : { chain: asked.chain }),
+  };
+}
+
 export function addReadCommand(registry: Command): void {
   withSource(
     registry
@@ -115,11 +128,7 @@ export function addReadCommand(registry: Command): void {
     .option('--include-revoked', 'with --onchain: print revoked entries too, marked; for diagnostics only')
     .addOption(clusterOption('devnet'))
     .addOption(rpcUrlOption())
-    .addOption(
-      new Option('--status <cluster>', 'read the activation status of every gate from this cluster').choices(
-        Object.keys(CLUSTERS),
-      ),
-    )
+    .addOption(chainOption('--status <chain>', 'read the state of every activation on this chain'))
     .option('--status-rpc-url <url>', 'JSON-RPC endpoint for --status instead of the public one')
     .option('--json', 'print the reading as JSON')
     .action(
@@ -145,14 +154,7 @@ export function addReadCommand(registry: Command): void {
             ...(options.includeRevoked ? { includeRevoked: true } : {}),
             ...(options.status === undefined
               ? {}
-              : {
-                  status: {
-                    cluster: options.status,
-                    source: rpcFeatureAccountSource(
-                      options.statusRpcUrl ?? CLUSTERS[options.status as keyof typeof CLUSTERS],
-                    ),
-                  },
-                }),
+              : { status: statusOf(options.status, options.statusRpcUrl) }),
           });
         } catch (error) {
           reportError(options.json, 'read the registry', error);
@@ -170,15 +172,14 @@ export function addReadCommand(registry: Command): void {
           );
         } else {
           console.log(provenanceLine(reading));
-          if (reading.network !== undefined)
-            console.log(`status read from ${reading.network.cluster} at slot ${reading.network.slot}`);
-          for (const { entry, gates, revokedOnChain } of reading.entries) {
-            console.log(`\n${entry.id}@${entry.rev}  ${entry.subject.name}: ${entry.subject.title}`);
+          if (reading.network !== undefined) console.log(`status: ${readingLine(reading.network)}`);
+          for (const { entry, activations, noActivation, revokedOnChain } of reading.entries) {
+            const subject = subjectOf(entry);
+            console.log(`\n${entry.id}@${entry.rev}  ${subject.name}: ${subject.title}`);
             if (revokedOnChain) console.log('  REVOKED on chain by its publisher: do not rely on this entry');
-            for (const gate of gates ?? [])
-              console.log(
-                `  gate ${gate.label}: ${gate.status.state}${gate.status.state === 'active' ? ` since slot ${gate.status.activatedAt}` : ''}`,
-              );
+            for (const item of activations ?? [])
+              console.log(`  ${item.activation.label}: ${describeActivation(item.status)}`);
+            if (noActivation !== undefined) console.log(`  ${noActivation}`);
             for (const item of entry.breaks) console.log(`  breaks ${item.surface}: ${item.summary}`);
           }
           if (reading.revoked.length > 0) console.log('');

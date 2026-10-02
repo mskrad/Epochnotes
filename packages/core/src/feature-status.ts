@@ -1,4 +1,10 @@
-import { address, createSolanaRpc, type GetMultipleAccountsApi, type Rpc } from '@solana/kit';
+import {
+  address,
+  createSolanaRpc,
+  type GetGenesisHashApi,
+  type GetMultipleAccountsApi,
+  type Rpc,
+} from '@solana/kit';
 
 export const CLUSTERS = {
   'mainnet-beta': 'https://api.mainnet-beta.solana.com',
@@ -87,9 +93,16 @@ export async function readFeatureStatus(
   }
 }
 
-/** Feature accounts read through a `@solana/kit` RPC client. */
-export function featureAccountSourceFromRpc(rpc: Rpc<GetMultipleAccountsApi>): FeatureAccountSource {
+/** Feature accounts read through a `@solana/kit` RPC client, which can also say which cluster it reads. */
+export function featureAccountSourceFromRpc(
+  rpc: Rpc<GetMultipleAccountsApi & GetGenesisHashApi>,
+): FeatureAccountSource & {
+  getGenesisHash(): Promise<string>;
+} {
   return {
+    async getGenesisHash() {
+      return rpc.getGenesisHash().send({ abortSignal: AbortSignal.timeout(RPC_TIMEOUT_MS) });
+    },
     async getAccounts(addresses) {
       const response = await rpc
         .getMultipleAccounts(
@@ -110,6 +123,8 @@ export function featureAccountSourceFromRpc(rpc: Rpc<GetMultipleAccountsApi>): F
 }
 
 /** Feature accounts over JSON-RPC at the given endpoint. */
-export function rpcFeatureAccountSource(rpcUrl: string): FeatureAccountSource {
+export function rpcFeatureAccountSource(rpcUrl: string): FeatureAccountSource & {
+  getGenesisHash(): Promise<string>;
+} {
   return featureAccountSourceFromRpc(createSolanaRpc(rpcUrl));
 }

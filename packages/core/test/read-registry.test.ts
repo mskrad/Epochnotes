@@ -7,12 +7,15 @@ import { afterAll, describe, expect, it } from 'vitest';
 import {
   type ChainSource,
   checkDirectory,
-  type FeatureAccountSource,
+  CLUSTER_GENESIS,
   type Issue,
   type OnchainRevocation,
   publishVersion,
   type ReadOptions,
   readRegistry,
+  SOLANA_CHAINS,
+  solanaActivationReader,
+  type SolanaReadSource,
 } from '../src/index.js';
 import { writeTestKey } from './keys.js';
 
@@ -21,7 +24,8 @@ const dir = mkdtempSync(join(tmpdir(), 'epochnotes-read-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 const versions = join(dir, 'versions');
 const keyFile = writeTestKey(join(dir, 'key.json'));
-const nothingScheduled: FeatureAccountSource = {
+const nothingScheduled: SolanaReadSource = {
+  getGenesisHash: async () => CLUSTER_GENESIS.testnet,
   getAccounts: async (addresses) => ({ slot: 7n, accounts: addresses.map(() => null) }),
 };
 
@@ -54,7 +58,7 @@ describe('reading the registry for a consumer', () => {
       'slot-duration',
       'tx-v1',
     ]);
-    expect(reading.entries.every((item) => item.gates === undefined)).toBe(true);
+    expect(reading.entries.every((item) => item.activations === undefined)).toBe(true);
   });
 
   it('narrows to the ids asked for and names the ones the version does not have', async () => {
@@ -67,26 +71,34 @@ describe('reading the registry for a consumer', () => {
     expect(reading.unknownIds).toEqual(['no-such-entry']);
   });
 
-  it('attaches what the network says about every gate, with the cluster and the slot', async () => {
+  it('attaches what the network says about every activation, with the chain and the point of the reading', async () => {
     const reading = await readRegistry({
       log: { versionsDir: versions, trustedPublishers: [publisher] },
       ids: ['rent-simd-0437'],
-      status: { cluster: 'testnet', source: nothingScheduled },
+      status: { reader: solanaActivationReader(nothingScheduled), chain: SOLANA_CHAINS.testnet },
     });
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
-    expect(reading.network).toEqual({ cluster: 'testnet', slot: '7' });
-    expect(reading.entries[0]?.gates).toHaveLength(5);
-    expect(reading.entries[0]?.gates?.every((gate) => gate.status.state === 'absent')).toBe(true);
+    expect(reading.network).toEqual({
+      chain: SOLANA_CHAINS.testnet,
+      cluster: 'testnet',
+      point: { slot: '7' },
+    });
+    expect(reading.entries[0]?.activations).toHaveLength(5);
+    expect(reading.entries[0]?.activations?.every((item) => item.status.state === 'absent')).toBe(true);
+    expect(reading.entries[0]).not.toHaveProperty('noActivation');
   });
 
   it('fails, rather than guess a status, when the cluster does not answer', async () => {
-    const down: FeatureAccountSource = { getAccounts: () => Promise.reject(new Error('fetch failed')) };
+    const down: SolanaReadSource = {
+      getGenesisHash: () => Promise.reject(new Error('fetch failed')),
+      getAccounts: () => Promise.reject(new Error('fetch failed')),
+    };
     await expect(
       readRegistry({
         log: { versionsDir: versions, trustedPublishers: [publisher] },
-        status: { cluster: 'testnet', source: down },
+        status: { reader: solanaActivationReader(down), chain: SOLANA_CHAINS.testnet },
       }),
-    ).rejects.toThrow('cluster testnet did not answer: fetch failed');
+    ).rejects.toThrow(`cannot read chain ${SOLANA_CHAINS.testnet}: fetch failed`);
   });
 
   it('treats a log that is not there as a broken environment, not as a failed verification', async () => {

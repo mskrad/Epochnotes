@@ -1,4 +1,10 @@
-import { clusterFromRpcUrl, CLUSTERS, type OnchainCluster } from '@epochnotes/core';
+import {
+  CAIP2_PATTERN,
+  clusterFromRpcUrl,
+  CLUSTERS,
+  type OnchainCluster,
+  SOLANA_CHAINS,
+} from '@epochnotes/core';
 import { Option } from 'commander';
 
 /** Exit codes shared by every command: 0 ok, 1 findings or invalid data, 2 environment or usage error. */
@@ -42,3 +48,39 @@ export function registryClusterOf(options: {
 export function clusterOf(options: { cluster: string; rpcUrl?: string }): OnchainCluster {
   return clusterFromRpcUrl(rpcUrlOf(options));
 }
+
+/**
+ * Names people use for chains. Each resolves to a CAIP-2 id before anything is read, and the endpoint is asked
+ * which chain it serves anyway. `localnet` has no fixed id: its genesis is whatever the local validator made.
+ */
+const CHAIN_ALIASES: Record<string, { chain?: string; rpcUrl: string }> = {
+  'mainnet-beta': { chain: SOLANA_CHAINS['mainnet-beta'], rpcUrl: CLUSTERS['mainnet-beta'] },
+  testnet: { chain: SOLANA_CHAINS.testnet, rpcUrl: CLUSTERS.testnet },
+  devnet: { chain: SOLANA_CHAINS.devnet, rpcUrl: CLUSTERS.devnet },
+  localnet: { rpcUrl: CLUSTERS.localnet },
+};
+
+/** Public read-only endpoints by CAIP-2 id. */
+const DEFAULT_ENDPOINTS: Record<string, string> = Object.fromEntries(
+  Object.values(CHAIN_ALIASES).flatMap((alias) =>
+    alias.chain === undefined ? [] : [[alias.chain, alias.rpcUrl]],
+  ),
+);
+
+export const chainOption = (flag = '--chain <id>', what = 'chain to read') =>
+  new Option(flag, `${what}: a CAIP-2 id, or one of ${Object.keys(CHAIN_ALIASES).join(', ')}`);
+
+/** A chain name as the user typed it, resolved; an unknown name is a usage error, never a guess. */
+export function resolveChain(name: string, rpcUrl?: string): { chain?: string; rpcUrl?: string } {
+  const alias = CHAIN_ALIASES[name];
+  if (alias !== undefined) return { ...alias, ...(rpcUrl === undefined ? {} : { rpcUrl }) };
+  if (!CAIP2_PATTERN.test(name))
+    throw new UsageError(
+      `"${name}" is not a chain: pass a CAIP-2 id such as eip155:1, or one of ${Object.keys(CHAIN_ALIASES).join(', ')}`,
+    );
+  const endpoint = rpcUrl ?? DEFAULT_ENDPOINTS[name];
+  return { chain: name, ...(endpoint === undefined ? {} : { rpcUrl: endpoint }) };
+}
+
+/** A mistake in what the user asked for: exit 2, like any other usage error. */
+export class UsageError extends Error {}

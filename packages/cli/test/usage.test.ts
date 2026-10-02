@@ -56,7 +56,6 @@ describe('exit codes', () => {
 
   it('offers the same clusters to every command that takes one', async () => {
     const commands = [
-      ['status'],
       ['registry', 'verify'],
       ['registry', 'anchor'],
       ['registry', 'revoke'],
@@ -71,6 +70,9 @@ describe('exit codes', () => {
       ),
     );
     expect(new Set(lists)).toEqual(new Set(['"mainnet-beta", "testnet", "devnet", "localnet"']));
+    // status reads any chain: it names them by CAIP-2 and keeps the cluster names as aliases.
+    const status = (await run('status', '--help')).out.replace(/\s+/g, ' ');
+    expect(status).toContain('a CAIP-2 id, or one of mainnet-beta, testnet, devnet, localnet');
   });
 });
 

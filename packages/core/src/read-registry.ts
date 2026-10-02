@@ -1,7 +1,12 @@
-import { type FeatureAccountSource, type FeatureState, readFeatureStatus } from './feature-status.js';
+import {
+  type ActivationReader,
+  type ActivationReading,
+  type ChainReading,
+  readActivations,
+} from './activation-status.js';
 import { validatePath } from './load.js';
 import { type Cluster, compareLogWithChain, fetchRevocation, type OnchainRevocation } from './onchain.js';
-import { type Entry, featureGatesOf } from './schema.js';
+import type { Entry } from './schema.js';
 import type { Issue } from './validate.js';
 import type { Manifest } from './version.js';
 import { type VerifyOptions, verifyLatestVersion } from './version-store.js';
@@ -26,16 +31,12 @@ export type Provenance =
     }
   | { verified: false; workingCopy: string; warning: string };
 
-export interface GateReading {
-  label: string;
-  address: string;
-  status: FeatureState;
-}
-
 export interface EntryReading {
   entry: Entry;
-  /** Present when a cluster was asked about: what the network says about each gate of the entry. */
-  gates?: GateReading[];
+  /** Present when a chain was asked about: what it says about each activation of the entry on that chain. */
+  activations?: ActivationReading[];
+  /** Present when a chain was asked about and the entry names no activation on it: why. */
+  noActivation?: string;
   /** Only with `includeRevoked`: the publisher withdrew this entry on chain. Do not rely on it. */
   revokedOnChain?: true;
 }
@@ -44,7 +45,7 @@ export type RegistryReading =
   | {
       ok: true;
       provenance: Provenance;
-      network?: { cluster: string; slot: string };
+      network?: Omit<ChainReading, 'activations' | 'withoutActivation'>;
       /** The entries a consumer may rely on. Entries withdrawn on chain are not here. */
       entries: EntryReading[];
       /** Entries of this version that the publisher withdrew on chain. Empty when revocations were not checked. */
@@ -76,8 +77,8 @@ export interface ReadOptions {
   chain?: ChainSource;
   /** Return withdrawn entries too, marked. For diagnostics: a consumer never sets this. */
   includeRevoked?: boolean;
-  /** Read the activation status of every gate from this cluster. */
-  status?: { cluster: string; source: FeatureAccountSource };
+  /** Read the state of every activation from the chain behind this reader; `chain` is what the user asked for. */
+  status?: { reader: ActivationReader; chain?: string };
 }
 
 /**
@@ -183,24 +184,27 @@ export async function readRegistry(options: ReadOptions): Promise<RegistryReadin
     isRevoked(entry.id) ? { entry, revokedOnChain: true } : { entry },
   );
 
-  let network: { cluster: string; slot: string } | undefined;
+  let network: Omit<ChainReading, 'activations' | 'withoutActivation'> | undefined;
   if (options.status !== undefined) {
-    const addresses = readings.flatMap((reading) =>
-      featureGatesOf(reading.entry).map((gate) => gate.address),
-    );
-    const report = await readFeatureStatus(options.status.source, addresses);
-    // An unreachable cluster is an environment failure, not a finding about the registry: no status is ever guessed.
-    if (!report.ok) throw new Error(`cluster ${options.status.cluster} did not answer: ${report.error}`);
-    network = { cluster: options.status.cluster, slot: report.slot.toString() };
+    let read: ChainReading;
+    try {
+      read = await readActivations(
+        readings.map((reading) => reading.entry),
+        options.status.reader,
+        options.status.chain,
+      );
+    } catch (error) {
+      // An unreachable or mistaken endpoint is an environment failure, not a finding: no status is ever guessed.
+      throw new Error(
+        `cannot read chain ${options.status.chain ?? 'behind that endpoint'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const { activations, withoutActivation, ...where } = read;
+    network = where;
     for (const reading of readings) {
-      reading.gates = featureGatesOf(reading.entry).map((gate) => ({
-        label: gate.label,
-        address: gate.address,
-        status: report.states.get(gate.address) ?? {
-          state: 'unreadable',
-          reason: 'no state returned for this gate',
-        },
-      }));
+      reading.activations = activations.filter((item) => item.entry === reading.entry.id);
+      const note = withoutActivation.find((item) => item.entry === reading.entry.id)?.reason;
+      if (note !== undefined) reading.noActivation = note;
     }
   }
   return {

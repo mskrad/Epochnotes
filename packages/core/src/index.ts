@@ -60,7 +60,21 @@ export {
   readFeatureStatus,
   rpcFeatureAccountSource,
 } from './feature-status.js';
-export { type GateStatus, registryStatus, type StatusReport } from './status.js';
+export { registryStatus, type StatusReport } from './status.js';
+export {
+  type ActivationReader,
+  activationReaderFor,
+  type ActivationReading,
+  type ActivationState,
+  activationStateOfFeature,
+  appliesTo,
+  type ChainReading,
+  readActivations,
+  type ReadingPoint,
+  solanaActivationReader,
+  type SolanaReadSource,
+  unsupportedReader,
+} from './activation-status.js';
 export {
   type ContentAttempt,
   contentSourceCandidates,
@@ -148,7 +162,6 @@ export {
   type ChainSource,
   chainSourceOf,
   type EntryReading,
-  type GateReading,
   type Provenance,
   type ReadOptions,
   readRegistry,

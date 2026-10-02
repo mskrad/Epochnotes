@@ -18,14 +18,14 @@ stop and remove it.
 Run the CLI (`npx epochnotes`, or `node packages/cli/bin/epochnotes.js` inside the Epochnotes repository):
 
 ```bash
-epochnotes registry read --json --status <cluster>
+epochnotes registry read --json --status <chain>
 ```
 
 - The log and the trusted publishers come from `--versions <dir-or-url>` and `--publishers <file>`, or from
   the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. If neither is set and the
   defaults do not exist, ask the person where their registry log is. Do not invent a URL.
-- `<cluster>` is the cluster the person's project runs on. If they did not say, ask, or use `mainnet-beta`
-  and say that you assumed it.
+- `<chain>` is the chain the person's project runs on: a CAIP-2 id, or a cluster name such as `mainnet-beta`.
+  If they did not say, ask, or use `mainnet-beta` and say that you assumed it.
 - Add `--onchain` whenever the answer will be relied on (a fix to ship, a decision to make), or the person
   asks for the log to be compared with its on-chain anchor. Only the chain shows that a publisher withdrew an
   entry or that the log was cut short. It needs network access to the cluster of the registry program.
@@ -43,7 +43,7 @@ epochnotes registry read --json --status <cluster>
 | exit 1 with an issue saying the entry was revoked | The registry verified, and the publisher withdrew this entry on chain. **Do not answer from it**, and do not rerun with `--include-revoked` to get its text. Say that the entry was withdrawn, quote the issue, and offer what the remaining entries say.                                          |
 | exit 1 with `issues`                              | **Do not answer the question.** Say that the registry failed verification, quote the issues, and say what to do (fetch the log again, check the publishers file, compare with the chain). Do not fall back to memory: a registry that fails verification is exactly the case this tool exists for. |
 | any entry carrying `revokedOnChain: true`         | Someone passed `--include-revoked`. You never pass it. Treat such an entry as absent: do not answer from it.                                                                                                                                                                                       |
-| exit 2 with `error`                               | The environment failed (network, path, usage). Say what failed. If only the status cluster was unreachable, you may rerun without `--status` and answer with "activation status: not read".                                                                                                        |
+| exit 2 with `error`                               | The environment failed (network, path, usage). Say what failed. If only the status chain was unreachable, you may rerun without `--status` and answer with "activation status: not read".                                                                                                          |
 | exit 2 with a report and no `error`               | The command ran and learned nothing: `check rpc` leaves `observed` at zero when no probe could speak about that endpoint. Report it as "cannot verify" with the reason from the probe, never as a fault of the endpoint and never as a pass.                                                       |
 
 If no entry matches the question, say so: "the registry (version N) has no entry about this". You may then
@@ -55,9 +55,12 @@ Every answer built on the registry carries these, in this order:
 
 1. **The answer itself**, in the person's terms: what breaks for them and what to do. Use `breaks` and `fix`.
 2. **Entry**: `id@rev`, with the subject name and title.
-3. **Status**: for every gate of the entry, its state, **with the cluster and the slot of the reading**. An
-   entry can have several gates in different states; report each. `absent` means no activation is scheduled
-   on that cluster, whatever any article says. Entries without gates apply by version range: say so.
+3. **Status**: for every activation of the entry on that chain, its state, **with the chain and the point of
+   the reading** (slot, block, time). An entry can activate on several chains, with several activations in
+   different states; report each. `absent` means nothing is scheduled on that chain, whatever any article
+   says; `scheduled` means known, not reached; `active` names what confirmed it — repeat that; `unknown` is
+   not an answer: say that the state could not be read, and why. An entry with no activation on the chain
+   asked about carries `noActivation`: report it, do not drop it.
 4. **Sources**: the primary sources of the statements you used. Each `breaks[].evidence` holds indexes into
    the entry's `sources`; give their `ref` and `retrieved` date.
 5. **Registry version**: version number, the first characters of the Merkle root, the publisher key, and

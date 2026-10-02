@@ -53,6 +53,6 @@ it from the entry: the change, the symptom, the primary source.
 ## 3. Report
 
 One table, one row per surface: surface, what was checked, label from the table above, entry `id@rev`,
-finding, fix. Then the registry version and the status reading (cluster, slot) once for the whole report.
+finding, fix. Then the registry version and the status reading (chain, point of the reading) once for the whole report.
 List the surfaces you could not check as plainly as the ones you could. A report that hides its blind spots
 reads as "everything is fine", and that is the one thing it must never claim.

@@ -1,25 +1,65 @@
 import {
-  type FeatureState,
+  type Activation,
+  activationReaderFor,
+  type ActivationState,
+  type ReadingPoint,
   registryStatus,
-  rpcFeatureAccountSource,
   type StatusReport,
 } from '@epochnotes/core';
 import { Command } from 'commander';
 
-import { clusterOption, EXIT, rpcUrlOf, rpcUrlOption } from './cluster.js';
+import { chainOption, clusterOption, EXIT, resolveChain, rpcUrlOption } from './cluster.js';
 import { reportError } from './output.js';
 
-function describe(status: FeatureState): string {
+function point(at: ReadingPoint): string {
+  return [
+    at.slot === undefined ? '' : `slot ${at.slot}`,
+    at.block === undefined ? '' : `block ${at.block}`,
+    at.time === undefined ? '' : `time ${at.time}`,
+  ]
+    .filter((part) => part !== '')
+    .join(', ');
+}
+
+const CONFIRMED: Record<Extract<ActivationState, { state: 'active' }>['confirmedBy'], string> = {
+  'feature-account': 'the feature account says so',
+  header: 'a block header shows it',
+  node: 'the node reports it',
+  'chain-data': 'a transaction of the chain shows it',
+  'time-only': 'by time only: no block field shows it',
+  'height-only': 'by height only: nothing else shows it',
+};
+
+/** One line for the state of an activation, the same in every command. */
+export function describeActivation(status: ActivationState): string {
   switch (status.state) {
     case 'active':
-      return `active since slot ${status.activatedAt}`;
-    case 'pending':
-      return 'pending (activates on an epoch boundary)';
+      return `active since ${point(status.since)} (${CONFIRMED[status.confirmedBy]})`;
+    case 'scheduled':
+      return 'scheduled (known to the chain, not reached yet)';
     case 'absent':
-      return 'absent (no feature account: not scheduled)';
-    case 'unreadable':
-      return `unreadable: ${status.reason}`;
+      return 'absent (nothing scheduled on this chain)';
+    case 'unknown':
+      return `unknown: ${status.reason}`;
   }
+}
+
+/** Where an activation is to be found: an account address, or the time or height it was set for. */
+export function whereOf(activation: Activation): string {
+  switch (activation.kind) {
+    case 'feature-account':
+      return activation.address;
+    case 'timestamp':
+      return `at time ${activation.at}`;
+    case 'block-height':
+      return `at block ${activation.at}`;
+  }
+}
+
+export function readingLine(reading: { chain: string; cluster?: string; point: ReadingPoint }): string {
+  const name = reading.cluster === undefined ? '' : ` (${reading.cluster})`;
+  const at = point(reading.point);
+  return `chain ${reading.chain}${name}${at === '' ? ', nothing to read on it' : `, read at ${at}`}`;
 }
 
 function print(report: StatusReport): void {
@@ -29,43 +69,60 @@ function print(report: StatusReport): void {
     return;
   }
   if (!report.ok) {
-    console.error(`Cluster ${report.cluster} did not answer: ${report.error}`);
-    console.error('  fix: check the network, or pass another endpoint with --rpc-url.');
+    console.error(`Cannot read chain ${report.chain}: ${report.error}`);
+    console.error('  fix: check the network, or pass an endpoint of that chain with --rpc-url.');
     return;
   }
-  console.log(`cluster ${report.cluster}, read at slot ${report.slot}`);
+  console.log(readingLine(report));
   let current = '';
-  for (const gate of report.gates) {
-    if (gate.entry !== current) console.log(`\n${gate.entry}@${gate.rev}  ${gate.subject}`);
-    current = gate.entry;
-    console.log(`  ${gate.label.padEnd(34)} ${gate.address.padEnd(44)}  ${describe(gate.status)}`);
+  for (const item of report.activations) {
+    if (item.entry !== current) console.log(`\n${item.entry}@${item.rev}  ${item.subject}`);
+    current = item.entry;
+    console.log(
+      `  ${item.activation.label.padEnd(34)} ${whereOf(item.activation).padEnd(44)}  ${describeActivation(item.status)}`,
+    );
   }
-  for (const entry of report.withoutGates)
-    console.log(`\n${entry}  no feature gate: applies by version range`);
+  for (const item of report.withoutActivation) console.log(`\n${item.entry}  ${item.reason}`);
 }
 
 export function statusCommand(): Command {
   return new Command('status')
-    .description('Show, from the network itself, which registry changes are active on a cluster.')
-    .addOption(clusterOption('mainnet-beta'))
+    .description('Show, from the network itself, which registry changes are active on a chain.')
+    .addOption(chainOption())
+    .addOption(clusterOption('mainnet-beta').hideHelp())
     .addOption(rpcUrlOption())
     .option('--registry <path>', 'directory of registry entries', 'registry/entries')
     .option('--json', 'print the report as JSON')
-    .action(async (options: { cluster: string; rpcUrl?: string; registry: string; json?: boolean }) => {
-      let report: StatusReport;
-      try {
-        const source = rpcFeatureAccountSource(rpcUrlOf(options));
-        report = await registryStatus(options.registry, options.cluster, source);
-      } catch (error) {
-        reportError(options.json, `read the registry at ${options.registry}`, error);
-        return;
-      }
-      if (options.json) {
-        // Slots are 64-bit: printed as decimal strings so no JSON reader rounds them.
-        console.log(
-          JSON.stringify(report, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2),
-        );
-      } else print(report);
-      process.exitCode = report.ok ? EXIT.ok : report.kind === 'registry' ? EXIT.findings : EXIT.environment;
-    });
+    .action(
+      async (options: {
+        chain?: string;
+        cluster: string;
+        rpcUrl?: string;
+        registry: string;
+        json?: boolean;
+      }) => {
+        let asked: ReturnType<typeof resolveChain>;
+        try {
+          asked = resolveChain(options.chain ?? options.cluster, options.rpcUrl);
+        } catch (error) {
+          reportError(options.json, 'use --chain', error);
+          return;
+        }
+        let report: StatusReport;
+        try {
+          const reader = activationReaderFor(asked.chain, asked.rpcUrl ?? '');
+          report = await registryStatus(options.registry, reader, asked.chain);
+        } catch (error) {
+          reportError(options.json, `read the registry at ${options.registry}`, error);
+          return;
+        }
+        if (options.json) console.log(JSON.stringify(report, null, 2));
+        else print(report);
+        process.exitCode = report.ok
+          ? EXIT.ok
+          : report.kind === 'registry'
+            ? EXIT.findings
+            : EXIT.environment;
+      },
+    );
 }

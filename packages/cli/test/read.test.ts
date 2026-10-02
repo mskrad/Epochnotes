@@ -73,7 +73,7 @@ describe('epochnotes registry read / check rpc', () => {
     expect(read.code).toBe(2);
     const answer = JSON.parse(read.stdout) as { ok: boolean; error: string };
     expect(answer.ok).toBe(false);
-    expect(answer.error).toContain('cluster localnet did not answer');
+    expect(answer.error).toContain('cannot read chain behind that endpoint');
   });
 
   it('treats a request for the chain that cannot be honoured as a usage error, exit 2, for every consumer command', async () => {

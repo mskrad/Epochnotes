@@ -1,27 +1,20 @@
-import { type FeatureAccountSource, type FeatureState, readFeatureStatus } from './feature-status.js';
+import { type ActivationReader, type ChainReading, readActivations } from './activation-status.js';
 import { validatePath } from './load.js';
-import { featureGatesOf, subjectOf } from './schema.js';
 import type { Issue } from './validate.js';
 
-export interface GateStatus {
-  entry: string;
-  rev: number;
-  subject: string;
-  label: string;
-  address: string;
-  status: FeatureState;
-}
-
 export type StatusReport =
-  | { ok: true; cluster: string; slot: bigint; gates: GateStatus[]; withoutGates: string[] }
+  | ({ ok: true } & ChainReading)
   | { ok: false; kind: 'registry'; issues: Issue[] }
-  | { ok: false; kind: 'network'; cluster: string; error: string };
+  | { ok: false; kind: 'network'; chain: string; error: string };
 
-/** Activation state of every feature gate named by the entries under `registryPath`, on one cluster. */
+/**
+ * The state, on one chain, of every activation named by the entries under `registryPath`. An unreachable or
+ * mistaken endpoint is a result, not an exception: the command has to say so, not crash.
+ */
 export async function registryStatus(
   registryPath: string,
-  cluster: string,
-  source: FeatureAccountSource,
+  reader: ActivationReader,
+  asked?: string,
 ): Promise<StatusReport> {
   const registry = validatePath(registryPath);
   if (!registry.ok) {
@@ -31,32 +24,14 @@ export async function registryStatus(
     return { ok: false, kind: 'registry', issues: [...issues, ...registry.registryIssues] };
   }
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
-  const gates = entries.flatMap((entry) =>
-    featureGatesOf(entry).map((gate) => ({
-      entry: entry.id,
-      rev: entry.rev,
-      subject: subjectOf(entry).name,
-      label: gate.label,
-      address: gate.address,
-    })),
-  );
-  const network = await readFeatureStatus(
-    source,
-    gates.map((gate) => gate.address),
-  );
-  if (!network.ok) return { ok: false, kind: 'network', cluster, error: network.error };
-  return {
-    ok: true,
-    cluster,
-    slot: network.slot,
-    gates: gates.map((gate) => ({
-      ...gate,
-      // Every asked address has a state; a gap would be a bug here, and must not read as "not scheduled".
-      status: network.states.get(gate.address) ?? {
-        state: 'unreadable',
-        reason: 'no state returned for this gate',
-      },
-    })),
-    withoutGates: entries.filter((entry) => featureGatesOf(entry).length === 0).map((entry) => entry.id),
-  };
+  try {
+    return { ok: true, ...(await readActivations(entries, reader, asked)) };
+  } catch (error) {
+    return {
+      ok: false,
+      kind: 'network',
+      chain: asked ?? 'unknown',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

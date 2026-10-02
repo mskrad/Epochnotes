@@ -162,16 +162,18 @@ try {
     );
   else {
     step(
-      'reads the status of every gate from devnet, as JSON',
-      ['status', '--cluster', 'devnet', '--json'],
+      'reads the state of every activation on devnet, named by its CAIP-2 id, as JSON',
+      ['status', '--chain', 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', '--json'],
       0,
       (_all, stdout) => {
         const report = JSON.parse(stdout);
-        if (report.cluster !== 'devnet' || !/^\d+$/.test(report.slot))
-          return 'no cluster or slot in the report';
-        return report.gates.length >= 11 && report.gates.every((gate) => gate.address && gate.status?.state)
+        if (report.chain !== 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' || report.cluster !== 'devnet')
+          return 'the report does not name the chain';
+        if (!/^\d+$/.test(report.point?.slot ?? '')) return 'no slot in the report';
+        return report.activations.length >= 11 &&
+          report.activations.every((item) => item.activation.address && item.status?.state)
           ? undefined
-          : 'gates are missing a status';
+          : 'activations are missing a state';
       },
     );
     step(

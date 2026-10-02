@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -25,6 +25,16 @@ function check(dir: string) {
   const report = checkRepository(dir, registry);
   if (!report.ok) throw new Error(JSON.stringify(report.issues));
   return report;
+}
+
+/** Whether this process can read a file now: root reads one whatever its mode says. */
+function canRead(path: string): boolean {
+  try {
+    readFileSync(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const canLink = (() => {
@@ -546,11 +556,28 @@ describe('check repo', () => {
       chmodSync(join(dir, 'secret.ts'), 0o000);
       try {
         const report = check(dir);
-        expect(report.findings.map((finding) => finding.file)).toEqual(['own.ts']);
-        expect(report.skipped).toEqual([{ file: 'secret.ts', reason: 'unreadable' }]);
+        // A privileged process (root in a container or CI) reads a file whatever its mode: then there is
+        // nothing to skip, and the file must be checked like any other. Decided by what the process can
+        // read, not by who it is.
+        if (canRead(join(dir, 'secret.ts'))) {
+          expect(report.findings.map((finding) => finding.file)).toEqual(['own.ts', 'secret.ts']);
+          expect(report.skipped).toEqual([]);
+        } else {
+          expect(report.findings.map((finding) => finding.file)).toEqual(['own.ts']);
+          expect(report.skipped).toEqual([{ file: 'secret.ts', reason: 'unreadable' }]);
+        }
       } finally {
         chmodSync(join(dir, 'secret.ts'), 0o644);
       }
+    });
+
+    it('checks a file it can read whatever its mode says, as a privileged process does', () => {
+      // The branch a root process takes, run here by keeping the file readable.
+      const dir = repo('readable-mode', { 'secret.ts': before, 'own.ts': before });
+      expect(canRead(join(dir, 'secret.ts'))).toBe(true);
+      const report = check(dir);
+      expect(report.findings.map((finding) => finding.file)).toEqual(['own.ts', 'secret.ts']);
+      expect(report.skipped).toEqual([]);
     });
   });
 

@@ -80,7 +80,8 @@ describe('reading the registry for a consumer', () => {
     if (!reading.ok) throw new Error(JSON.stringify(reading.issues));
     expect(reading.network).toEqual({
       chain: SOLANA_CHAINS.testnet,
-      cluster: 'testnet',
+      name: 'testnet',
+      identifiedBy: 'genesis',
       point: { slot: '7' },
     });
     expect(reading.entries[0]?.activations).toHaveLength(5);

@@ -32,6 +32,17 @@ export function namespaceOf(chain: string): string {
   return chain.split(':')[0] ?? chain;
 }
 
+/** The EVM chains this library reads by name: Ethereum and Base. */
+export const EVM_CHAINS = { ethereum: 'eip155:1', base: 'eip155:8453' } as const;
+
+/** The name people use for a chain this library knows, for the reports people read. */
+export function chainNameOf(chain: string): string | undefined {
+  return (
+    solanaClusterOf(chain) ??
+    (Object.entries(EVM_CHAINS) as [string, string][]).find(([, id]) => id === chain)?.[0]
+  );
+}
+
 /** The cluster name of a known Solana CAIP-2 id, for messages people read. */
 export function solanaClusterOf(chain: string): SolanaCluster | undefined {
   return (Object.entries(SOLANA_CHAINS) as [SolanaCluster, string][]).find(([, id]) => id === chain)?.[0];

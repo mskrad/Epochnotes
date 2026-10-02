@@ -167,7 +167,11 @@ try {
       0,
       (_all, stdout) => {
         const report = JSON.parse(stdout);
-        if (report.chain !== 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' || report.cluster !== 'devnet')
+        if (
+          report.chain !== 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' ||
+          report.name !== 'devnet' ||
+          report.identifiedBy !== 'genesis'
+        )
           return 'the report does not name the chain';
         if (!/^\d+$/.test(report.point?.slot ?? '')) return 'no slot in the report';
         return report.activations.length >= 11 &&

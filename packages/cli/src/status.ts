@@ -56,8 +56,19 @@ export function whereOf(activation: Activation): string {
   }
 }
 
-export function readingLine(reading: { chain: string; cluster?: string; point: ReadingPoint }): string {
-  const name = reading.cluster === undefined ? '' : ` (${reading.cluster})`;
+const IDENTIFIED: Record<'genesis' | 'chain-id' | 'asked', string> = {
+  genesis: '',
+  'chain-id': ', known by the chain id it states: its genesis block was not checked',
+  asked: ', taken as named: nothing confirmed it',
+};
+
+export function readingLine(reading: {
+  chain: string;
+  name?: string;
+  identifiedBy: 'genesis' | 'chain-id' | 'asked';
+  point: ReadingPoint;
+}): string {
+  const name = `${reading.name === undefined ? '' : ` (${reading.name})`}${IDENTIFIED[reading.identifiedBy]}`;
   const at = point(reading.point);
   return `chain ${reading.chain}${name}${at === '' ? ', not read: see why below' : `, read at ${at}`}`;
 }

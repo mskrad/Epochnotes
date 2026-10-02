@@ -2,6 +2,7 @@ import {
   CAIP2_PATTERN,
   clusterFromRpcUrl,
   CLUSTERS,
+  EVM_CHAINS,
   type OnchainCluster,
   SOLANA_CHAINS,
 } from '@epochnotes/core';
@@ -58,6 +59,9 @@ const CHAIN_ALIASES: Record<string, { chain?: string; rpcUrl: string }> = {
   testnet: { chain: SOLANA_CHAINS.testnet, rpcUrl: CLUSTERS.testnet },
   devnet: { chain: SOLANA_CHAINS.devnet, rpcUrl: CLUSTERS.devnet },
   localnet: { rpcUrl: CLUSTERS.localnet },
+  // Public endpoints, read only. Any other endpoint is passed with --rpc-url.
+  ethereum: { chain: EVM_CHAINS.ethereum, rpcUrl: 'https://ethereum-rpc.publicnode.com' },
+  base: { chain: EVM_CHAINS.base, rpcUrl: 'https://mainnet.base.org' },
 };
 
 /** Public read-only endpoints by CAIP-2 id. */

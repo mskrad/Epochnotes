@@ -1,10 +1,12 @@
-import { namespaceOf, solanaChainId, solanaClusterOf } from './chains.js';
+import { chainNameOf, namespaceOf, solanaChainId } from './chains.js';
+import { evmActivationReader } from './evm-activation.js';
 import {
   type FeatureAccountSource,
   type FeatureState,
   readFeatureStatus,
   rpcFeatureAccountSource,
 } from './feature-status.js';
+import { httpJsonRpc } from './json-rpc.js';
 import { type Activation, activationsOf, type Entry, subjectOf } from './schema.js';
 
 /**
@@ -40,8 +42,11 @@ export type ActivationState =
 
 /** Reads the activations of one chain behind one endpoint. Tests substitute it without a network. */
 export interface ActivationReader {
-  /** The CAIP-2 id of the chain the endpoint serves, as the endpoint says, not as the user named it. */
-  identify(): Promise<string>;
+  /**
+   * The CAIP-2 id of the chain the endpoint serves, as the endpoint says, not as the user named it, and what
+   * showed it: the genesis block, only the chain id the endpoint states, or nothing — the name the user gave.
+   */
+  identify(): Promise<{ chain: string; by: 'genesis' | 'chain-id' | 'asked' }>;
   /** States in the order of `activations`, and the point they were read at. */
   read(activations: Activation[]): Promise<{ point: ReadingPoint; states: ActivationState[] }>;
 }
@@ -79,7 +84,7 @@ export function solanaActivationReader(source: SolanaReadSource): ActivationRead
         throw new Error(
           `the endpoint answered getGenesisHash with ${JSON.stringify(genesis)}, not a genesis hash`,
         );
-      return solanaChainId(genesis);
+      return { chain: solanaChainId(genesis), by: 'genesis' as const };
     },
     async read(activations) {
       const addresses = activations.map((item) =>
@@ -113,7 +118,7 @@ export function solanaActivationReader(source: SolanaReadSource): ActivationRead
  */
 export function unsupportedReader(chain: string): ActivationReader {
   return {
-    identify: () => Promise.resolve(chain),
+    identify: () => Promise.resolve({ chain, by: 'asked' as const }),
     read: (activations) =>
       Promise.resolve({
         point: {},
@@ -133,6 +138,8 @@ export function unsupportedReader(chain: string): ActivationReader {
 export function activationReaderFor(chain: string | undefined, rpcUrl: string): ActivationReader {
   if (chain === undefined || namespaceOf(chain) === 'solana')
     return solanaActivationReader(rpcFeatureAccountSource(rpcUrl));
+  // Every EVM chain is read the same way; the genesis block is checked where this library pins it.
+  if (namespaceOf(chain) === 'eip155') return evmActivationReader(httpJsonRpc(rpcUrl));
   return unsupportedReader(chain);
 }
 
@@ -152,8 +159,10 @@ export interface ActivationReading {
 export interface ChainReading {
   /** The CAIP-2 id of the chain that answered. */
   chain: string;
+  /** What showed which chain answered: its genesis block, only the chain id it states, or the name asked for. */
+  identifiedBy: 'genesis' | 'chain-id' | 'asked';
   /** The name people use for it, when there is one. */
-  cluster?: string;
+  name?: string;
   point: ReadingPoint;
   activations: ActivationReading[];
   /** Entries that say nothing about this chain, and why — never silently left out. */
@@ -169,7 +178,7 @@ export async function readActivations(
   reader: ActivationReader,
   asked?: string,
 ): Promise<ChainReading> {
-  const chain = await reader.identify();
+  const { chain, by } = await reader.identify();
   if (asked !== undefined && asked !== chain) throw new Error(`the endpoint serves ${chain}, not ${asked}`);
   const wanted = entries.flatMap((entry) =>
     activationsOf(entry)
@@ -192,10 +201,11 @@ export async function readActivations(
             : `no activation on this chain; it activates on ${elsewhere.join(', ')}`,
       };
     });
-  const cluster = solanaClusterOf(chain);
+  const name = chainNameOf(chain);
   return {
     chain,
-    ...(cluster === undefined ? {} : { cluster }),
+    identifiedBy: by,
+    ...(name === undefined ? {} : { name }),
     point,
     activations: wanted.map(({ entry, activation }, index) => ({
       entry: entry.id,

@@ -31,7 +31,12 @@ describe('registry status', () => {
       SOLANA_CHAINS.devnet,
     );
     if (!report.ok) throw new Error(JSON.stringify(report));
-    expect(report).toMatchObject({ chain: SOLANA_CHAINS.devnet, cluster: 'devnet', point: { slot: '7' } });
+    expect(report).toMatchObject({
+      chain: SOLANA_CHAINS.devnet,
+      name: 'devnet',
+      identifiedBy: 'genesis',
+      point: { slot: '7' },
+    });
     expect([...new Set(report.activations.map((item) => item.entry))]).toEqual([
       'alpenglow',
       'rent-simd-0437',

@@ -34,6 +34,8 @@ export {
 } from './schema.js';
 export {
   CAIP2_PATTERN,
+  chainNameOf,
+  EVM_CHAINS,
   namespaceOf,
   SOLANA_CHAINS,
   type SolanaCluster,
@@ -61,6 +63,8 @@ export {
   rpcFeatureAccountSource,
 } from './feature-status.js';
 export { registryStatus, type StatusReport } from './status.js';
+export { EVM_GENESIS, evmActivationReader, evmActivationState } from './evm-activation.js';
+export { call, httpJsonRpc, type JsonRpc } from './json-rpc.js';
 export {
   type ActivationReader,
   activationReaderFor,

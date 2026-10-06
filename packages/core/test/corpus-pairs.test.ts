@@ -140,8 +140,9 @@ describe('the corpus of before/after pairs', () => {
     expect(
       problemsAfter('no-licence-text', (dir) => rmSync(join(dir, 'pairs/LICENSES/MIT.txt'))),
     ).toContainEqual(expect.stringContaining('pairs/LICENSES/MIT.txt is missing'));
-    // It runs the whole corpus once per broken copy: its time grows with the corpus, not with a regression.
-  }, 30_000);
+    // It runs the whole corpus once per broken copy: 3-4 s alone, and its time grows with the corpus. The limit
+    // leaves room for a loaded machine, not for a regression several times slower.
+  }, 15_000);
 
   it('notices a stray file in a case, and a manifest that is not there', () => {
     expect(

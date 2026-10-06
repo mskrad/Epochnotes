@@ -71,6 +71,8 @@ function hintFor(issue: z.core.$ZodIssue, rawVersion?: unknown): string {
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
   if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
+  if (field === 'equals')
+    return 'Compare with a string, a whole number or true/false; an entry holds no null, and a missing value is not a behaviour to pass on.';
   if (field === 'method' && issue.path.includes('calls'))
     return `A probe only reads: use one of ${PROBE_METHODS.join(', ')}.`;
   if (field === 'fixture')

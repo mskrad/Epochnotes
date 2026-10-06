@@ -127,10 +127,17 @@ export function checkCommand(): Command {
             `${record.id}: REVOKED on chain by its publisher (at version ${record.atVersion}); its rules were not run`,
           );
         print(report);
+        if (report.filesScanned === 0)
+          console.log(
+            'nothing was read: no file here is one a rule reads, or git ignores this directory — this is not a clean result',
+          );
       }
+      // A check that read no file has answered nothing: it must not pass for one that found nothing.
       process.exitCode = report.findings.some((finding) => finding.confidence === 'breaks')
         ? EXIT.findings
-        : EXIT.ok;
+        : report.filesScanned === 0
+          ? EXIT.environment
+          : EXIT.ok;
     });
   addRpcCheckCommand(check);
   return check;

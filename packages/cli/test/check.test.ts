@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -42,7 +43,8 @@ describe('epochnotes check repo', () => {
     symlinkSync(outside, join(repo, 'external.ts'));
 
     const json = await run('check', 'repo', repo, '--registry', entries, '--json');
-    expect(json.code).toBe(0);
+    // The only file is a link that was not followed: nothing was read, which is exit 2, not a clean 0.
+    expect(json.code).toBe(2);
     expect(json.out).not.toContain(marker);
     expect(JSON.parse(json.stdout)).toMatchObject({
       findings: [],
@@ -51,5 +53,26 @@ describe('epochnotes check repo', () => {
     const prose = await run('check', 'repo', repo, '--registry', entries);
     expect(prose.out).not.toContain(marker);
     expect(prose.stdout).toContain('skipped: external.ts — symlink-outside-root');
+    expect(prose.stdout).toContain('nothing was read');
+  });
+
+  it('exits 2, not 0, when it read no file: a directory git ignores, or one without any file a rule reads', async () => {
+    const project = join(dir, 'ignored-project');
+    mkdirSync(join(project, 'build'), { recursive: true });
+    writeFileSync(join(project, '.gitignore'), 'build/\n');
+    writeFileSync(
+      join(project, 'build', 'reader.ts'),
+      'getTransaction(sig, { maxSupportedTransactionVersion: 0 });\n',
+    );
+    execFileSync('git', ['-C', project, 'init', '-q']);
+    const ignored = await run('check', 'repo', join(project, 'build'), '--registry', entries, '--json');
+    expect(ignored.code).toBe(2);
+    expect(JSON.parse(ignored.stdout)).toMatchObject({ filesScanned: 0, findings: [] });
+    const other = join(dir, 'no-rule-files');
+    mkdirSync(other);
+    writeFileSync(join(other, 'Main.java'), 'class Main {}\n');
+    const prose = await run('check', 'repo', other, '--registry', entries);
+    expect(prose.code).toBe(2);
+    expect(prose.stdout).toContain('nothing was read');
   });
 });

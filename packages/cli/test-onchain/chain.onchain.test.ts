@@ -352,6 +352,9 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       const repo = join(dir, 'repo');
       mkdirSync(repo);
       writeFileSync(join(repo, 'reader.ts'), 'getTransaction(sig, { maxSupportedTransactionVersion: 0 });\n');
+      // A file the remaining entries do read: with tx-v1 withdrawn, the check still reads something, so its
+      // silence is about the withdrawn rules, not about an empty scan (which would exit 2).
+      writeFileSync(join(repo, 'Vault.sol'), 'contract Vault {}\n');
       const unchecked = await run('check', 'repo', repo, ...source, '--json');
       expect(unchecked.code).toBe(1);
       expect(JSON.parse(unchecked.stdout)).toMatchObject({ findings: [{ entry: 'tx-v1' }] });
@@ -360,6 +363,7 @@ describe('epochnotes registry anchor / verify --onchain', () => {
       expect(checked.code).toBe(0);
       expect(JSON.parse(checked.stdout)).toMatchObject({
         provenance: { revocations: 'checked' },
+        filesScanned: 1,
         findings: [],
         revoked: [{ id: 'tx-v1' }],
       });

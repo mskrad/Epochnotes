@@ -136,8 +136,8 @@ a contract", because an EOA delegated under EIP-7702 has code:
 npx epochnotes check repo corpus/pairs/eip-7702/real-taiko-bridge-is-contract ; echo "exit=$?"
 ```
 
-One `CHECK` finding on `before.sol`: a rule at `check` confidence asks a person to look, it does not claim a
-break.
+One `CHECK` finding on `before.sol`, and exit 0: a rule at `check` confidence asks a person to look, it does
+not claim a break, so it does not fail a build. Only a `breaks` finding makes the command exit 1.
 
 ## 5. Ask an RPC provider how it really behaves
 

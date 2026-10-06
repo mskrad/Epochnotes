@@ -162,11 +162,23 @@ describe('epochnotes registry read / check rpc', () => {
       genesis = CLUSTER_GENESIS.devnet;
       const probe = await run('check', 'rpc', '--rpc-url', url, ...source, '--json');
       expect(probe.code).toBe(2);
-      expect(JSON.parse(probe.stdout)).toMatchObject({
-        cluster: 'devnet',
+      const report = JSON.parse(probe.stdout) as {
+        chain: string;
+        name: string;
+        observed: number;
+        probes: { verdict: string }[];
+      };
+      expect(report).toMatchObject({
+        chain: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+        name: 'devnet',
         observed: 0,
-        probes: [{ verdict: 'not-applicable' }],
       });
+      // Every probe of the version is pinned elsewhere: the Solana one to mainnet-beta, the EVM ones to their chains.
+      expect(report.probes.map((item) => item.verdict)).toEqual([
+        'not-applicable',
+        'not-applicable',
+        'not-applicable',
+      ]);
       const prose = await run('check', 'rpc', '--rpc-url', url, ...source);
       expect(prose.code).toBe(2);
       expect(prose.stdout).toContain('nothing was learned about this endpoint');
@@ -182,7 +194,9 @@ describe('epochnotes registry read / check rpc', () => {
       expect(probe.code).toBe(0);
       expect(JSON.parse(probe.stdout)).toMatchObject({
         observed: 1,
-        probes: [{ verdict: 'reads' }],
+        probes: expect.arrayContaining([
+          expect.objectContaining({ rule: 'rpc-reads-v1-transaction', verdict: 'reads' }),
+        ]),
       });
       expect(probe.stdout).not.toContain('nothing was learned');
     });
@@ -194,7 +208,12 @@ describe('epochnotes registry read / check rpc', () => {
       });
       const probe = await run('check', 'rpc', '--rpc-url', url, ...source, '--json');
       expect(probe.code).toBe(1);
-      expect(JSON.parse(probe.stdout)).toMatchObject({ observed: 1, probes: [{ verdict: 'cannot-read' }] });
+      expect(JSON.parse(probe.stdout)).toMatchObject({
+        observed: 1,
+        probes: expect.arrayContaining([
+          expect.objectContaining({ rule: 'rpc-reads-v1-transaction', verdict: 'cannot-read' }),
+        ]),
+      });
     });
   });
 

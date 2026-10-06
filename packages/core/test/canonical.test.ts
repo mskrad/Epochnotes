@@ -12,10 +12,10 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-// Changed on 2026-10-02 with the move to schema 2 (activations per chain). The entry stays at rev 1: no version
+// Changed on 2026-10-02 with the move to schema 2 (activations per chain), and on 2026-10-06 when its probe became data. The entry stays at rev 1: no version
 // of the registry has been published yet, and the first published version must start every entry at rev 1.
 // After the first publication this value changes only together with `rev`.
-const PINNED_TX_V1_REV_1 = '10b9c1e2f2666b6e0bf657dc35cfa99e0dc7ea11879df825cad9a7afd3468beb';
+const PINNED_TX_V1_REV_1 = '8dbab7cf721cf6592abb5a850972db22bd6f25c0c373f723bbc06efd1640ddf6';
 // The same entry in schema 1, as versions signed before 2026-10-02 hold it. It must never change: those
 // versions verify only while the reader hashes a schema-1 entry exactly as it did.
 const PINNED_TX_V1_SCHEMA_1 = 'b599952c254ae6bfb1437ea32eb927c0b6a2c7f381b6a0a21ed44830858d7ea9';

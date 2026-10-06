@@ -110,6 +110,32 @@ function semanticIssues(entry: Entry): Issue[] {
         });
       }
     }
+    if (rule.kind === 'runtime-probe' && 'calls' in rule.probe) {
+      const ids = new Set<string>();
+      rule.probe.calls.forEach((call, index) => {
+        if (ids.has(call.id))
+          issues.push({
+            path: `${at}.probe.calls[${index}].id`,
+            message: `Duplicate call id "${call.id}"`,
+            hint: 'Every call of a probe has its own id: the pass conditions name calls by it.',
+          });
+        ids.add(call.id);
+      });
+      rule.probe.pass.forEach((condition, index) => {
+        if (!ids.has(condition.call))
+          issues.push({
+            path: `${at}.probe.pass[${index}].call`,
+            message: `No call with the id "${condition.call}"`,
+            hint: `A pass condition names one of the probe's calls: ${[...ids].join(', ')}.`,
+          });
+      });
+      if (!rule.probe.calls.some((call) => call.params.includes('$fixture')))
+        issues.push({
+          path: `${at}.probe.calls`,
+          message: 'No call reads the fixture',
+          hint: 'Put the string $fixture where the transaction id goes; a probe that does not read its fixture observes nothing about it.',
+        });
+    }
     if (rule.kind === 'lockfile-version' && !isVersionRange(rule.package.ecosystem, rule.package.range)) {
       issues.push({
         path: `${at}.package.range`,

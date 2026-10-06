@@ -400,12 +400,20 @@ describe('epochnotes registry anchor / verify --onchain', () => {
         ...['--onchain', '--registry-cluster', 'localnet'],
       ];
       const probe = await run(...args, '--json');
-      expect(JSON.parse(probe.stdout)).toMatchObject({ probes: [], revoked: [{ id: 'tx-v1' }] });
-      // The only entry with a probe was withdrawn, so this run observed nothing: exit 0 would read as
-      // "the endpoint was checked and is fine".
+      const report = JSON.parse(probe.stdout) as {
+        revoked: { id: string }[];
+        observed: number;
+        probes: { entry: string; verdict: string }[];
+      };
+      expect(report.revoked).toMatchObject([{ id: 'tx-v1' }]);
+      // The withdrawn entry's probe is not run at all; the probes left are pinned to other chains than this
+      // validator, so nothing is observed — exit 0 would read as "the endpoint was checked and is fine".
+      expect(report.probes.some((item) => item.entry === 'tx-v1')).toBe(false);
+      expect(report.probes.every((item) => item.verdict === 'not-applicable')).toBe(true);
+      expect(report.observed).toBe(0);
       expect(probe.code).toBe(2);
       const prose = await run(...args);
-      expect(prose.stdout).toContain('no entry of this version carries a probe to run');
+      expect(prose.stdout).toContain('nothing was learned about this endpoint');
     });
   });
 });

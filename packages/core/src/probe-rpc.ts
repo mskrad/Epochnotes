@@ -1,12 +1,15 @@
-import { GENESIS, solanaClusterOf } from './chains.js';
+import { chainNameOf, SOLANA_CHAINS, solanaChainId } from './chains.js';
+import { evmActivationReader } from './evm-activation.js';
 import { redactUrl } from './onchain.js';
-import type { Entry } from './schema.js';
+import { type Entry, probeOf } from './schema.js';
 
 export interface ProbeCall {
-  /** What was passed as `maxSupportedTransactionVersion`. */
-  parameter: 'omitted' | 0 | 1;
-  /** `version N` on success, or the JSON-RPC error. */
-  outcome: { ok: true; version: string } | { ok: false; code: number | null; message: string };
+  /** The id the entry gives the call. */
+  call: string;
+  method: string;
+  /** What the entry asked to record, on success; the JSON-RPC error, or the absence of the transaction. */
+  outcome:
+    { ok: true; observed: Record<string, unknown> } | { ok: false; code: number | null; message: string };
 }
 
 export interface ProbeResult {
@@ -22,7 +25,9 @@ export interface ProbeResult {
 
 export interface RpcProbeReport {
   endpoint: string;
-  cluster: string;
+  /** The CAIP-2 id of the chain the endpoint serves, as it says itself, or `unknown`. */
+  chain: string;
+  name?: string;
   /** How many probes actually saw the endpoint behave. Zero means nothing was learned: that is not a pass. */
   observed: number;
   probes: ProbeResult[];
@@ -55,10 +60,64 @@ function httpRpc(rpcUrl: string): Rpc {
   };
 }
 
+/** A value at a path of an answer: `result.version`, `result.authorizationList.length`. */
+function at(answer: unknown, path: string): unknown {
+  let value: unknown = answer;
+  for (const key of path.split('.')) {
+    if (value === null || value === undefined) return undefined;
+    if (key === 'length' && Array.isArray(value)) return value.length;
+    if (typeof value !== 'object' || !Object.hasOwn(value, key)) return undefined;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
+}
+
+/** What a report may carry of a value: scalars as they are, the size of an array, the kind of anything else. */
+function recordable(value: unknown): unknown {
+  if (value === undefined) return null;
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
+  return Array.isArray(value) ? `array of ${value.length}` : typeof value;
+}
+
 /**
- * Runs the read-only runtime probes of the entries against one RPC endpoint. A registry entry records how
- * the reference RPC behaves; a provider may differ, and only asking it tells. Nothing is written, nothing is
- * signed, no key is involved: each probe is a few `getTransaction` reads of a known public transaction.
+ * Which chain an endpoint serves, as it says itself: Solana by its genesis hash, an EVM chain by its chain id
+ * and, where pinned, its genesis block. An endpoint that answers neither is `unknown`; one that does not answer
+ * at all is a transport failure, thrown.
+ */
+async function identifyEndpoint(rpc: Rpc): Promise<string> {
+  // Some EVM endpoints refuse a method they do not know at the HTTP level rather than with a JSON-RPC error, so
+  // a failed Solana question is not yet a dead endpoint: it is dead only if it answers neither question.
+  let solanaFailure: unknown;
+  try {
+    const first = await rpc('getGenesisHash', []);
+    if (
+      first.error === undefined &&
+      typeof first.result === 'string' &&
+      /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(first.result)
+    )
+      return solanaChainId(first.result);
+  } catch (error) {
+    solanaFailure = error;
+  }
+  let evmFailure: unknown;
+  try {
+    const chainId = await rpc('eth_chainId', []);
+    if (chainId.error !== undefined) return 'unknown';
+  } catch (error) {
+    evmFailure = error;
+  }
+  if (evmFailure !== undefined) throw solanaFailure ?? evmFailure;
+  try {
+    return (await evmActivationReader(rpc).identify()).chain;
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Runs the read-only runtime probes of the entries against one RPC endpoint. A registry entry records how the
+ * reference RPC behaves; a provider may differ, and only asking it tells. A probe is data: the calls to make,
+ * what to record and when the endpoint passes. Nothing is written, nothing is signed, no key is involved.
  */
 export async function probeRpc(
   rpcUrl: string,
@@ -67,73 +126,86 @@ export async function probeRpc(
 ): Promise<RpcProbeReport> {
   const endpoint = redactUrl(rpcUrl);
   const probes: ProbeResult[] = [];
-  let genesis: string;
+  let chain: string;
   try {
-    genesis = String((await rpc('getGenesisHash', [])).result);
+    chain = await identifyEndpoint(rpc);
   } catch (error) {
     const explanation = `The endpoint did not answer: ${reason(error, rpcUrl)}`;
     return {
       endpoint,
-      cluster: 'unknown',
+      chain: 'unknown',
       observed: 0,
       probes: [
         { entry: '-', rule: '-', fixture: '-', expect: '-', verdict: 'unreachable', explanation, calls: [] },
       ],
     };
   }
-  const cluster = Object.entries(GENESIS).find(([, hash]) => hash === genesis)?.[0] ?? 'unknown';
+  const name = chainNameOf(chain);
 
   for (const entry of entries) {
     for (const rule of entry.detect) {
       if (rule.kind !== 'runtime-probe') continue;
+      const probe = probeOf(rule.probe);
       const fixture = rule.probe.fixture ?? '';
-      // <chain>:<signature>, where the chain is a cluster name (schema 1) or a CAIP-2 id, which has a colon
-      // of its own (schema 2): the signature is what follows the last colon.
-      const split = fixture.lastIndexOf(':');
-      const fixtureChain = split === -1 ? fixture : fixture.slice(0, split);
-      const signature = split === -1 ? undefined : fixture.slice(split + 1);
-      const fixtureCluster = solanaClusterOf(fixtureChain) ?? fixtureChain;
       const base = { entry: entry.id, rule: rule.rule, fixture, expect: rule.probe.expect };
-      if (rule.probe.method !== 'getTransaction' || signature === undefined) {
+      if (probe === undefined) {
         probes.push({
           ...base,
           verdict: 'not-applicable',
-          explanation: `This tool cannot run a probe of ${rule.probe.method}.`,
+          explanation: `This tool cannot run a probe of ${'method' in rule.probe ? rule.probe.method : 'this form'}.`,
           calls: [],
         });
         continue;
       }
-      if (fixtureCluster !== cluster) {
+      // <chain>:<id>: a cluster name (schema 1) or a CAIP-2 id with a colon of its own (schema 2) — the id is what
+      // follows the last colon.
+      const split = probe.fixture.lastIndexOf(':');
+      const fixtureChain = probe.fixture.slice(0, split);
+      const id = probe.fixture.slice(split + 1);
+      const fixtureCaip =
+        fixtureChain in SOLANA_CHAINS
+          ? SOLANA_CHAINS[fixtureChain as keyof typeof SOLANA_CHAINS]
+          : fixtureChain;
+      if (fixtureCaip !== chain) {
         probes.push({
           ...base,
           verdict: 'not-applicable',
-          explanation: `The fixture lives on ${fixtureCluster}, the endpoint serves ${cluster}.`,
+          explanation: `The fixture lives on ${fixtureCaip}, the endpoint serves ${chain}.`,
           calls: [],
         });
         continue;
       }
       const calls: ProbeCall[] = [];
+      const answers = new Map<string, Awaited<ReturnType<Rpc>>>();
       try {
-        for (const parameter of ['omitted', 0, 1] as const) {
-          const config =
-            parameter === 'omitted'
-              ? { encoding: 'base64' }
-              : { encoding: 'base64', maxSupportedTransactionVersion: parameter };
-          const answer = await rpc('getTransaction', [signature, config]);
+        for (const step of probe.calls) {
+          const params = step.params.map((param) => (param === '$fixture' ? id : param));
+          const answer = await rpc(step.method, params);
+          answers.set(step.id, answer);
           if (answer.error !== undefined)
             calls.push({
-              parameter,
+              call: step.id,
+              method: step.method,
               outcome: { ok: false, code: answer.error.code ?? null, message: answer.error.message ?? '' },
             });
           else if (answer.result === null || answer.result === undefined)
             calls.push({
-              parameter,
+              call: step.id,
+              method: step.method,
               outcome: { ok: false, code: null, message: 'transaction not found on this endpoint' },
             });
           else
             calls.push({
-              parameter,
-              outcome: { ok: true, version: String((answer.result as { version?: unknown }).version) },
+              call: step.id,
+              method: step.method,
+              outcome: {
+                ok: true,
+                observed: Object.fromEntries(
+                  probe.observe
+                    .filter((path) => path.startsWith('result'))
+                    .map((path) => [path, recordable(at(answer, path))]),
+                ),
+              },
             });
         }
       } catch (error) {
@@ -145,16 +217,18 @@ export async function probeRpc(
         });
         continue;
       }
-      const reads = calls.filter((call) => call.outcome.ok).map((call) => String(call.parameter));
       const missing = calls.every((call) => !call.outcome.ok && call.outcome.code === null);
+      const failed = probe.pass.filter(
+        (condition) => at(answers.get(condition.call), condition.path) !== condition.equals,
+      );
       probes.push({
         ...base,
-        verdict: missing ? 'fixture-missing' : reads.length > 0 ? 'reads' : 'cannot-read',
+        verdict: missing ? 'fixture-missing' : failed.length === 0 ? 'reads' : 'cannot-read',
         explanation: missing
           ? 'The endpoint does not have the fixture transaction (pruned history?), so its behaviour could not be observed.'
-          : reads.length > 0
-            ? `The endpoint returns the fixture with maxSupportedTransactionVersion ${reads.join(', ')}; see the calls for what it refuses.`
-            : 'The endpoint has the fixture but returns it with no setting of maxSupportedTransactionVersion.',
+          : failed.length === 0
+            ? `The endpoint answers as the entry expects: ${probe.pass.map((c) => `${c.call} ${c.path} = ${JSON.stringify(c.equals)}`).join('; ')}.`
+            : `The endpoint does not: ${failed.map((c) => `${c.call} ${c.path} is ${JSON.stringify(recordable(at(answers.get(c.call), c.path)))}, not ${JSON.stringify(c.equals)}`).join('; ')}.`,
         calls,
       });
     }
@@ -162,5 +236,5 @@ export async function probeRpc(
   const observed = probes.filter(
     (probe) => probe.verdict === 'reads' || probe.verdict === 'cannot-read',
   ).length;
-  return { endpoint, cluster, observed, probes };
+  return { endpoint, chain, ...(name === undefined ? {} : { name }), observed, probes };
 }

@@ -48,6 +48,8 @@ A publisher withdraws an entry with a record on chain, which the signed log alon
 
 `--versions` and `--publishers` default to the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. `--working-copy <dir>` reads unsigned entry files, and the output says so.
 
+A runtime probe is data in the entry, not code: the read-only calls to make against a known transaction, what to record from each answer, and the conditions under which the endpoint behaves as the entry says. `check rpc` first asks the endpoint which chain it serves, then runs only the probes pinned to that chain — today a Solana mainnet-beta probe and one each for Ethereum and Base.
+
 A check that could not ask its question says so instead of passing. `check repo` lists, under `entriesNotChecked`, every entry that carries no rule a static check can run: no finding for such an entry means nothing was looked for. `check rpc` exits 2, not 0, when no probe observed the endpoint — the probes of an entry are pinned to the cluster of their fixture, so an endpoint of another cluster is left unexamined, and a check that runs it in CI must not go green on that.
 
 ## Rent held above the minimum

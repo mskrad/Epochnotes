@@ -19,6 +19,7 @@ export { type FileReport, type RegistryReport, validatePath } from './load.js';
 export {
   type Activation,
   activationsOf,
+  type DeclarativeProbe,
   ENTRY_SCHEMA_VERSION,
   type Entry,
   entryJsonSchema,
@@ -29,6 +30,7 @@ export {
   type EntryV2,
   featureGatesOf,
   PROBE_CLUSTERS,
+  probeOf,
   READABLE_SCHEMA_VERSIONS,
   subjectOf,
 } from './schema.js';

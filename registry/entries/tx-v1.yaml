@@ -115,8 +115,20 @@ detect:
     confidence: breaks
     summary: The project's transaction reader is run against a known version 1 transaction.
     probe:
-      method: getTransaction
       fixture: solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5
+      calls:
+        - id: version-omitted
+          method: getTransaction
+          params: ['$fixture', { encoding: base64 }]
+        - id: version-0
+          method: getTransaction
+          params: ['$fixture', { encoding: base64, maxSupportedTransactionVersion: 0 }]
+        - id: version-1
+          method: getTransaction
+          params: ['$fixture', { encoding: base64, maxSupportedTransactionVersion: 1 }]
+      observe: [result.version]
+      pass:
+        - { call: version-1, path: result.version, equals: 1 }
       expect: Result has version 1 and no JSON-RPC error.
 fix:
   - summary: Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock; with @solana/web3.js this also needs version 1.99.0 or later.

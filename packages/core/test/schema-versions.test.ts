@@ -10,6 +10,7 @@ import {
   buildVersion,
   type Entry,
   loadPublisherKey,
+  probeOf,
   probeRpc,
   publishVersion,
   readRegistry,
@@ -140,9 +141,12 @@ describe('one entry, two schemas', () => {
     for (const field of ['axis', 'relations', 'breaks', 'fix', 'sources'] as const)
       expect(now[field], field).toEqual(old[field]);
     // A probe fixture names its chain by CAIP-2 now; everything else about the rules is unchanged.
+    // A probe is compared as the engine runs it (schema 1 named only its method), less the spelling of its chain.
     const fixtureless = (entry: Entry) =>
       entry.detect.map((rule) =>
-        rule.kind === 'runtime-probe' ? { ...rule, probe: { ...rule.probe, fixture: undefined } } : rule,
+        rule.kind === 'runtime-probe'
+          ? { ...rule, probe: { ...probeOf(rule.probe), fixture: undefined } }
+          : rule,
       );
     expect(fixtureless(now)).toEqual(fixtureless(old));
   });
@@ -241,5 +245,64 @@ describe('activations in schema 2', () => {
     if (!result.ok) throw new Error(JSON.stringify(result.issues));
     expect(activationsOf(result.entry)).toEqual([featureAccount]);
     expect(subjectOf(result.entry)).toEqual({ standard: 'simd', name: 'SIMD-0000', title: 'X' });
+  });
+});
+
+describe('a probe as data', () => {
+  const probeEntry = (probe: Record<string, unknown>) => ({
+    ...v2With([{ kind: 'timestamp', chain: 'eip155:1', at: 1, label: 'x' }]),
+    detect: [{ rule: 'sample-probe', kind: 'runtime-probe', confidence: 'check', summary: 's', probe }],
+  });
+  const good = {
+    fixture: `eip155:1:0x${'ab'.repeat(32)}`,
+    calls: [{ id: 'transaction', method: 'eth_getTransactionByHash', params: ['$fixture'] }],
+    observe: ['result.type'],
+    pass: [{ call: 'transaction', path: 'result.type', equals: '0x4' }],
+    expect: 'Type 4.',
+  };
+
+  it('accepts a probe that names its calls, what to record and when it passes', () => {
+    expect(issuesOf(probeEntry(good))).toEqual([]);
+  });
+
+  it('refuses a probe the engine could not run or could not judge', () => {
+    const cases: [string, Record<string, unknown>, RegExp][] = [
+      [
+        'a call without an id',
+        { ...good, calls: [{ method: 'eth_getTransactionByHash', params: ['$fixture'] }] },
+        /probe\.calls\[0\]\.id/,
+      ],
+      [
+        'a pass on a call that does not exist',
+        { ...good, pass: [{ call: 'receipt', path: 'result.type', equals: '0x4' }] },
+        /probe\.pass\[0\]\.call/,
+      ],
+      ['two calls with one id', { ...good, calls: [...good.calls, ...good.calls] }, /probe\.calls\[1\]\.id/],
+      [
+        'no call that reads the fixture',
+        { ...good, calls: [{ id: 'transaction', method: 'eth_blockNumber', params: [] }] },
+        /probe\.calls$/,
+      ],
+      [
+        'a fixture on a chain no endpoint is identified as',
+        { ...good, fixture: `eip155:10:0x${'ab'.repeat(32)}` },
+        /probe\.fixture/,
+      ],
+      [
+        'an EVM fixture with a Solana signature',
+        { ...good, fixture: `eip155:1:${'1'.repeat(88)}` },
+        /probe\.fixture/,
+      ],
+      ['a path outside the answer', { ...good, observe: ['params.0'] }, /probe\.observe\[0\]/],
+      ['no pass condition', { ...good, pass: [] }, /probe\.pass/],
+      ['the schema-1 form', { method: 'getTransaction', fixture: good.fixture, expect: 'x' }, /probe/],
+    ];
+    for (const [name, probe, path] of cases)
+      expect(
+        issuesOf(probeEntry(probe))
+          .map((issue) => issue.path)
+          .join(' '),
+        name,
+      ).toMatch(path);
   });
 });

@@ -87,6 +87,40 @@ detect:
       branch — for a signature that is ERC-1271, for a recipient a receiver hook.
     languages: [solidity]
     pattern: '\.code\.length\s*==\s*0\b|\b0\s*==\s*[\w.\[\]()]{1,80}\.code\.length\b'
+  - rule: ethereum-provider-returns-set-code-transaction
+    kind: runtime-probe
+    confidence: check
+    summary: >-
+      An Ethereum provider returns a set-code transaction (type 4) with its authorization list. A provider that
+      drops the list, or fails on the type, hides delegations from whatever reads through it.
+    probe:
+      fixture: 'eip155:1:0x78bb8ba2326cf6fa5d38b964b62cff971effffafcd1c8d014b2a2d37181a1bb9'
+      calls:
+        - id: transaction
+          method: eth_getTransactionByHash
+          params: ['$fixture']
+      observe: [result.type, result.authorizationList.length]
+      pass:
+        - { call: transaction, path: result.type, equals: '0x4' }
+        - { call: transaction, path: result.authorizationList.length, equals: 1 }
+      expect: The transaction has type 0x4 and an authorization list of one authorization.
+  - rule: base-provider-returns-set-code-transaction
+    kind: runtime-probe
+    confidence: check
+    summary: >-
+      A Base provider returns a set-code transaction (type 4) with its authorization list. A provider that drops
+      the list, or fails on the type, hides delegations from whatever reads through it.
+    probe:
+      fixture: 'eip155:8453:0xf46de53cfe2be13579e3c7093767837f7e5d503f6e6aa3b0e905fef33f72101f'
+      calls:
+        - id: transaction
+          method: eth_getTransactionByHash
+          params: ['$fixture']
+      observe: [result.type, result.authorizationList.length]
+      pass:
+        - { call: transaction, path: result.type, equals: '0x4' }
+        - { call: transaction, path: result.authorizationList.length, equals: 1 }
+      expect: The transaction has type 0x4 and an authorization list of one authorization.
 fix:
   - summary: >-
       Replace a reentrancy guard built on tx.origin == msg.sender with one held in a transient storage variable,
@@ -177,6 +211,10 @@ sources:
     note: >-
       Returns 0xef01007702cb554e6bfb442cb743a7df23154544a7176c, 23 bytes. The account sent the type-4 transaction
       0x78bb8ba2326cf6fa5d38b964b62cff971effffafcd1c8d014b2a2d37181a1bb9 (block 26106929) to itself.
+  - kind: rpc-observation
+    ref: eip155:8453 eth_getTransactionByHash 0xf46de53cfe2be13579e3c7093767837f7e5d503f6e6aa3b0e905fef33f72101f
+    retrieved: '2026-10-06'
+    note: Type 0x4 in block 52091351, with one authorization (to 0xe6cae83bde06e4c305530e199d7217f42808555b).
   - kind: source-code
     ref: https://github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11
     retrieved: '2026-10-02'

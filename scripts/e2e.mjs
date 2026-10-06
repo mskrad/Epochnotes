@@ -200,6 +200,31 @@ try {
       },
     );
     step(
+      'asks a Base provider, read-only, whether it returns a set-code transaction whole',
+      [
+        'check',
+        'rpc',
+        '--rpc-url',
+        'https://mainnet.base.org',
+        '--versions',
+        versions,
+        '--publishers',
+        publishers,
+        '--json',
+      ],
+      0,
+      (_all, stdout) => {
+        const report = JSON.parse(stdout);
+        const probe = report.probes.find(
+          (item) => item.rule === 'base-provider-returns-set-code-transaction',
+        );
+        if (report.chain !== 'eip155:8453') return `the endpoint was not identified as Base: ${report.chain}`;
+        return probe?.verdict === 'reads'
+          ? undefined
+          : `the Base probe says ${probe?.verdict}: ${probe?.explanation}`;
+      },
+    );
+    step(
       // The probe of the entry is pinned to a mainnet-beta transaction: against devnet nothing can be observed,
       // and the run must not pass for a checked endpoint.
       'refuses to pass an endpoint no probe could speak about',

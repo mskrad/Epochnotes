@@ -336,21 +336,93 @@
               "probe": {
                 "type": "object",
                 "properties": {
-                  "method": {
-                    "type": "string",
-                    "minLength": 1
-                  },
                   "fixture": {
-                    "description": "The transaction a probe reads, as <CAIP-2 chain>:<signature>. The probe runs only against an endpoint that serves that chain.",
                     "type": "string",
-                    "pattern": "^(solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z|solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1):[1-9A-HJ-NP-Za-km-z]{64,128}$"
+                    "pattern": "^(?:(?:solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp|solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z|solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1):[1-9A-HJ-NP-Za-km-z]{64,128}|(?:eip155:1|eip155:8453):0x[0-9a-fA-F]{64})$",
+                    "description": "The transaction a probe reads, as <CAIP-2 chain>:<id>. The probe runs only against an endpoint that serves that chain."
+                  },
+                  "calls": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "maxLength": 64,
+                          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                          "description": "How the observations and the pass conditions name this call."
+                        },
+                        "method": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A read-only JSON-RPC method."
+                        },
+                        "params": {
+                          "default": [],
+                          "description": "Parameters; the string $fixture stands for the transaction id.",
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": ["id", "method"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "observe": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(?:result|error)(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    },
+                    "description": "What to record from every answer."
+                  },
+                  "pass": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "call": {
+                          "type": "string",
+                          "maxLength": 64,
+                          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+                        },
+                        "path": {
+                          "type": "string",
+                          "pattern": "^(?:result|error)(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                        },
+                        "equals": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["call", "path", "equals"],
+                      "additionalProperties": false
+                    },
+                    "description": "The endpoint behaves as the entry says when every condition holds."
                   },
                   "expect": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": ["method", "expect"],
+                "required": ["fixture", "calls", "observe", "pass", "expect"],
                 "additionalProperties": false
               }
             },

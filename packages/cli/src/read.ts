@@ -237,7 +237,7 @@ export function addRpcCheckCommand(check: Command): void {
           console.log(provenanceLine(reading));
           printRevoked(reading);
           console.log(
-            `endpoint ${report.endpoint} serves ${report.cluster}; ${report.observed} probe(s) observed its behaviour`,
+            `endpoint ${report.endpoint} serves ${report.chain}${report.name === undefined ? '' : ` (${report.name})`}; ${report.observed} probe(s) observed its behaviour`,
           );
           if (report.observed === 0)
             console.log(
@@ -251,7 +251,13 @@ export function addRpcCheckCommand(check: Command): void {
             );
             for (const call of probe.calls)
               console.log(
-                `  maxSupportedTransactionVersion ${call.parameter}: ${call.outcome.ok ? `version ${call.outcome.version}` : `error ${call.outcome.code ?? '-'} ${call.outcome.message}`}`,
+                `  ${call.call} (${call.method}): ${
+                  call.outcome.ok
+                    ? Object.entries(call.outcome.observed)
+                        .map(([path, value]) => `${path} = ${JSON.stringify(value)}`)
+                        .join(', ')
+                    : `error ${call.outcome.code ?? '-'} ${call.outcome.message}`
+                }`,
               );
           }
         }

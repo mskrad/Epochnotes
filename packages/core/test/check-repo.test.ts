@@ -93,7 +93,7 @@ describe('check repo', () => {
       .find((entry) => entry.id === 'tx-v1');
     if (txV1 === undefined) throw new Error('tx-v1 is not in the registry');
     // A spread loses which schema the detect list belongs to; the entry is the same shape either way.
-    const withKinds = (id: string, detect: typeof txV1.detect) => ({ ...txV1, id, detect }) as Entry;
+    const withKinds = (id: string, detect: unknown[]) => ({ ...txV1, id, detect }) as Entry;
     const report = checkDirectory(repo('coverage-kinds', { 'src/reader.ts': before }), [
       withKinds(
         'probe-only',

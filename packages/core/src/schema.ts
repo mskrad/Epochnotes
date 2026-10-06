@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { SOLANA_CHAINS } from './chains.js';
+import { EVM_CHAINS, SOLANA_CHAINS } from './chains.js';
 
 /** The registry entry format this library writes. */
 export const ENTRY_SCHEMA_VERSION = 2;
@@ -39,14 +39,11 @@ const ruleBase = {
   summary: text,
 };
 
-/** Probe fixtures of schema 2 name the chain by CAIP-2, and only a chain an endpoint can be identified as. */
-const PROBE_CHAINS = Object.values(SOLANA_CHAINS);
-
 type Language = 'ts' | 'js' | 'rust' | 'python' | 'go' | 'markdown' | 'solidity';
 
-function detectRuleSchema<L extends readonly [Language, ...Language[]]>(
+function detectRuleSchema<L extends readonly [Language, ...Language[]], P extends z.ZodType>(
   languages: L,
-  fixture: z.ZodOptional<z.ZodString>,
+  probe: P,
 ) {
   return z.discriminatedUnion('kind', [
     z.strictObject({
@@ -65,38 +62,120 @@ function detectRuleSchema<L extends readonly [Language, ...Language[]]>(
     z.strictObject({
       ...ruleBase,
       kind: z.literal('runtime-probe'),
-      probe: z.strictObject({ method: text, fixture, expect: text }),
+      probe,
     }),
   ]);
 }
 
 const detectRuleV1 = detectRuleSchema(
   ['ts', 'js', 'rust', 'python', 'go', 'markdown'] as const,
-  z
+  z.strictObject({
+    method: text,
+    fixture: z
+      .string()
+      .regex(
+        new RegExp(`^(${PROBE_CLUSTERS.join('|')}):[1-9A-HJ-NP-Za-km-z]{64,128}$`),
+        `A fixture names the cluster it lives on and the signature of a transaction there, as <cluster>:<signature>. The cluster is one of ${PROBE_CLUSTERS.join(', ')}: a name no endpoint can be recognised by would be run against every endpoint whose genesis hash is not known.`,
+      )
+      .optional()
+      .describe(
+        'The transaction a probe reads, as <cluster>:<signature>. The probe runs only against an endpoint that serves that cluster.',
+      ),
+    expect: text,
+  }),
+);
+
+/** Probe fixtures of schema 2: a chain an endpoint can be identified as, and an id in that chain's own form. */
+const SOLANA_PROBE_CHAINS = Object.values(SOLANA_CHAINS);
+const EVM_PROBE_CHAINS = Object.values(EVM_CHAINS);
+const PROBE_CHAINS = [...SOLANA_PROBE_CHAINS, ...EVM_PROBE_CHAINS];
+
+/** Where a probe looks in an answer: `result` or `error`, then field names. */
+const answerPath = z
+  .string()
+  .regex(
+    /^(?:result|error)(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/,
+    'A path starts at result or error and names fields, as result.version.',
+  );
+
+/**
+ * A runtime probe of schema 2 is data the engine runs, not code: the calls to make (the transaction id put in
+ * for `$fixture`), what to record from each answer, and when the endpoint behaves as the entry says. The reading
+ * of what was recorded stays with `expect`, in words, as before.
+ */
+const probeV2 = z.strictObject({
+  fixture: z
     .string()
     .regex(
-      new RegExp(`^(${PROBE_CLUSTERS.join('|')}):[1-9A-HJ-NP-Za-km-z]{64,128}$`),
-      `A fixture names the cluster it lives on and the signature of a transaction there, as <cluster>:<signature>. The cluster is one of ${PROBE_CLUSTERS.join(', ')}: a name no endpoint can be recognised by would be run against every endpoint whose genesis hash is not known.`,
+      new RegExp(
+        `^(?:(?:${SOLANA_PROBE_CHAINS.join('|')}):[1-9A-HJ-NP-Za-km-z]{64,128}|(?:${EVM_PROBE_CHAINS.join('|')}):0x[0-9a-fA-F]{64})$`,
+      ),
+      `A fixture names the chain it lives on, by its CAIP-2 id, and a transaction there, as <chain>:<id>: a signature on Solana, a 0x hash on an EVM chain. The chain is one of ${PROBE_CHAINS.join(', ')}: a chain no endpoint can be identified as would be run against every endpoint that could not be placed.`,
     )
-    .optional()
     .describe(
-      'The transaction a probe reads, as <cluster>:<signature>. The probe runs only against an endpoint that serves that cluster.',
+      'The transaction a probe reads, as <CAIP-2 chain>:<id>. The probe runs only against an endpoint that serves that chain.',
     ),
-);
+  calls: z
+    .array(
+      z.strictObject({
+        id: slug.describe('How the observations and the pass conditions name this call.'),
+        method: text.describe('A read-only JSON-RPC method.'),
+        params: z
+          .array(z.unknown())
+          .default([])
+          .describe('Parameters; the string $fixture stands for the transaction id.'),
+      }),
+    )
+    .min(1),
+  observe: z.array(answerPath).min(1).describe('What to record from every answer.'),
+  pass: z
+    .array(
+      z.strictObject({
+        call: slug,
+        path: answerPath,
+        equals: z.union([z.string(), z.int(), z.boolean(), z.null()]),
+      }),
+    )
+    .min(1)
+    .describe('The endpoint behaves as the entry says when every condition holds.'),
+  expect: text,
+});
 
 const detectRuleV2 = detectRuleSchema(
   ['ts', 'js', 'rust', 'python', 'go', 'markdown', 'solidity'] as const,
-  z
-    .string()
-    .regex(
-      new RegExp(`^(${PROBE_CHAINS.join('|')}):[1-9A-HJ-NP-Za-km-z]{64,128}$`),
-      `A fixture names the chain it lives on, by its CAIP-2 id, and the signature of a transaction there, as <chain>:<signature>. The chain is one of ${PROBE_CHAINS.join(', ')}: a chain no endpoint can be identified as would be run against every endpoint that could not be placed.`,
-    )
-    .optional()
-    .describe(
-      'The transaction a probe reads, as <CAIP-2 chain>:<signature>. The probe runs only against an endpoint that serves that chain.',
-    ),
+  probeV2,
 );
+
+export type DeclarativeProbe = z.infer<typeof probeV2>;
+
+/**
+ * The probe of a rule in the declarative form. A schema-1 probe, which named only its method, is the probe this
+ * library ran for it: getTransaction with maxSupportedTransactionVersion omitted, 0 and 1, passing when version
+ * 1 is read with version 1. Any other schema-1 method has no meaning here.
+ */
+export function probeOf(
+  probe: { method: string; fixture?: string | undefined; expect: string } | DeclarativeProbe,
+): DeclarativeProbe | undefined {
+  if ('calls' in probe) return probe;
+  if (probe.method !== 'getTransaction' || probe.fixture === undefined) return undefined;
+  const call = (id: string, version?: number) => ({
+    id,
+    method: 'getTransaction',
+    params: [
+      '$fixture',
+      version === undefined
+        ? { encoding: 'base64' }
+        : { encoding: 'base64', maxSupportedTransactionVersion: version },
+    ],
+  });
+  return {
+    fixture: probe.fixture,
+    calls: [call('version-omitted'), call('version-0', 0), call('version-1', 1)],
+    observe: ['result.version'],
+    pass: [{ call: 'version-1', path: 'result.version', equals: 1 }],
+    expect: probe.expect,
+  };
+}
 
 const relations = z
   .array(z.strictObject({ type: z.enum(['requires', 'supersedes', 'related']), id: slug }))

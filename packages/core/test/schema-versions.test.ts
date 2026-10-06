@@ -295,6 +295,16 @@ describe('a probe as data', () => {
       ],
       ['a path outside the answer', { ...good, observe: ['params.0'] }, /probe\.observe\[0\]/],
       ['no pass condition', { ...good, pass: [] }, /probe\.pass/],
+      [
+        'a pass on null, which no canonical entry can hold',
+        { ...good, pass: [{ call: 'transaction', path: 'result.type', equals: null }] },
+        /probe\.pass\[0\]\.equals/,
+      ],
+      [
+        'an error path to record, which would be dropped',
+        { ...good, observe: ['error.code'] },
+        /probe\.observe\[0\]/,
+      ],
       ['the schema-1 form', { method: 'getTransaction', fixture: good.fixture, expect: 'x' }, /probe/],
       [
         'a call that writes',

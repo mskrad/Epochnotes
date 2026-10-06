@@ -156,13 +156,24 @@ const probeV2 = z.strictObject({
       }),
     )
     .min(1),
-  observe: z.array(answerPath).min(1).describe('What to record from every answer.'),
+  observe: z
+    .array(
+      answerPath.regex(
+        /^result(?:\.|$)/,
+        'What a probe records is in the result: an error is recorded as it is, whole.',
+      ),
+    )
+    .min(1)
+    .describe(
+      'What to record from every answer that has a result; an error is always recorded with its code and text.',
+    ),
   pass: z
     .array(
       z.strictObject({
         call: slug,
         path: answerPath,
-        equals: z.union([z.string(), z.int(), z.boolean(), z.null()]),
+        // No null: an entry has no null in its canonical form, and an absent value is not a behaviour to pass on.
+        equals: z.union([z.string(), z.int(), z.boolean()]),
       }),
     )
     .min(1)

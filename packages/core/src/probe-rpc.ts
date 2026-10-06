@@ -228,7 +228,11 @@ export async function probeRpc(
         });
         continue;
       }
-      const missing = calls.every((call) => !call.outcome.ok && call.outcome.code === null);
+      // Missing means no answer had the transaction and none was an error: an error without a code is still a
+      // refusal, not a pruned history.
+      const missing = [...answers.values()].every(
+        (answer) => answer.error === undefined && (answer.result === null || answer.result === undefined),
+      );
       const failed = probe.pass.filter(
         (condition) => at(answers.get(condition.call), condition.path) !== condition.equals,
       );

@@ -118,6 +118,11 @@ describe('probing a Solana endpoint', () => {
     expect(probe(await probeRpc('https://rpc.example', entries, rpc), TX_V1)?.verdict).toBe('cannot-read');
   });
 
+  it('takes an error without a code for a refusal, not for a pruned history', async () => {
+    const { rpc } = solana(GENESIS['mainnet-beta'], () => ({ error: { message: 'refused' } }));
+    expect(probe(await probeRpc('https://rpc.example', entries, rpc), TX_V1)?.verdict).toBe('cannot-read');
+  });
+
   it('tells a pruned fixture from a refusal', async () => {
     const { rpc } = solana(GENESIS['mainnet-beta'], () => ({ result: null }));
     expect(probe(await probeRpc('https://rpc.example', entries, rpc), TX_V1)?.verdict).toBe(

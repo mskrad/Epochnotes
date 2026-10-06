@@ -393,9 +393,16 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "pattern": "^(?:result|error)(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      "allOf": [
+                        {
+                          "pattern": "^(?:result|error)(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                        },
+                        {
+                          "pattern": "^result(?:\\.|$)"
+                        }
+                      ]
                     },
-                    "description": "What to record from every answer."
+                    "description": "What to record from every answer that has a result; an error is always recorded with its code and text."
                   },
                   "pass": {
                     "minItems": 1,
@@ -424,9 +431,6 @@
                             },
                             {
                               "type": "boolean"
-                            },
-                            {
-                              "type": "null"
                             }
                           ]
                         }

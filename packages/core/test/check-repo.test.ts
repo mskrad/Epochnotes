@@ -160,7 +160,7 @@ describe('check repo', () => {
     expect(report.findings.map((finding) => finding.file)).toEqual(['skills/build/debug.md']);
   });
 
-  it('inside git, checks tracked files only', () => {
+  it('inside git, checks tracked files and files not yet added, never ignored ones', () => {
     const dir = repo('tracked', { 'src/a.ts': before, 'dist/a.js': before, '.gitignore': 'dist/\n' });
     const git = (...args: string[]) =>
       execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], {
@@ -170,6 +170,13 @@ describe('check repo', () => {
     git('add', '-A');
     git('commit', '-q', '-m', 'init');
     expect(check(dir).findings.map((finding) => finding.file)).toEqual(['src/a.ts']);
+    // A file written after the last commit is read: a check that skipped it would report it clean unread.
+    mkdirSync(join(dir, 'scripts'));
+    writeFileSync(join(dir, 'scripts', 'new.ts'), before);
+    writeFileSync(join(dir, 'dist', 'b.js'), before);
+    const report = check(dir);
+    expect(report.findings.map((finding) => finding.file)).toEqual(['scripts/new.ts', 'src/a.ts']);
+    expect(report.filesScanned).toBe(2);
   });
 
   it.each([
@@ -268,23 +275,21 @@ describe('check repo', () => {
       expect(report.skipped).toEqual([]);
     });
 
-    it('inside git, a link does not widen the scan to an ignored or untracked file of the repository', () => {
+    it('inside git, a link does not widen the scan to an ignored file of the repository', () => {
       const dir = repo('link-ignored', { '.gitignore': '.env.ts\n', 'own.ts': after });
       const git = (...args: string[]) =>
         execFileSync('git', ['-C', dir, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args]);
       git('init', '-q');
       writeFileSync(join(dir, '.env.ts'), secret);
-      writeFileSync(join(dir, 'scratch.ts'), secret);
+      // A file not yet added is part of the scan in its own right, so a link to it is read as that file.
+      writeFileSync(join(dir, 'scratch.ts'), after);
       symlinkSync(join(dir, '.env.ts'), join(dir, 'env-alias.ts'));
       symlinkSync(join(dir, 'scratch.ts'), join(dir, 'scratch-alias.ts'));
       git('add', '.gitignore', 'own.ts', 'env-alias.ts', 'scratch-alias.ts');
       git('commit', '-q', '-m', 'init');
       const report = check(dir);
       expect(everywhere(report)).not.toContain(MARKER);
-      expect(report.skipped).toEqual([
-        { file: 'env-alias.ts', reason: 'symlink-target-not-scanned' },
-        { file: 'scratch-alias.ts', reason: 'symlink-target-not-scanned' },
-      ]);
+      expect(report.skipped).toEqual([{ file: 'env-alias.ts', reason: 'symlink-target-not-scanned' }]);
     });
 
     it('outside git, a link does not lead into a directory that is left out by name', () => {

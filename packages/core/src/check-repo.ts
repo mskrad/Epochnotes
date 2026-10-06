@@ -105,9 +105,9 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
 }
 
 /**
- * The files to check, by their real paths. In a git work tree these are the tracked files: that leaves out
- * dependencies and build output without guessing directory names — a guess such as "build" once hid
- * `skills/build/...`.
+ * The files to check, by their real paths. In a git work tree these are the files git does not ignore — tracked
+ * ones and new ones not yet added: that leaves out dependencies and build output without guessing directory
+ * names — a guess such as "build" once hid `skills/build/...` — and does not report a new file clean unread.
  *
  * Nothing outside the root is ever read. A repository is somebody else's data: a link in it — a tracked link,
  * or a tracked path that runs through a linked directory — may point at any file this process can open, and a
@@ -115,7 +115,7 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
  * root is reported as skipped, and a file reached twice is read once, under its real name.
  *
  * A link does not widen what is checked inside the root either: its target is read only if it is a file the
- * scan covers anyway (tracked, or outside the directories skipped by name). A link to an ignored `.env.ts` is
+ * scan covers anyway (not ignored by git, or outside the directories skipped by name). A link to an ignored `.env.ts` is
  * reported as skipped, not read.
  *
  * Not covered: hard links, which cannot be told from the file itself, and a path swapped between resolving and
@@ -133,11 +133,17 @@ function sourceFiles(root: string): {
   let candidates: string[];
   let tracked = true;
   try {
-    const listed = execFileSync('git', ['-C', realRoot, 'ls-files', '-z'], {
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    // Tracked files and files not yet added, but never ignored ones: an ignored file is where a project keeps what
+    // is not code (keys, builds, caches), and a new file not yet committed is as much the project as any other.
+    const listed = execFileSync(
+      'git',
+      ['-C', realRoot, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+      {
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
     candidates = listed
       .split('\0')
       .filter(Boolean)

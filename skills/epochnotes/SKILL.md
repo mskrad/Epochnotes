@@ -90,6 +90,9 @@ epochnotes check repo <path> --versions <dir-or-url> --publishers <file> --json
 epochnotes check rpc --rpc-url <endpoint> --json
 ```
 
+Give every finding with its confidence: `breaks` is certain, `check` needs a person to look and is not a
+claim that the code is broken. Say which one it is in the answer, not only in the list of findings.
+
 These commands take the same `--onchain` as the read. With it, the rules of entries the publisher withdrew
 are not run, and the report names those entries under `revoked`. Without it, `provenance.revocations` is
 `not-checked`: say so in the report, because a withdrawn rule may have produced a finding. The registry

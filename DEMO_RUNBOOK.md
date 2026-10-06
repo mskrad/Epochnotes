@@ -57,7 +57,8 @@ What to look at, in this order:
 - `status: chain solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp (mainnet-beta), read at slot N` — the chain is named
   by the endpoint itself (its genesis hash), and the activation state comes from the feature gate accounts at
   the moment you ask, not from the entry. Each state says what showed it;
-- `breaks` items with the surface they belong to, and the `fix` for each;
+- `breaks` items with the surface they belong to, then the `fix` lines — the entry's fixes, which a rule may
+  name but a break does not;
 - `sources` with the date each one was read.
 
 ### The same version on three chains

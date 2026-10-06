@@ -55,6 +55,25 @@ describe('epochnotes registry read / check rpc', () => {
     expect(JSON.parse(read.stdout)).toMatchObject({ entries: [], unknownIds: ['no-such-entry'] });
   });
 
+  it('prints, in prose, the fix and every source with the date it was read', async () => {
+    const prose = await run('registry', 'read', 'tx-v1', '--working-copy', entries);
+    expect(prose.code).toBe(0);
+    expect(prose.stdout).toMatch(/^ {2}fix: /m);
+    expect(prose.stdout).toMatch(/^ {2}source \[0\] \w[\w-]*: \S+ \(retrieved \d{4}-\d{2}-\d{2}\)$/m);
+  });
+
+  it('says that nothing activates on a chain, rather than that it was not read, when no entry asked about does', async () => {
+    // No network: a chain this version has no adapter for is never asked, and tx-v1 does not activate on it.
+    const prose = await run(
+      ...['registry', 'read', 'tx-v1', '--working-copy', entries],
+      ...['--status', 'bip122:000000000019d6689c085ae165831e93'],
+    );
+    expect(prose.code).toBe(0);
+    expect(prose.stdout).toContain('status: chain bip122:000000000019d6689c085ae165831e93');
+    expect(prose.stdout).toContain('nothing in this reading activates on it');
+    expect(prose.stdout).not.toContain('not read: see why below');
+  });
+
   it('marks unsigned files as unverified in both output forms', async () => {
     const prose = await run('registry', 'read', 'tx-v1', '--working-copy', entries);
     expect(prose.code).toBe(0);

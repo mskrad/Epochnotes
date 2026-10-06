@@ -292,6 +292,30 @@ describe('check repo', () => {
       expect(report.skipped).toEqual([{ file: 'env-alias.ts', reason: 'symlink-target-not-scanned' }]);
     });
 
+    it('inside git, a link not yet added is held to the same bounds as a tracked one', () => {
+      const dir = repo('untracked-links', { '.gitignore': '.env.ts\n', 'own.ts': after });
+      const git = (...args: string[]) =>
+        execFileSync('git', ['-C', dir, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args]);
+      git('init', '-q');
+      git('add', '.gitignore', 'own.ts');
+      git('commit', '-q', '-m', 'init');
+      writeFileSync(join(dir, '.env.ts'), secret);
+      const outside = join(root, 'untracked-links-outside.ts');
+      writeFileSync(outside, secret);
+      // Neither link is added to git: both are candidates now, and neither may widen what is read.
+      symlinkSync('.env.ts', join(dir, 'env-alias.ts'));
+      symlinkSync(outside, join(dir, 'outside-alias.ts'));
+      const report = check(dir);
+      expect(everywhere(report)).not.toContain(MARKER);
+      expect(report.skipped).toHaveLength(2);
+      expect(report.skipped).toEqual(
+        expect.arrayContaining([
+          { file: 'env-alias.ts', reason: 'symlink-target-not-scanned' },
+          { file: 'outside-alias.ts', reason: 'symlink-outside-root' },
+        ]),
+      );
+    });
+
     it('outside git, a link does not lead into a directory that is left out by name', () => {
       const dir = repo('link-dependencies', { 'own.ts': after, 'node_modules/pkg/x.ts': secret });
       symlinkSync(join(dir, 'node_modules', 'pkg', 'x.ts'), join(dir, 'file-alias.ts'));

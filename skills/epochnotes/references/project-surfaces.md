@@ -12,12 +12,16 @@ anything, and show it to the person: they will know what you missed.
 | Surface                               | Where to look                                                                                        |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Source code that talks to the network | RPC calls, transaction building and decoding, account size and cost estimates, timing assumptions    |
+| Contracts and programs it owns        | Solidity sources: checks on `tx.origin`, on whether an account has code, on signatures and receivers |
 | Dependencies                          | lockfiles of every ecosystem in the repository                                                       |
 | RPC providers                         | names of environment variables, config files, deployment manifests; note the provider, never the key |
 | Streams and indexers                  | websocket subscriptions, gRPC streams, webhooks, third-party indexing APIs                           |
-| Deployed programs                     | program ids in config, IDLs, deploy scripts; which cluster each lives on                             |
+| Deployed programs and contracts       | program ids, contract addresses, IDLs and ABIs, deploy scripts; which chain each lives on            |
 | Services the project exposes          | its own HTTP API, bots, cron jobs that read chain data                                               |
 | Documentation and examples            | READMEs, docs sites, templates: users copy them, so a stale snippet is a breakage shipped to others  |
+
+Name the chain of every surface: a project on several chains can be broken on one and fine on another, and
+the status of a change is read per chain (`registry read --status <chain>` once for each).
 
 ## 2. Check each surface with the strongest method you have
 
@@ -27,7 +31,7 @@ anything, and show it to the person: they will know what you missed.
 | A read-only request to the project's own public endpoint            | **verified live**           | the endpoint is public, the request is a plain read, and the person agreed          |
 | `epochnotes check repo <path> --versions ...`                       | **found in code**           | always; `breaks` findings are certain, `check` findings need a human look           |
 | Reading code the rules do not cover, guided by the entry's `breaks` | **by reading, not by rule** | the entry names a surface and no `detect` rule covers it                            |
-| Nothing available                                                   | **cannot verify** and why   | closed third-party service, no credentials, no fixture on that cluster              |
+| Nothing available                                                   | **cannot verify** and why   | closed third-party service, no credentials, no fixture on that chain                |
 
 A rent scan says how far its figures go in `reliability`: `exact` is a full read; `estimate` is a sample with
 its standard error; `partial` leaves some accounts out and says which; `unreliable` must not be quoted. Even an

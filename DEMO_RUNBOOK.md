@@ -60,6 +60,26 @@ What to look at, in this order:
 - `breaks` items with the surface they belong to, and the `fix` for each;
 - `sources` with the date each one was read.
 
+### The same version on three chains
+
+The version you signed also holds a change of Ethereum and Base. Read it on each chain:
+
+```bash
+npx epochnotes registry read eip-7702 --status ethereum
+npx epochnotes registry read eip-7702 --status base
+npx epochnotes status --chain mainnet-beta
+```
+
+- On Ethereum and on Base the fork is read against the head block, and `a block header shows it` means the
+  block carries the field the fork adds: the time in the entry is a claim, the header is the observation. A
+  state read by time alone would say so.
+- Each chain has its own fork time, from its own client's configuration; one entry, two activations.
+- On Solana the same entry is not dropped: `no activation on this chain; it activates on eip155:1,
+eip155:8453`.
+- The first line of each reading names the chain and how it was recognised. If a public endpoint answers from
+  a node without full history, it says `known by the chain id it states` instead of confirming the genesis
+  block: honest, and worth seeing once.
+
 ## 3. Prove the entry belongs to the signed version
 
 ```bash
@@ -108,6 +128,16 @@ fixed file alone in a directory and the same command exits 0 with `0 finding(s)`
 mkdir -p demo/fixed && cp corpus/pairs/tx-v1/real-altude-js-gettransaction/after.ts demo/fixed/
 npx epochnotes check repo demo/fixed ; echo "exit=$?"
 ```
+
+The same check reads Solidity. A real fix, from Taiko's bridge, removed a check that treated "has code" as "is
+a contract", because an EOA delegated under EIP-7702 has code:
+
+```bash
+npx epochnotes check repo corpus/pairs/eip-7702/real-taiko-bridge-is-contract ; echo "exit=$?"
+```
+
+One `CHECK` finding on `before.sol`: a rule at `check` confidence asks a person to look, it does not claim a
+break.
 
 ## 5. Ask an RPC provider how it really behaves
 

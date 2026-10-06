@@ -1,21 +1,21 @@
 # Epochnotes
 
-A signed registry of Solana network changes — and the checks built on it: what breaks in your code, where, and how to fix it.
+A signed registry of network changes on Solana, Ethereum and Base — and the checks built on it: what breaks in your code, where, and how to fix it.
 
-An upgrade lands, a call that worked for a year starts failing, and the answer lives in a SIMD, a client changelog and a feature gate account — three places, none of them your code. Epochnotes keeps that answer as a signed entry, tells you where it applies in your repository, and reads the activation status from the network at the moment you ask. When it cannot verify what it reads, it refuses to answer rather than guess; when it had nothing to check something against, it says so instead of reporting a clean result.
+An upgrade lands, a call or a contract check that worked for a year starts failing, and the answer lives in a SIMD or an EIP, a client's configuration and the chain itself — three places, none of them your code. Epochnotes keeps that answer as a signed entry, tells you where it applies in your repository, and reads the activation status from each chain at the moment you ask: a feature account on Solana, the head block and the header field a fork adds on Ethereum and Base. One signed version covers every chain it names. When it cannot verify what it reads, it refuses to answer rather than guess; when it had nothing to check something against, it says so instead of reporting a clean result.
 
 Status: pre-release. The first signed version of the registry is published after release, so today every reader signs a log of their own — [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) walks through it end to end in about ten minutes. Nothing here has been audited.
 
 ## Layout
 
-| Path                | Purpose                                                                     |
-| ------------------- | --------------------------------------------------------------------------- |
-| `packages/core`     | Library: entry schema, canonical hashing, validation, on-chain status reads |
-| `packages/cli`      | `epochnotes` command — a thin shell over `core`                             |
-| `programs/registry` | Anchor program: publishers and the version log                              |
-| `registry/`         | Entry schema, registry entries (YAML) and published versions                |
-| `skills/epochnotes` | Claude skill: answers from the verified registry, checks a whole project    |
-| `corpus/`           | Before/after code pairs and the manifest of what a correct check reports    |
+| Path                | Purpose                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| `packages/core`     | Library: entry schema, canonical hashing, validation, status per chain   |
+| `packages/cli`      | `epochnotes` command — a thin shell over `core`                          |
+| `programs/registry` | Anchor program: publishers and the version log                           |
+| `registry/`         | Entry schema, registry entries (YAML) and published versions             |
+| `skills/epochnotes` | Claude skill: answers from the verified registry, checks a whole project |
+| `corpus/`           | Before/after code pairs and the manifest of what a correct check reports |
 
 ## Develop
 
@@ -34,11 +34,15 @@ npm run corpus:check  # the corpus manifest, its files and the detection engine 
 
 ```bash
 epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, activation status with chain and slot
+epochnotes registry read --json --status ethereum       # the same version, read on Ethereum: block, time, what confirmed each fork
+epochnotes status --chain base                          # every activation the registry names on Base
 epochnotes check repo <path> --versions <dir-or-url>    # detection rules taken from the verified version
 epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does this provider behave as the entry says
 ```
 
 Every chain is named by its [CAIP-2](https://chainagnostic.org/CAIPs/caip-2) id, and `--chain` (or `--status` for `registry read`) takes either that id or a name: `mainnet-beta`, `devnet`, `testnet`, `localnet` for Solana, `ethereum` and `base` for the EVM chains. On Solana a change activates by a feature account; on an EVM chain by a fork time, which the head block confirms where the fork adds a header field — a state read by time alone says so. The endpoint is asked which chain it serves: one that serves another chain than the one asked for is refused rather than read, and an endpoint given alone with `--rpc-url` is read as the chain it says it is. Every reading names the chain and the point it was taken at, and every state says what showed it.
+
+Detection rules cover TypeScript, JavaScript, Rust, Go, Python, Markdown and Solidity, and the lockfiles of npm and Cargo. A rule says how sure it is: `breaks` is certain, `check` needs a person to look. Every rule is measured on a corpus of real fixes before it ships (`npm run corpus:check` prints recall per entry), and what a rule leaves out on purpose is recorded there with the reason.
 
 A publisher withdraws an entry with a record on chain, which the signed log alone does not show. With `--onchain`, `registry read`, `check repo`, `check rpc` and `rent scan` leave withdrawn entries out, name them under `revoked`, and refuse an entry asked for by name (exit 1), in the same words as `registry verify`. Without it the output says that revocations were not checked.
 

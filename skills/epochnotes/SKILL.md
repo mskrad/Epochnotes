@@ -1,13 +1,14 @@
 ---
 name: epochnotes
-description: Answers questions about Solana network changes (protocol upgrades, SIMDs, feature gates, validator client releases, SDK majors) and what they break in a project, from the signed Epochnotes registry instead of from memory. Use it when someone asks what an upgrade changes or breaks, when an RPC call, decoder, indexer or cost estimate started failing without a code change, when they ask whether a change is already active on a cluster, or when they want a whole project (code, RPC providers, deployed programs, external services) checked against upcoming or recent network changes.
+description: Answers questions about network changes on Solana, Ethereum and Base (protocol upgrades and hard forks, SIMDs and EIPs, feature gates, client releases, SDK majors) and what they break in a project, from the signed Epochnotes registry instead of from memory. Use it when someone asks what an upgrade changes or breaks, when an RPC call, a decoder, a contract check, an indexer or a cost estimate started failing without a code change, when they ask whether a change is already active on a chain, or when they want a whole project (code, contracts, RPC providers, deployed programs, external services) checked against upcoming or recent network changes.
 ---
 
 # Epochnotes
 
-You answer from a signed registry, not from what you remember. What you remember about Solana upgrades is
-older than the network: dates slip, gates activate, libraries ship fixes. The registry is maintained, signed
-and versioned; the activation status comes from the network at the moment you ask.
+You answer from a signed registry, not from what you remember. What you remember about network upgrades is
+older than the network: dates slip, forks and gates activate, libraries ship fixes. The registry is
+maintained, signed and versioned; the activation status comes from the chain itself at the moment you ask.
+One signed version covers every chain it names: Solana clusters, Ethereum and Base.
 
 **This skill holds no facts about any change.** If you catch yourself stating an activation date, a slot, a
 version number, an error code or a parameter value that you did not just read from the command output below,
@@ -24,8 +25,11 @@ epochnotes registry read --json --status <chain>
 - The log and the trusted publishers come from `--versions <dir-or-url>` and `--publishers <file>`, or from
   the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. If neither is set and the
   defaults do not exist, ask the person where their registry log is. Do not invent a URL.
-- `<chain>` is the chain the person's project runs on: a CAIP-2 id, or a cluster name such as `mainnet-beta`.
-  If they did not say, ask, or use `mainnet-beta` and say that you assumed it.
+- `<chain>` is the chain the person's project runs on: a CAIP-2 id, or a name — `mainnet-beta`, `devnet`,
+  `testnet` for Solana, `ethereum` or `base`. If they did not say, ask; a project on several chains is read
+  once per chain. If you must assume one, say which.
+- An entry about another chain is not dropped from the reading: it carries `noActivation`, which names the
+  chains it activates on.
 - Add `--onchain` whenever the answer will be relied on (a fix to ship, a decision to make), or the person
   asks for the log to be compared with its on-chain anchor. Only the chain shows that a publisher withdrew an
   entry or that the log was cut short. It needs network access to the cluster of the registry program.
@@ -61,6 +65,12 @@ Every answer built on the registry carries these, in this order:
    says; `scheduled` means known, not reached; `active` names what confirmed it — repeat that; `unknown` is
    not an answer: say that the state could not be read, and why. An entry with no activation on the chain
    asked about carries `noActivation`: report it, do not drop it.
+   What confirmed a state differs by chain, and the difference is part of the answer. On Solana the feature
+   account itself says so. On an EVM chain an entry states a fork time, taken from the client's
+   configuration, and the head block confirms it where the fork adds a header field (`header`); a state
+   `active` by `time-only` was not seen in any block — say so. The reading also says how the chain itself
+   was recognised (`identifiedBy`): `genesis` is confirmed, `chain-id` means the endpoint was taken at its
+   word for which chain it is — repeat that when it happens.
 4. **Sources**: the primary sources of the statements you used. Each `breaks[].evidence` holds indexes into
    the entry's `sources`; give their `ref` and `retrieved` date.
 5. **Registry version**: version number, the first characters of the Merkle root, the publisher key, and
@@ -83,9 +93,10 @@ epochnotes check rpc --rpc-url <endpoint> --json
 These commands take the same `--onchain` as the read. With it, the rules of entries the publisher withdrew
 are not run, and the report names those entries under `revoked`. Without it, `provenance.revocations` is
 `not-checked`: say so in the report, because a withdrawn rule may have produced a finding. The registry
-program lives on one cluster, which is not necessarily the cluster the project runs on: `registry read` and
-`check repo` take it as `--cluster`, while `check rpc` and `rent scan` take it as `--registry-cluster`. Ask
-the person which cluster their registry is anchored on if the CLI default does not answer.
+program lives on one Solana cluster, whatever chain the project runs on: `registry read` and `check repo`
+take it as `--cluster`, while `check rpc` and `rent scan` take it as `--registry-cluster`. Ask the person
+which cluster their registry is anchored on if the CLI default does not answer. Rent tools are about Solana
+only; on other chains they have nothing to say.
 
 A check that could not ask its question is not a check that found nothing, and the reports say which case they
 are. In the probe report, `observed` counts the probes that actually saw the endpoint behave; zero means

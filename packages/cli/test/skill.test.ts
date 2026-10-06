@@ -20,6 +20,8 @@ const factShapes: [string, RegExp][] = [
   ['a year or a date', /\b20\d\d\b/],
   ['a version number', /\b\d+\.\d+(\.\d+)?\b/],
   ['a SIMD number', /SIMD-?\s?\d+/i],
+  ['an EIP or BEP number', /\b(EIP|BEP|ERC)-?\s?\d+/i],
+  ['an EVM chain id', /\beip155:\d+/],
   ['a slot, an error code or another long number', /\d{3,}/],
   ['an address', /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/],
   ['a hexadecimal value', /\b0x[0-9a-f]+\b/i],

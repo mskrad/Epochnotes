@@ -184,6 +184,22 @@ try {
       },
     );
     step(
+      'reads a change of Ethereum and Base on Base itself: a fork time confirmed by the header of the head block',
+      ['status', '--chain', 'base', '--json'],
+      0,
+      (_all, stdout) => {
+        const report = JSON.parse(stdout);
+        if (report.chain !== 'eip155:8453' || !/^\d+$/.test(report.point?.block ?? ''))
+          return 'the report does not name Base and its head block';
+        const fork = report.activations.find((item) => item.entry === 'eip-7702');
+        if (fork?.status?.state !== 'active' || fork.status.confirmedBy !== 'header')
+          return `eip-7702 is not active by header on Base: ${JSON.stringify(fork?.status)}`;
+        return report.withoutActivation.some((item) => item.entry === 'tx-v1')
+          ? undefined
+          : 'the Solana entries are not named as having no activation on Base';
+      },
+    );
+    step(
       // The probe of the entry is pinned to a mainnet-beta transaction: against devnet nothing can be observed,
       // and the run must not pass for a checked endpoint.
       'refuses to pass an endpoint no probe could speak about',

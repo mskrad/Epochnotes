@@ -76,9 +76,9 @@ npx epochnotes status --chain mainnet-beta
 - Each chain has its own fork time, from its own client's configuration; one entry, two activations.
 - On Solana the same entry is not dropped: `no activation on this chain; it activates on eip155:1,
 eip155:8453`.
-- The first line of each reading names the chain and how it was recognised. If a public endpoint answers from
-  a node without full history, it says `known by the chain id it states` instead of confirming the genesis
-  block: honest, and worth seeing once.
+- The `status:` line names the chain, and its genesis block was checked unless the line says otherwise: if a
+  public endpoint answers from a node without full history, it says `known by the chain id it states`.
+  Honest, and worth seeing once.
 
 ## 3. Prove the entry belongs to the signed version
 
@@ -122,11 +122,13 @@ count, which are the point of the demo:
   against it. Silence about it would read as a clean result, so the report refuses to be silent.
 
 Every pair holds the code before the fix and after it, so that directory always has one finding. Put the
-fixed file alone in a directory and the same command exits 0 with `0 finding(s)`:
+fixed file alone in a directory of its own and the same command exits 0 with `0 finding(s) … in 1 file(s)
+checked` — read the file count: a check that read nothing would say `0 file(s)`.
 
 ```bash
-mkdir -p demo/fixed && cp corpus/pairs/tx-v1/real-altude-js-gettransaction/after.ts demo/fixed/
-npx epochnotes check repo demo/fixed ; echo "exit=$?"
+fixed="${TMPDIR:-/tmp}/epochnotes-fixed" && mkdir -p "$fixed"
+cp corpus/pairs/tx-v1/real-altude-js-gettransaction/after.ts "$fixed/"
+npx epochnotes check repo "$fixed" ; echo "exit=$?"
 ```
 
 The same check reads Solidity. A real fix, from Taiko's bridge, removed a check that treated "has code" as "is
@@ -175,10 +177,14 @@ mkdir -p ~/.claude/skills && cp -R skills/epochnotes ~/.claude/skills/
 ```
 
 Start a new Claude session in a project of yours, with `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`
-exported, and ask something the assistant would otherwise answer from memory:
+exported. Tell it first that the log is a local demo, not anchored on chain: the skill compares a log with its
+on-chain anchor when an answer will be relied on, and the demo key is not an admitted publisher, so without
+that word it refuses to answer — which is the right thing for it to do. Then ask something the assistant
+would otherwise answer from memory:
 
 - "my getTransaction started failing with -32015 on mainnet, what happened?"
-- "check this project against recent Solana network changes"
+- "our contract on Ethereum and Base requires tx.origin == msg.sender; did EIP-7702 change anything?"
+- "check this project against recent network changes"
 
 The skill holds no facts about any change: it runs the commands above, and its answer carries the version,
 the publisher, the activation status with the chain and the point it was read at, and the sources. If verification fails, it refuses to

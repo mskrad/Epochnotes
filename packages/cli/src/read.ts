@@ -172,7 +172,13 @@ export function addReadCommand(registry: Command): void {
           );
         } else {
           console.log(provenanceLine(reading));
-          if (reading.network !== undefined) console.log(`status: ${readingLine(reading.network)}`);
+          if (reading.network !== undefined)
+            console.log(
+              `status: ${readingLine(
+                reading.network,
+                reading.entries.some((item) => (item.activations ?? []).length > 0),
+              )}`,
+            );
           for (const { entry, activations, noActivation, revokedOnChain } of reading.entries) {
             const subject = subjectOf(entry);
             console.log(`\n${entry.id}@${entry.rev}  ${subject.name}: ${subject.title}`);
@@ -181,6 +187,12 @@ export function addReadCommand(registry: Command): void {
               console.log(`  ${item.activation.label}: ${describeActivation(item.status)}`);
             if (noActivation !== undefined) console.log(`  ${noActivation}`);
             for (const item of entry.breaks) console.log(`  breaks ${item.surface}: ${item.summary}`);
+            for (const item of entry.fix) console.log(`  fix: ${item.summary}`);
+            entry.sources.forEach((source, index) =>
+              console.log(
+                `  source [${index}] ${source.kind}: ${source.ref} (retrieved ${source.retrieved})`,
+              ),
+            );
           }
           if (reading.revoked.length > 0) console.log('');
           printRevoked(reading);

@@ -98,6 +98,9 @@ take it as `--cluster`, while `check rpc` and `rent scan` take it as `--registry
 which cluster their registry is anchored on if the CLI default does not answer. Rent tools are about Solana
 only; on other chains they have nothing to say.
 
+The probes of `check rpc` are pinned to a transaction on one chain each: an endpoint of a chain no probe is
+pinned to teaches nothing, and the report says so.
+
 A check that could not ask its question is not a check that found nothing, and the reports say which case they
 are. In the probe report, `observed` counts the probes that actually saw the endpoint behave; zero means
 nothing was learned about that endpoint (the command exits 2) and is reported as "cannot verify", never as

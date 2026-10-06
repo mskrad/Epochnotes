@@ -23,3 +23,6 @@ key.json
 *keypair*.json
 .env*
 !.env.example
+
+# the scratch directory of DEMO_RUNBOOK.md: a throwaway key and a local version log
+/demo/

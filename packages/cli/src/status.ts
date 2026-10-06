@@ -62,15 +62,20 @@ const IDENTIFIED: Record<'genesis' | 'chain-id' | 'asked', string> = {
   asked: ', taken as named: nothing confirmed it',
 };
 
-export function readingLine(reading: {
-  chain: string;
-  name?: string;
-  identifiedBy: 'genesis' | 'chain-id' | 'asked';
-  point: ReadingPoint;
-}): string {
+export function readingLine(
+  reading: {
+    chain: string;
+    name?: string;
+    identifiedBy: 'genesis' | 'chain-id' | 'asked';
+    point: ReadingPoint;
+  },
+  anyActivation = true,
+): string {
   const name = `${reading.name === undefined ? '' : ` (${reading.name})`}${IDENTIFIED[reading.identifiedBy]}`;
   const at = point(reading.point);
-  return `chain ${reading.chain}${name}${at === '' ? ', not read: see why below' : `, read at ${at}`}`;
+  // Nothing read can mean two things: nothing here activates on this chain, or this chain could not be read.
+  const empty = anyActivation ? ', not read: see why below' : ', nothing in this reading activates on it';
+  return `chain ${reading.chain}${name}${at === '' ? empty : `, read at ${at}`}`;
 }
 
 function print(report: StatusReport): void {
@@ -84,7 +89,7 @@ function print(report: StatusReport): void {
     console.error('  fix: check the network, or pass an endpoint of that chain with --rpc-url.');
     return;
   }
-  console.log(readingLine(report));
+  console.log(readingLine(report, report.activations.length > 0));
   let current = '';
   for (const item of report.activations) {
     if (item.entry !== current) console.log(`\n${item.entry}@${item.rev}  ${item.subject}`);

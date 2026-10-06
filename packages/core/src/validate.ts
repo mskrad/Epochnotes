@@ -10,6 +10,7 @@ import {
   entrySchemaV1,
   entrySchemaV2,
   PROBE_CLUSTERS,
+  PROBE_METHODS,
   READABLE_SCHEMA_VERSIONS,
 } from './schema.js';
 
@@ -70,6 +71,8 @@ function hintFor(issue: z.core.$ZodIssue, rawVersion?: unknown): string {
   if (issue.code === 'invalid_type' && issue.expected === 'int')
     return 'Use a whole number; fractional numbers are not allowed in entries.';
   if (field === 'retrieved') return 'Add retrieved: the date the source was read, as YYYY-MM-DD.';
+  if (field === 'method' && issue.path.includes('calls'))
+    return `A probe only reads: use one of ${PROBE_METHODS.join(', ')}.`;
   if (field === 'fixture')
     return `Name the chain the transaction lives on and its signature, as <chain>:<signature>. In schema_version 2 the chain is a CAIP-2 id, one of ${Object.values(SOLANA_CHAINS).join(', ')}; in schema_version 1 it is one of ${PROBE_CLUSTERS.join(', ')}. A probe runs only against an endpoint that serves that chain, so a chain no endpoint is recognised by would be probed on every endpoint that could not be placed.`;
   if (issue.code === 'invalid_type' && issue.input === undefined) return `Add the required field "${field}".`;

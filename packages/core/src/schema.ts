@@ -90,6 +90,33 @@ const SOLANA_PROBE_CHAINS = Object.values(SOLANA_CHAINS);
 const EVM_PROBE_CHAINS = Object.values(EVM_CHAINS);
 const PROBE_CHAINS = [...SOLANA_PROBE_CHAINS, ...EVM_PROBE_CHAINS];
 
+/**
+ * The JSON-RPC methods a probe may call: reads, and nothing else. A probe is run by the reader against the
+ * reader's own endpoint, so a signed entry must not be able to make it send, sign or simulate anything.
+ */
+export const PROBE_METHODS = [
+  // Solana
+  'getTransaction',
+  'getBlock',
+  'getSignaturesForAddress',
+  'getAccountInfo',
+  'getMultipleAccounts',
+  'getSlot',
+  'getBlockHeight',
+  'getVersion',
+  'getGenesisHash',
+  // EVM
+  'eth_getTransactionByHash',
+  'eth_getTransactionReceipt',
+  'eth_getBlockByNumber',
+  'eth_getBlockByHash',
+  'eth_getCode',
+  'eth_getBalance',
+  'eth_getStorageAt',
+  'eth_blockNumber',
+  'eth_chainId',
+] as const;
+
 /** Where a probe looks in an answer: `result` or `error`, then field names. */
 const answerPath = z
   .string()
@@ -119,7 +146,9 @@ const probeV2 = z.strictObject({
     .array(
       z.strictObject({
         id: slug.describe('How the observations and the pass conditions name this call.'),
-        method: text.describe('A read-only JSON-RPC method.'),
+        method: z
+          .enum(PROBE_METHODS)
+          .describe('A JSON-RPC method that only reads: a probe never sends, signs or simulates.'),
         params: z
           .array(z.unknown())
           .default([])
@@ -160,7 +189,7 @@ export function probeOf(
   if (probe.method !== 'getTransaction' || probe.fixture === undefined) return undefined;
   const call = (id: string, version?: number) => ({
     id,
-    method: 'getTransaction',
+    method: 'getTransaction' as const,
     params: [
       '$fixture',
       version === undefined

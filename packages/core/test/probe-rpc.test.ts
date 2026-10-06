@@ -181,6 +181,34 @@ describe('probing an EVM endpoint', () => {
   });
 });
 
+describe('a probe only ever reads', () => {
+  it('never calls a method outside the read-only list, even from an entry that was not validated', async () => {
+    const eth = entries.find((entry) => entry.id === 'eip-7702') as Entry;
+    // An entry that a validator would refuse, handed to the engine directly.
+    const writing = {
+      ...eth,
+      detect: eth.detect.map((rule) =>
+        rule.kind === 'runtime-probe' && 'calls' in rule.probe
+          ? {
+              ...rule,
+              probe: {
+                ...rule.probe,
+                calls: [{ id: 'transaction', method: 'eth_sendRawTransaction', params: ['$fixture'] }],
+              },
+            }
+          : rule,
+      ),
+    } as Entry;
+    const { rpc, asked } = evm('0x1', EVM_GENESIS['eip155:1'] as string, () => ({ result: {} }));
+    const report = await probeRpc('https://rpc.example', [writing], rpc);
+    expect(asked).not.toContain('eth_sendRawTransaction');
+    expect(probe(report, ETHEREUM)).toMatchObject({
+      verdict: 'not-applicable',
+      explanation: 'This tool does not call eth_sendRawTransaction: a probe may only read.',
+    });
+  });
+});
+
 describe('what the report says about the run', () => {
   it('only ever reads', async () => {
     const { rpc, asked } = solana(GENESIS['mainnet-beta'], refusesBelowOne);

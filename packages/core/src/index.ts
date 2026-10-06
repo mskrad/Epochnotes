@@ -30,6 +30,7 @@ export {
   type EntryV2,
   featureGatesOf,
   PROBE_CLUSTERS,
+  PROBE_METHODS,
   probeOf,
   READABLE_SCHEMA_VERSIONS,
   subjectOf,

@@ -140,7 +140,8 @@ describe('the corpus of before/after pairs', () => {
     expect(
       problemsAfter('no-licence-text', (dir) => rmSync(join(dir, 'pairs/LICENSES/MIT.txt'))),
     ).toContainEqual(expect.stringContaining('pairs/LICENSES/MIT.txt is missing'));
-  });
+    // It runs the whole corpus once per broken copy: its time grows with the corpus, not with a regression.
+  }, 30_000);
 
   it('notices a stray file in a case, and a manifest that is not there', () => {
     expect(

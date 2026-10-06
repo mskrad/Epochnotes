@@ -1,7 +1,7 @@
 import { chainNameOf, SOLANA_CHAINS, solanaChainId } from './chains.js';
 import { evmActivationReader } from './evm-activation.js';
 import { redactUrl } from './onchain.js';
-import { type Entry, probeOf } from './schema.js';
+import { type Entry, PROBE_METHODS, probeOf } from './schema.js';
 
 export interface ProbeCall {
   /** The id the entry gives the call. */
@@ -148,6 +148,17 @@ export async function probeRpc(
       const probe = probeOf(rule.probe);
       const fixture = rule.probe.fixture ?? '';
       const base = { entry: entry.id, rule: rule.rule, fixture, expect: rule.probe.expect };
+      // A probe only ever reads, whatever the entry says: a method outside the read-only list is never called.
+      const unsafe = probe?.calls.find((call) => !(PROBE_METHODS as readonly string[]).includes(call.method));
+      if (unsafe !== undefined) {
+        probes.push({
+          ...base,
+          verdict: 'not-applicable',
+          explanation: `This tool does not call ${unsafe.method}: a probe may only read.`,
+          calls: [],
+        });
+        continue;
+      }
       if (probe === undefined) {
         probes.push({
           ...base,

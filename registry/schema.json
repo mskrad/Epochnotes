@@ -355,8 +355,27 @@
                         },
                         "method": {
                           "type": "string",
-                          "minLength": 1,
-                          "description": "A read-only JSON-RPC method."
+                          "enum": [
+                            "getTransaction",
+                            "getBlock",
+                            "getSignaturesForAddress",
+                            "getAccountInfo",
+                            "getMultipleAccounts",
+                            "getSlot",
+                            "getBlockHeight",
+                            "getVersion",
+                            "getGenesisHash",
+                            "eth_getTransactionByHash",
+                            "eth_getTransactionReceipt",
+                            "eth_getBlockByNumber",
+                            "eth_getBlockByHash",
+                            "eth_getCode",
+                            "eth_getBalance",
+                            "eth_getStorageAt",
+                            "eth_blockNumber",
+                            "eth_chainId"
+                          ],
+                          "description": "A JSON-RPC method that only reads: a probe never sends, signs or simulates."
                         },
                         "params": {
                           "default": [],

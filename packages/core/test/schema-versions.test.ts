@@ -296,6 +296,16 @@ describe('a probe as data', () => {
       ['a path outside the answer', { ...good, observe: ['params.0'] }, /probe\.observe\[0\]/],
       ['no pass condition', { ...good, pass: [] }, /probe\.pass/],
       ['the schema-1 form', { method: 'getTransaction', fixture: good.fixture, expect: 'x' }, /probe/],
+      [
+        'a call that writes',
+        { ...good, calls: [{ id: 'transaction', method: 'eth_sendRawTransaction', params: ['$fixture'] }] },
+        /probe\.calls\[0\]\.method/,
+      ],
+      [
+        'a call that simulates',
+        { ...good, calls: [{ id: 'transaction', method: 'simulateTransaction', params: ['$fixture'] }] },
+        /probe\.calls\[0\]\.method/,
+      ],
     ];
     for (const [name, probe, path] of cases)
       expect(

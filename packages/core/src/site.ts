@@ -88,7 +88,7 @@ function entryCard(entry: Entry): string {
     .map((chain) => `<span class="tag chain">${escapeHtml(chain)}</span>`)
     .join(
       '',
-    )}<span class="muted">entry <code>${escapeHtml(entry.id)}</code> · rev ${entry.rev}${statics + probes === 0 ? '' : ` · ${statics} static rule(s), ${probes} RPC probe(s)`}</span></p>
+    )}<span class="muted">entry <code>${escapeHtml(entry.id)}</code> · rev ${escapeHtml(String(entry.rev))}${statics + probes === 0 ? '' : ` · ${statics} static rule(s), ${probes} RPC probe(s)`}</span></p>
 </header>
 <h4>What breaks</h4>
 <ul>${entry.breaks.map((item) => `<li><span class="tag surface">${escapeHtml(item.surface)}</span> ${escapeHtml(item.summary)}</li>`).join('')}</ul>

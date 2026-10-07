@@ -11,9 +11,15 @@ if (flag !== -1) {
     console.error('--watch-report takes the path of a report.json written by epochnotes watch solana');
     process.exit(2);
   }
-  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  let watch;
+  try {
+    watch = siteWatchOf(JSON.parse(readFileSync(reportPath, 'utf8')));
+  } catch (error) {
+    console.error(`${reportPath} is not a report written by epochnotes watch solana: ${error.message}`);
+    process.exit(2);
+  }
   mkdirSync(new URL('site/', root), { recursive: true });
-  writeFileSync(watchFile, `${JSON.stringify(siteWatchOf(report), null, 2)}\n`);
+  writeFileSync(watchFile, `${JSON.stringify(watch, null, 2)}\n`);
 }
 const registry = validatePath(new URL('registry/entries', root).pathname);
 if (registry.files.some((file) => file.entry === undefined)) {

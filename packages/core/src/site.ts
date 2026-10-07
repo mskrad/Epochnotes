@@ -17,6 +17,12 @@ export interface SiteWatch {
 }
 
 export function siteWatchOf(report: WatchReport): SiteWatch {
+  if (
+    !Number.isInteger(report.declared) ||
+    !Number.isInteger(report.inRegistry) ||
+    !Array.isArray(report.upcoming)
+  )
+    throw new Error('it has no counts of declared and covered gates, or no list of upcoming gates');
   return {
     agave: report.agave,
     clusters: report.clusters,
@@ -114,7 +120,7 @@ ${WATCHED_CLUSTERS.map((cluster) => `<td>${stateChip(item.state[cluster] ?? 'unk
 </tr>`,
     )
     .join('\n');
-  return `<p>Read on ${escapeHtml(watch.agave.retrieved)} from agave ${link(commit, watch.agave.commit.slice(0, 12))} and three clusters (${WATCHED_CLUSTERS.map((cluster) => `${cluster} slot ${escapeHtml(watch.clusters[cluster].slot)}`).join(', ')}): <strong>${watch.declared}</strong> feature gates declared, <strong>${watch.inRegistry}</strong> of them covered by the registry.</p>
+  return `<p>Read on ${escapeHtml(watch.agave.retrieved)} from agave ${link(commit, watch.agave.commit.slice(0, 12))} and three clusters (${WATCHED_CLUSTERS.map((cluster) => `${cluster} slot ${escapeHtml(watch.clusters[cluster].slot)}`).join(', ')}): <strong>${escapeHtml(String(watch.declared))}</strong> feature gates declared, <strong>${escapeHtml(String(watch.inRegistry))}</strong> of them covered by the registry.</p>
 <h3>On the way to mainnet-beta (${watch.upcoming.length})</h3>
 <p class="muted">Not active on mainnet-beta yet, but active on testnet or devnet, or already scheduled on mainnet-beta.</p>
 <div class="scroll"><table>
@@ -143,7 +149,7 @@ h4{margin:14px 0 4px;font-size:0.95rem;color:var(--muted);text-transform:upperca
 .muted{color:var(--muted)}
 .small{font-size:0.9rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.card{overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
 .entry{margin-bottom:14px}
 .entry ul{margin:4px 0;padding-left:20px}
 .meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}

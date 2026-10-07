@@ -55,7 +55,35 @@ describe('the project page', () => {
         { kind: 'simd', ref: 'https://example.org/"onmouseover="alert(1)', retrieved: '2026-10-07' },
       ],
     } as Entry;
-    const page = renderSite([hostile]);
+    const markup = '"\'><script>alert(1)</script>';
+    const everywhere = {
+      ...hostile,
+      subject: { standard: 'simd', name: markup, title: markup },
+      breaks: [...hostile.breaks, { surface: markup, summary: 'x' }],
+      applies: {
+        activations: [
+          { kind: 'feature-account', chain: 'solana', address: markup, label: markup, effect: markup },
+          { kind: 'timestamp', chain: markup, at: 0, label: markup, effect: markup },
+        ],
+      },
+    } as unknown as Entry;
+    const hostileWatch = {
+      agave: { repository: `https://x.org/${markup}`, commit: markup, retrieved: markup },
+      clusters: { 'mainnet-beta': { slot: markup }, testnet: { slot: markup }, devnet: { slot: markup } },
+      declared: markup,
+      inRegistry: markup,
+      upcoming: [
+        {
+          module: markup,
+          simd: markup,
+          description: markup,
+          state: { 'mainnet-beta': markup, testnet: markup, devnet: markup },
+          entry: markup,
+        },
+      ],
+    } as unknown as SiteWatch;
+    const page = renderSite([hostile, everywhere], hostileWatch);
+    expect(page).not.toContain('<script>alert(1)');
     const tags = page.match(/<[^>]*>/g) ?? [];
     expect(tags.filter((tag) => /^<(script|img|b)\b|\son\w+=|javascript:/i.test(tag))).toEqual([]);
     expect(page).toContain(
@@ -96,6 +124,7 @@ describe('the project page', () => {
     } as WatchReport;
     const kept = siteWatchOf(report);
     expect(JSON.stringify(kept)).not.toContain('draft');
+    expect(() => siteWatchOf({ ...report, declared: '1' } as unknown as WatchReport)).toThrow('no counts');
     expect(kept.upcoming).toEqual([
       { module: 'x', state: { 'mainnet-beta': 'absent', testnet: 'active', devnet: 'active' } },
     ]);

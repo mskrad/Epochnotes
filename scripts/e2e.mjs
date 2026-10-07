@@ -161,7 +161,7 @@ try {
 
   if (process.env.E2E_OFFLINE === '1')
     console.log(
-      'SKIP     status on devnet and rent scan on mainnet (E2E_OFFLINE=1): this run does not cover the network steps',
+      'SKIP     status on devnet, the Solana watcher and rent scan on mainnet (E2E_OFFLINE=1): this run does not cover the network steps',
     );
   else {
     step(
@@ -252,6 +252,30 @@ try {
         return report.simulation.logs.some((line) => line.includes('Instruction: CloseOpenOrdersAccount'))
           ? undefined
           : 'the simulation did not reach the close instruction';
+      },
+    );
+    const watched = join(work, 'watch');
+    const watchArgs = ['watch', 'solana', '--state', join(watched, 'state.json'), '--out', watched, '--json'];
+    step('takes a baseline of every gate agave declares on three clusters', watchArgs, 0, (_all, stdout) => {
+      const report = JSON.parse(stdout);
+      if (report.baseline !== true) return 'the first run is not a baseline';
+      if (!/^[0-9a-f]{40}$/.test(report.agave?.commit ?? '')) return 'the agave commit is not pinned';
+      if (report.declared < 200 || report.inRegistry < 1)
+        return `${report.declared} gates, ${report.inRegistry} named`;
+      return report.upcoming.length > 0 ? undefined : 'nothing on the way to mainnet-beta';
+    });
+    // The second run reads the same agave commit: a new commit there between two runs is not this test's business.
+    const agaveRef = JSON.parse(readFileSync(join(watched, 'state.json'), 'utf8')).agave.commit;
+    step(
+      'compares the second run with the first and drafts nothing on a quiet chain',
+      [...watchArgs, '--agave-ref', agaveRef],
+      0,
+      (_all, stdout) => {
+        const report = JSON.parse(stdout);
+        if (report.baseline !== false) return 'the second run did not compare with the snapshot';
+        return report.newlyDeclared.length === 0 && report.drafts.length === 0
+          ? undefined
+          : 'a quiet chain produced changes';
       },
     );
     step(

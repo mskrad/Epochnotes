@@ -52,6 +52,22 @@ A runtime probe is data in the entry, not code: the read-only calls to make agai
 
 A check that could not ask its question says so instead of passing. `check repo` lists, under `entriesNotChecked`, every entry that carries no rule a static check can run: no finding for such an entry means nothing was looked for. `check rpc` exits 2, not 0, when no probe observed the endpoint — the probes of an entry are pinned to the cluster of their fixture, so an endpoint of another cluster is left unexamined, and a check that runs it in CI must not go green on that.
 
+## Watching for changes
+
+Entries are written by people; the watcher tells them where to look. `watch solana` reads every feature gate agave declares (`feature-set/src/lib.rs` at a pinned commit) and its state on mainnet-beta, testnet and devnet, compares it with the snapshot of the last look, and reports:
+
+- gates on the way to mainnet-beta — active on testnet or devnet, or scheduled on mainnet-beta — and the entry that covers each, if any;
+- gates agave declared since the last look, and every change of state per cluster;
+- for each gate that moved and no entry names, a draft entry: the activations and the source are filled in, what breaks and how to fix it are not.
+
+```bash
+epochnotes watch solana --state ~/.epochnotes/watch/state.json --out ~/.epochnotes/watch   # report.md, report.json, drafts/
+```
+
+It only reads, and it never signs or publishes. A draft carries `DRAFT:` markers that `registry validate` refuses, so it cannot be published by mistake: a person writes it from the SIMD, adds the SIMD as a source, and signs. A gate whose account holds lamports but is not a feature account is reported as `unknown`, with what the account holds instead. A look that could not read agave or any of the clusters exits 2 and leaves the last snapshot as it was.
+
+Run it on a schedule — cron, CI, or a scheduled task of an AI assistant that also drafts the prose from the SIMD for a person to review. Next: watchers for Ethereum and Base (fork times in the client configurations), a notification when something not in the registry moves, and the latest report on the project page.
+
 ## Rent held above the minimum
 
 The staged rent reduction lowers the minimum balance of every account, and returns nothing by itself. `rent scan` measures, read-only, what is left above the minimum:

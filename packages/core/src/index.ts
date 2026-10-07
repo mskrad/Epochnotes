@@ -66,6 +66,23 @@ export {
   rpcFeatureAccountSource,
 } from './feature-status.js';
 export { registryStatus, type StatusReport } from './status.js';
+export {
+  type DeclaredFeature,
+  DRAFT_MARKER,
+  draftEntry,
+  parseAgaveFeatures,
+  WATCHED_CLUSTERS,
+  type WatchChange,
+  type WatchDraft,
+  type WatchedCluster,
+  type WatchedFeature,
+  type WatchOptions,
+  type WatchReport,
+  watchReportMarkdown,
+  type WatchSnapshot,
+  watchSolana,
+} from './watch.js';
+export { type WatchFiles, watchSolanaFiles } from './watch-run.js';
 export { EVM_GENESIS, evmActivationReader, evmActivationState } from './evm-activation.js';
 export { call, httpJsonRpc, type JsonRpc } from './json-rpc.js';
 export {

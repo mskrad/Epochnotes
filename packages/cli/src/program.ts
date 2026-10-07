@@ -7,6 +7,7 @@ import { checkCommand } from './check.js';
 import { registryCommand } from './registry.js';
 import { rentCommand } from './rent.js';
 import { statusCommand } from './status.js';
+import { watchCommand } from './watch.js';
 
 /** The version lives in package.json only. */
 export const CLI_VERSION = (createRequire(import.meta.url)('../package.json') as { version: string }).version;
@@ -29,6 +30,7 @@ export function buildProgram(): Command {
       .addCommand(registryCommand())
       .addCommand(statusCommand())
       .addCommand(checkCommand())
-      .addCommand(rentCommand()),
+      .addCommand(rentCommand())
+      .addCommand(watchCommand()),
   );
 }

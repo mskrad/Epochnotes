@@ -4,6 +4,7 @@ import { parse as parseYaml, YAMLParseError } from 'yaml';
 import type { z } from 'zod';
 
 import { SOLANA_CHAINS } from './chains.js';
+import { DRAFT_MARKER } from './watch.js';
 import {
   activationsOf,
   type Entry,
@@ -150,6 +151,18 @@ function semanticIssues(entry: Entry): Issue[] {
     }
   });
 
+  // A draft written by the watcher is not an entry until a person replaces every marker with what the source says.
+  [
+    ...entry.breaks.map((item, index) => [`breaks[${index}].summary`, item.summary] as const),
+    ...entry.fix.map((item, index) => [`fix[${index}].summary`, item.summary] as const),
+  ].forEach(([path, summary]) => {
+    if (summary.includes(DRAFT_MARKER))
+      issues.push({
+        path,
+        message: 'Entry is a draft written by the watcher',
+        hint: `Write what the primary source says, add it to sources, and remove every ${DRAFT_MARKER} marker.`,
+      });
+  });
   const activations = entry.schema_version === 2 ? 'activations' : 'gates';
   activationsOf(entry).forEach((gate, index) => {
     if (gate.kind === 'feature-account' && !isAddress(gate.address)) {

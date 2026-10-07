@@ -12,12 +12,14 @@ import { fileURLToPath } from 'node:url';
 export const DEFAULT_CONTENT_TIMEOUT_MS = 20_000;
 export const DEFAULT_CONTENT_MAX_BYTES = 64 * 1024 * 1024;
 
+/** One try at reading committed content: where, and what came of it. */
 export interface ContentAttempt {
   source: string;
   outcome: 'ok' | 'hash_mismatch' | 'http_error' | 'timeout' | 'too_large' | 'unsupported' | 'error';
   detail?: string;
 }
 
+/** Thrown when no source served bytes with the committed hash; lists every attempt. */
 export class ContentUnavailableError extends Error {
   constructor(readonly attempts: ContentAttempt[]) {
     const tried = attempts

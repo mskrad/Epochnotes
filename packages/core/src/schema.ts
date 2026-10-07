@@ -128,7 +128,7 @@ const answerPath = z
 /**
  * A runtime probe of schema 2 is data the engine runs, not code: the calls to make (the transaction id put in
  * for `$fixture`), what to record from each answer, and when the endpoint behaves as the entry says. The reading
- * of what was recorded stays with `expect`, in words, as before.
+ * of what was recorded stays with `expect`, in words.
  */
 const probeV2 = z.strictObject({
   fixture: z
@@ -186,6 +186,9 @@ const detectRuleV2 = detectRuleSchema(
   probeV2,
 );
 
+/**
+ * A runtime probe in the form the engine runs: fixture, read-only calls, what to record and when it passes.
+ */
 export type DeclarativeProbe = z.infer<typeof probeV2>;
 
 /**
@@ -347,6 +350,7 @@ const activation = z.discriminatedUnion('kind', [
   }),
 ]);
 
+/** Where and how one change activates on one chain: a feature account, a fork time or a block height. */
 export type Activation = z.infer<typeof activation>;
 
 const appliesV2 = z
@@ -388,7 +392,9 @@ export const entrySchemaV2 = z.strictObject({
 /** The format authors write. */
 export const entrySchema = entrySchemaV2;
 
+/** An entry in schema 1, as versions signed before schema 2 hold it. */
 export type EntryV1 = z.infer<typeof entrySchemaV1>;
+/** An entry in schema 2, the format authors write. */
 export type EntryV2 = z.infer<typeof entrySchemaV2>;
 /** An entry as it was written and signed, in either format. Hash it as it is; read it through the views below. */
 export type Entry = EntryV1 | EntryV2;

@@ -96,6 +96,10 @@ const ADAPTERS: Adapter[] = [
 const rpcOf = (rpcUrl: string, transport?: RpcTransport) =>
   transport === undefined ? createSolanaRpc(rpcUrl) : createSolanaRpcFromTransport(transport);
 
+/**
+ * The unsigned transaction that returns the rent deposit of one account, and what the program checks before
+ * it agrees.
+ */
 export interface ClosePlan {
   account: string;
   program: { address: string; name: string };
@@ -113,8 +117,10 @@ export interface ClosePlan {
   transaction: string;
 }
 
+/** Why no close transaction is offered for an account. */
 export type CloseRefusal = { ok: false; reason: string };
 
+/** What the cluster says the close transaction would do, or why it could not say. */
 export interface SimulationResult {
   endpoint: string;
   slot: string;

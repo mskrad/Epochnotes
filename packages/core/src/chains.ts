@@ -13,6 +13,7 @@ export const GENESIS = {
   devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
 } as const;
 
+/** A Solana cluster this library knows by its genesis hash. */
 export type SolanaCluster = keyof typeof GENESIS;
 
 /** The CAIP-2 id of a Solana chain from its genesis hash. */
@@ -28,6 +29,7 @@ export const SOLANA_CHAINS = Object.fromEntries(
 /** CAIP-2: a namespace of 3–8 characters and a reference of up to 32. */
 export const CAIP2_PATTERN = /^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$/;
 
+/** The CAIP-2 namespace of a chain id: `solana`, `eip155`. */
 export function namespaceOf(chain: string): string {
   return chain.split(':')[0] ?? chain;
 }

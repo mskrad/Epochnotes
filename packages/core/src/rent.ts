@@ -33,9 +33,11 @@ export function rentScheduleFromEntry(entry: Entry): RentSchedule {
   return { entry: entry.id, rev: entry.rev, legacyRate: BigInt(legacy), steps };
 }
 
+/** The rent-exempt minimum of an account of `space` bytes at `rate` lamports per byte. */
 export const minimumBalance = (space: bigint, rate: bigint): bigint =>
   (ACCOUNT_STORAGE_OVERHEAD + space) * rate;
 
+/** What one account holds above the rent-exempt minimum, and how much of that is a rent deposit. */
 export interface AccountRent {
   /**
    * The earlier rate at which the balance is exactly the minimum: the account holds a rent deposit and nothing
@@ -65,6 +67,10 @@ export function rentAfter(lamports: bigint, space: bigint, rate: bigint, legacyR
   return legacyMinimum - atRate;
 }
 
+/**
+ * The rent of one account: an exact excess when its balance is an earlier minimum, an upper bound when it is not,
+ * and the deposit part above the minimum of every step still to come.
+ */
 export function accountRent(
   account: { lamports: bigint; space: bigint },
   schedule: RentSchedule,

@@ -90,6 +90,7 @@ function snapshotAt(path: string): WatchSnapshot {
   return snapshot as WatchSnapshot;
 }
 
+/** Where a look of the watcher reads and writes its files. */
 export interface WatchFiles {
   /** The snapshot of the last look: read when present, replaced after a successful look. */
   state: string;

@@ -67,7 +67,7 @@ describe('probing a Solana endpoint', () => {
       verdict: 'reads',
       expect: 'Result has version 1 and no JSON-RPC error.',
     });
-    // What the probe recorded before (parameter omitted, 0, 1 → error, error, version 1), call by call.
+    // Parameter omitted, 0, 1 → error, error, version 1: call by call, as the probe has always recorded them.
     expect(probe(report, TX_V1)?.calls).toEqual([
       {
         call: 'version-omitted',

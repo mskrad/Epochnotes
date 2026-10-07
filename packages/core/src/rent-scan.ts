@@ -27,6 +27,7 @@ function spaceOf(account: RpcAccount): bigint {
   return BigInt(account.account.space);
 }
 type RpcAnswer = { result?: unknown; error?: { code?: number; message?: string } };
+/** One JSON-RPC call. Scans take this function, so tests substitute it without a network. */
 export type RentRpc = (method: string, params: unknown[]) => Promise<RpcAnswer>;
 
 /**
@@ -61,6 +62,7 @@ export function rentRpc(
   };
 }
 
+/** The rent figures of one account type in a scan. */
 export interface RentBucket {
   /** Account type by discriminator, `unlisted` for a type the table does not know, `all` when nothing is split. */
   type: string;
@@ -80,6 +82,10 @@ export interface RentBucket {
   unreliable?: boolean;
 }
 
+/**
+ * A rent scan of a program or a wallet: the rate in force, the schedule, and figures per account type and in
+ * total.
+ */
 export interface RentScanReport {
   target: { kind: 'program'; program: string; name?: string } | { kind: 'wallet'; wallet: string };
   endpoint: string;
@@ -235,6 +241,7 @@ const splitNote = (program: KnownProgram | undefined): string =>
     ? 'Account types are not split: this program is not in the table of known programs.'
     : `Account types are told apart by the first 8 bytes of the data (Anchor discriminator). A type is closable when the program source (${program.source}) gives it a "close =" constraint; who signs is read from the ${program.idl.name} ${program.idl.version} IDL fetched from mainnet-beta on ${program.idl.retrieved}. The source may be ahead of the deployed program, and closing can have preconditions.`;
 
+/** What every scan needs: the endpoint, the gates of the schedule, and the schedule itself. */
 export interface ScanOptions {
   rpc: RentRpc;
   gates: FeatureAccountSource;
@@ -307,6 +314,10 @@ function pick(random: () => number, count: number): number[] {
   return all.slice(0, count);
 }
 
+/**
+ * A scan by sample: which byte splits accounts into groups, how many groups to read, and the seed that picks
+ * them.
+ */
 export interface SampleOptions extends ScanOptions {
   /** Offset of a byte that is spread evenly over accounts: a byte of a key stored in the data. */
   offset: number;

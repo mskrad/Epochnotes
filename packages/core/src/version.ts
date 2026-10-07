@@ -43,9 +43,12 @@ export const manifestSchema = z.strictObject({
   signature: z.string().regex(/^[0-9a-f]{128}$/),
 });
 
+/** A signed version of a publisher's registry. */
 export type Manifest = z.infer<typeof manifestSchema>;
+/** A manifest before its publisher signs it. */
 export type UnsignedManifest = Omit<Manifest, 'signature'>;
 
+/** The content file of a version as bytes, its entries and their leaves. */
 export interface VersionContent {
   bytes: Uint8Array;
   entries: Entry[];
@@ -289,6 +292,7 @@ export function manifestSigningBytes(manifest: UnsignedManifest | Manifest): Uin
   return new TextEncoder().encode(SIGNING_DOMAIN + canonicalize(unsigned));
 }
 
+/** Signs a manifest with the publisher key, over the bytes `manifestSigningBytes` gives. */
 export async function signManifest(
   manifest: UnsignedManifest,
   privateKey: webcrypto.CryptoKey,
@@ -296,6 +300,7 @@ export async function signManifest(
   return { ...manifest, signature: toHex(await signBytes(privateKey, manifestSigningBytes(manifest))) };
 }
 
+/** Whether the signature of a manifest is its publisher's, over exactly the bytes a publisher signs. */
 export async function verifyManifestSignature(manifest: Manifest): Promise<boolean> {
   try {
     const key = await getPublicKeyFromAddress(
@@ -407,6 +412,7 @@ export function verifyContent(
   return issues.length === 0 ? decoded : { ok: false, issues };
 }
 
+/** An entry of a version, its leaf and position, and the proof that ties it to the version's root. */
 export interface EntryProof {
   entry: Entry;
   leaf: string;
@@ -451,6 +457,7 @@ export interface VersionPin {
   merkleRoot: string;
 }
 
+/** Reads a pin written as `<n>:<merkle_root>`; undefined for anything else. */
 export function parsePin(value: string): VersionPin | undefined {
   const match = /^([1-9]\d*):([0-9a-f]{64})$/.exec(value);
   if (match === null || !Number.isSafeInteger(Number(match[1]))) return undefined;

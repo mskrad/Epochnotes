@@ -194,7 +194,8 @@ describe('watching the clusters', () => {
 
   it('reports what changed since the last snapshot, and drafts only what the registry does not name', async () => {
     const { snapshot } = await watch(quiet());
-    // Since then: agave declared a gate it did not before, testnet activated vote state v4 elsewhere, …
+    // The last look, as if it were taken before agave declared the stake v5 gate and before testnet activated
+    // alpenglow and vote state v4.
     const before = {
       ...snapshot,
       features: snapshot.features

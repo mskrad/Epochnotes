@@ -6,6 +6,7 @@ import {
   type Rpc,
 } from '@solana/kit';
 
+/** JSON-RPC endpoints of the Solana clusters: the public ones, and a validator on this machine. */
 export const CLUSTERS = {
   'mainnet-beta': 'https://api.mainnet-beta.solana.com',
   testnet: 'https://api.testnet.solana.com',
@@ -14,6 +15,7 @@ export const CLUSTERS = {
   localnet: 'http://127.0.0.1:8899',
 } as const;
 
+/** A Solana cluster with a public endpoint known to this library. */
 export type Cluster = keyof typeof CLUSTERS;
 
 const FEATURE_PROGRAM = 'Feature111111111111111111111111111111111111';
@@ -34,6 +36,7 @@ export type FeatureState =
   /** The account exists but is not a feature account this library understands. */
   | { state: 'unreadable'; reason: string };
 
+/** A feature account as an RPC node returns it: its owner and its raw data. */
 export interface FeatureAccount {
   owner: string;
   data: Uint8Array;
@@ -44,6 +47,7 @@ export interface FeatureAccountSource {
   getAccounts(addresses: string[]): Promise<{ slot: bigint; accounts: (FeatureAccount | null)[] }>;
 }
 
+/** The states of the gates asked about and the slot of the answer, or why the cluster did not answer. */
 export type FeatureStatusReport =
   { ok: true; slot: bigint; states: Map<string, FeatureState> } | { ok: false; error: string };
 

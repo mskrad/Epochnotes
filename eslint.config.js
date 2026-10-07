@@ -16,7 +16,7 @@ export default tseslint.config(
   {
     files: ['packages/cli/src/**/*.ts'],
     rules: {
-      // The CLI is a thin shell (architecture §1): only core and the argument parser may be imported.
+      // The CLI is a thin shell: only core and the argument parser may be imported, so logic stays testable in core.
       'no-restricted-imports': [
         'error',
         {

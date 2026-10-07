@@ -31,6 +31,7 @@ export type Provenance =
     }
   | { verified: false; workingCopy: string; warning: string };
 
+/** An entry a consumer may rely on, with what the chain says about its activations when it was asked. */
 export interface EntryReading {
   entry: Entry;
   /** Present when a chain was asked about: what it says about each activation of the entry on that chain. */
@@ -41,6 +42,7 @@ export interface EntryReading {
   revokedOnChain?: true;
 }
 
+/** Verified entries with their provenance, or why nothing can be returned. */
 export type RegistryReading =
   | {
       ok: true;
@@ -60,11 +62,16 @@ export interface ChainSource {
   revocation(publisher: string, entryId: string): Promise<OnchainRevocation | undefined>;
 }
 
+/**
+ * Asks the registry program on `cluster`: how the log compares with the chain, and whether an entry was
+ * revoked.
+ */
 export const chainSourceOf = (cluster: Cluster): ChainSource => ({
   differences: (log) => compareLogWithChain(cluster, log),
   revocation: (publisher, entryId) => fetchRevocation(cluster, publisher, entryId),
 });
 
+/** Where entries come from, which ones, and what to ask the chain. */
 export interface ReadOptions {
   /** The signed log to read from. Without it, `workingCopy` must be given. */
   log?: VerifyOptions;

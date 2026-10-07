@@ -9,6 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 
+/** One step of a proof: a sibling hash and the side it sits on. */
 export interface MerkleProofNode {
   /** The side the sibling sits on. */
   position: 'left' | 'right';
@@ -29,6 +30,7 @@ function pair(left: Uint8Array, right: Uint8Array): Uint8Array {
   return sha256(joined);
 }
 
+/** Every level of the tree, leaves first, root last. */
 export function buildMerkleLevels(leaves: Uint8Array[]): Uint8Array[][] {
   if (leaves.length === 0) throw new Error('A Merkle tree needs at least one leaf');
   leaves.forEach((leaf, index) => {
@@ -47,10 +49,12 @@ export function buildMerkleLevels(leaves: Uint8Array[]): Uint8Array[][] {
   return levels;
 }
 
+/** The root of a tree built by `buildMerkleLevels`. */
 export function merkleRoot(levels: Uint8Array[][]): Uint8Array {
   return levels[levels.length - 1]?.[0] as Uint8Array;
 }
 
+/** The siblings from a leaf up to the root, in the form `rootFromProof` and `verifyMerkleProof` take. */
 export function buildMerkleProof(levels: Uint8Array[][], leafIndex: number): MerkleProofNode[] {
   const leafCount = levels[0]?.length ?? 0;
   if (!Number.isInteger(leafIndex) || leafIndex < 0 || leafIndex >= leafCount) {

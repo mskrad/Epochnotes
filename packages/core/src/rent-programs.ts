@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 /** Who can close an account of this type, according to the `close =` constraints of the program source. */
 export type ClosableBy = 'owner' | 'admin' | 'nobody';
 
+/** An account type of a known program: who can close it and where its owner sits in the data. */
 export interface AccountType {
   name: string;
   closableBy: ClosableBy;
@@ -12,6 +13,7 @@ export interface AccountType {
   ownerOffset?: number;
 }
 
+/** A program the rent scanner can split by account type, with where that knowledge was read. */
 export interface KnownProgram {
   address: string;
   name: string;
@@ -108,5 +110,6 @@ export const KNOWN_PROGRAMS: KnownProgram[] = [
   },
 ];
 
+/** The known program at an address, if there is one. */
 export const knownProgram = (address: string): KnownProgram | undefined =>
   KNOWN_PROGRAMS.find((program) => program.address === address);

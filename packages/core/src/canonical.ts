@@ -5,6 +5,7 @@ import type { Entry } from './schema.js';
 /** A value the canonical form accepts: no floats, no null, no undefined. */
 export type CanonicalValue = string | number | boolean | CanonicalValue[] | { [key: string]: CanonicalValue };
 
+/** Thrown for a value the canonical form does not accept; `path` says where in the value it sits. */
 export class CanonicalizationError extends Error {
   constructor(
     message: string,
@@ -60,6 +61,7 @@ export function entryLeafHash(entry: Entry): Uint8Array {
   return createHash('sha256').update(canonicalize(entry), 'utf8').digest();
 }
 
+/** Lower-case hex of bytes, the form roots, leaves and hashes take in manifests and reports. */
 export function toHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('hex');
 }

@@ -25,6 +25,7 @@ export interface Issue {
   hint: string;
 }
 
+/** A valid entry with its defaults filled in, or every issue found in it. */
 export type ValidationResult = { ok: true; entry: Entry; issues: [] } | { ok: false; issues: Issue[] };
 
 /** A `YYYY-MM-DD` string that is also a real calendar date. */
@@ -235,7 +236,6 @@ function semanticIssues(entry: Entry): Issue[] {
   return issues;
 }
 
-/** Validates one parsed entry: shape first, then the checks a schema cannot express. */
 const PROBE_BYTES = 192 * 1024;
 const PROBE_BUDGET_MS = 400;
 
@@ -314,6 +314,7 @@ export function slowPatternInput(pattern: string): string | undefined {
   return undefined;
 }
 
+/** Validates one parsed entry: shape first, then the checks a schema cannot express. */
 export function validateEntry(raw: unknown): ValidationResult {
   // The format decides the schema; parsing against the right one gives errors at the right field instead of
   // a union's "invalid input".

@@ -30,6 +30,10 @@ const MAX_FILE_BYTES = 1024 * 1024;
  */
 const MAX_LOCKFILE_BYTES = 64 * 1024 * 1024;
 
+/**
+ * One place in a repository where a detect rule matched: which entry and rule, how sure it is, and the lines
+ * around it.
+ */
 export interface Finding {
   entry: string;
   rev: number;
@@ -45,6 +49,7 @@ export interface Finding {
   fix: string[];
 }
 
+/** A path the check did not read, and why: so that an unread file is never taken for a clean one. */
 export interface Skipped {
   /** Path relative to the scanned directory, as it is named there. */
   file: string;
@@ -57,6 +62,10 @@ export interface Skipped {
     | 'unparsable-lockfile';
 }
 
+/**
+ * A repository check: what was read, what was found, and what could not be asked at all. `ok: false` when the
+ * directory cannot be checked.
+ */
 export type CheckReport =
   | {
       ok: true;
@@ -107,7 +116,7 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
 /**
  * The files to check, by their real paths. In a git work tree these are the files git does not ignore — tracked
  * ones and new ones not yet added: that leaves out dependencies and build output without guessing directory
- * names — a guess such as "build" once hid `skills/build/...` — and does not report a new file clean unread.
+ * names — a guess such as "build" would also hide `skills/build/...` — and does not report a new file clean unread.
  *
  * Nothing outside the root is ever read. A repository is somebody else's data: a link in it — a tracked link,
  * or a tracked path that runs through a linked directory — may point at any file this process can open, and a
@@ -385,7 +394,7 @@ export function checkDirectory(
           rule,
           extensions: new Set(rule.languages.flatMap((language) => EXTENSIONS[language])),
           // Over the whole text, so that a line break inside the match does not hide it; `m` keeps ^ and $ meaning
-          // a line, as they did when patterns ran line by line.
+          // a line.
           regex: new RegExp(rule.pattern, 'gm'),
           read: 0,
         });
@@ -470,7 +479,7 @@ export function checkDirectory(
         for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
           if (match[0] === '') regex.lastIndex += 1; // an empty match must not loop forever
           const line = lineOf(match.index);
-          if (line === lastLine) continue; // one finding for a line and a rule, as before
+          if (line === lastLine) continue; // one finding for a line and a rule
           // Commented-out code does not run.
           if (isComment(match.index, line)) continue;
           lastLine = line;

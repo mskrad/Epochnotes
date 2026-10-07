@@ -3,6 +3,7 @@ import { evmActivationReader } from './evm-activation.js';
 import { redactUrl } from './onchain.js';
 import { type Entry, PROBE_METHODS, probeOf } from './schema.js';
 
+/** One call of a probe and what it observed. */
 export interface ProbeCall {
   /** The id the entry gives the call. */
   call: string;
@@ -12,6 +13,7 @@ export interface ProbeCall {
     { ok: true; observed: Record<string, unknown> } | { ok: false; code: number | null; message: string };
 }
 
+/** The verdict of one probe against one endpoint, with the observations it rests on. */
 export interface ProbeResult {
   entry: string;
   rule: string;
@@ -23,6 +25,7 @@ export interface ProbeResult {
   calls: ProbeCall[];
 }
 
+/** The verdicts of every probe against one endpoint, and the chain that endpoint said it serves. */
 export interface RpcProbeReport {
   endpoint: string;
   /** The CAIP-2 id of the chain the endpoint serves, as it says itself, or `unknown`. */

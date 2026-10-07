@@ -2,6 +2,10 @@ import { type ActivationReader, type ChainReading, readActivations } from './act
 import { validatePath } from './load.js';
 import type { Issue } from './validate.js';
 
+/**
+ * The reading of one chain, or why there is none: the registry did not validate, or the network did not
+ * answer.
+ */
 export type StatusReport =
   | ({ ok: true } & ChainReading)
   | { ok: false; kind: 'registry'; issues: Issue[] }

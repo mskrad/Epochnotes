@@ -47,7 +47,7 @@ export interface BrokenEntry {
 
 /**
  * Broken entries are derived from the reference entry by one edit each, so they cannot drift away from it.
- * The first seven are the variants fixed in the entry format note; the rest cover traceability of sources.
+ * They cover the shape of an entry first, then the traceability of its claims to its sources.
  */
 export const brokenEntries: BrokenEntry[] = [
   {

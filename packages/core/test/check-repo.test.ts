@@ -488,9 +488,9 @@ describe('check repo', () => {
     it('reads hostile lockfiles in time that grows with their size, and still finds the version at their end', () => {
       const pinned = '"@solana/web3.js@^1.98.0":\n  version "1.98.4"\n';
       const hostile: Record<string, string> = {
-        // what made the old expression backtrack: blocks of indented lines without a version
+        // the worst case of a backtracking expression: blocks of indented lines without a version
         blocks: `# yarn lockfile v1\n${`"@solana/web3.js@^1":\n${'  resolved "x"\n'.repeat(40)}\n`.repeat(2000)}${pinned}`,
-        // what made the first rewrite quadratic: very many empty lines, and lines of spaces
+        // the worst case of a parser that rescans: very many empty lines, and lines of spaces
         empty: `# yarn lockfile v1\n${'\n'.repeat(400_000)}${pinned}`,
         spaces: `# yarn lockfile v1\n${`${' '.repeat(50)}\n`.repeat(100_000)}${pinned}`,
       };

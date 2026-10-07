@@ -12,9 +12,9 @@ import {
 } from '../src/index.js';
 import { reference, referenceYaml } from './helpers.js';
 
-// Changed on 2026-10-02 with the move to schema 2 (activations per chain), and on 2026-10-06 when its probe became data. The entry stays at rev 1: no version
-// of the registry has been published yet, and the first published version must start every entry at rev 1.
-// After the first publication this value changes only together with `rev`.
+// The leaf of tx-v1 as it stands. The entry stays at rev 1 until the first version of the registry is published,
+// because that version must start every entry at rev 1; until then an edit of the entry changes this value on
+// purpose. After the first publication it changes only together with `rev`.
 const PINNED_TX_V1_REV_1 = '8dbab7cf721cf6592abb5a850972db22bd6f25c0c373f723bbc06efd1640ddf6';
 // The same entry in schema 1, as versions signed before 2026-10-02 hold it. It must never change: those
 // versions verify only while the reader hashes a schema-1 entry exactly as it did.

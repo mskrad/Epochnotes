@@ -30,6 +30,10 @@ import {
 const manifestFile = (dir: string, n: number) => join(dir, `${n}.json`);
 const contentFile = (dir: string, root: string) => join(dir, `${root}.jsonl`);
 
+/**
+ * The manifests of a versions directory in number order, unchecked; one that is not JSON is undefined, for
+ * `verifyLog` to report.
+ */
 export function readRawLog(versionsDir: string): unknown[] {
   if (!existsSync(versionsDir)) return [];
   return readdirSync(versionsDir)
@@ -101,6 +105,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   }
 }
 
+/** The keys a publishers file marks active: the publishers a reader trusts. */
 export function readTrustedPublishers(file: string): string[] {
   const parsed = JSON.parse(readFileSync(file, 'utf8')) as {
     publishers?: { key?: unknown; status?: unknown }[];
@@ -130,6 +135,7 @@ export type VerifiedVersion =
   | { ok: true; manifest: Manifest; log: Manifest[]; content: VersionContent; contentSource: string }
   | { ok: false; issues: Issue[]; attempts?: ContentAttempt[] };
 
+/** Where a log is read from, whose signatures count, and what the reader remembers from last time. */
 export interface VerifyOptions {
   /** A directory, or the base URL of a static host with the same layout. */
   versionsDir: string;
@@ -193,6 +199,9 @@ export async function verifyLatestVersion(options: VerifyOptions): Promise<Verif
   }
 }
 
+/**
+ * An entry proved against the latest verified version, with where its content came from, or why it was not.
+ */
 export type EntryVerification =
   | {
       ok: true;
@@ -275,6 +284,7 @@ export function writeNewFile(target: string, text: string): void {
   }
 }
 
+/** The version written, the version that would be written (dry run), nothing to publish, or why not. */
 export type PublishResult =
   | { ok: true; published: true; dryRun: boolean; manifest: Manifest; files: string[] }
   | { ok: true; published: false; manifest: Manifest }

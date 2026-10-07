@@ -446,15 +446,15 @@ describe('sampling a program', () => {
 });
 
 describe('accounts too short to hold the sampled byte', () => {
-  // The audit's fixture: one account of 8 bytes, one of 72 with a zero at offset 40.
-  const audit: Member[] = [
+  // The smallest case with both: an account of 8 bytes, too short for the byte, and one of 72 with a zero at offset 40.
+  const shortAndSampled: Member[] = [
     { type: 'Market', lamports: 136_000, space: 8, byte: 0 },
     { type: 'Market', lamports: 200_000, space: 72, byte: 0 },
   ];
 
-  it('are read by exact size: every group plus the short sizes give the full scan (the audit case)', async () => {
-    const { options, calls } = population(audit);
-    const full = await scanProgram(UNKNOWN, population(audit).options);
+  it('are read by exact size: every group plus the short sizes give the full scan', async () => {
+    const { options, calls } = population(shortAndSampled);
+    const full = await scanProgram(UNKNOWN, population(shortAndSampled).options);
     const report = await sampleProgram(UNKNOWN, { ...options, offset: 40, buckets: 256, seed: 1 });
     expect(full.total).toMatchObject({ accounts: 2, excessNow: 168_000n });
     expect(report.total).toEqual(full.total);

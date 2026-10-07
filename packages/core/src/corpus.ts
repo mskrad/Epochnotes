@@ -50,8 +50,10 @@ const manifestSchema = z.strictObject({
   quiet: z.array(quietSchema).default([]),
 });
 
+/** One case of the corpus manifest: where the code comes from and what a correct check reports on it. */
 export type CorpusCase = z.infer<typeof caseSchema>;
 
+/** What the engine reported on one case, against what it should. */
 export interface CorpusRow {
   id: string;
   /** The registry entry the case is about; recall is also given per entry, since entries cover different chains. */
@@ -63,6 +65,7 @@ export interface CorpusRow {
   detected: boolean;
 }
 
+/** Where the manifest, the files and the engine disagree, and the recall of the engine on the corpus. */
 export interface CorpusReport {
   problems: string[];
   rows: CorpusRow[];

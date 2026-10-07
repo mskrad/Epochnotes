@@ -2,6 +2,7 @@ import { chainNameOf } from './chains.js';
 import { activationsOf, type Activation, type Entry, subjectOf } from './schema.js';
 import { WATCHED_CLUSTERS, type WatchedCluster, type WatchReport } from './watch.js';
 
+/** The part of a watcher report the project page shows. */
 export interface SiteWatch {
   agave: { repository: string; commit: string; retrieved: string };
   clusters: Record<WatchedCluster, { slot: string }>;
@@ -16,6 +17,9 @@ export interface SiteWatch {
   }[];
 }
 
+/**
+ * Keeps of a watcher report only what the page shows; throws when the report lacks its counts or its list.
+ */
 export function siteWatchOf(report: WatchReport): SiteWatch {
   if (
     !Number.isInteger(report.declared) ||
@@ -169,6 +173,9 @@ th{color:var(--muted);font-weight:600}
 .roadmap li{margin:4px 0}
 footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:0.9rem;color:var(--muted)}`;
 
+/**
+ * The project page as one self-contained HTML document: no script, no external resource, every value escaped.
+ */
 export function renderSite(entries: Entry[], watch?: SiteWatch): string {
   const sorted = [...entries].sort((a, b) => a.id.localeCompare(b.id));
   const chains = [...new Set(sorted.flatMap((entry) => chainsOf(activationsOf(entry))))].sort(

@@ -5,6 +5,10 @@ import { entryLeafHash, toHex } from './canonical.js';
 import type { Entry } from './schema.js';
 import { type Issue, validateEntryYaml, validateRegistry } from './validate.js';
 
+/**
+ * The validation result of one entry file: its id, revision and leaf when it is valid, its issues when it is
+ * not.
+ */
 export interface FileReport {
   file: string;
   ok: boolean;
@@ -16,6 +20,7 @@ export interface FileReport {
   issues: Issue[];
 }
 
+/** The validation result of an entry file or a directory of them. */
 export interface RegistryReport {
   ok: boolean;
   files: FileReport[];

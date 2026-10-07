@@ -22,6 +22,7 @@ import type { Issue } from './validate.js';
 import { readRawLog } from './version-store.js';
 import { verifyLog } from './version.js';
 
+/** One version of the local log written to chain: its number, root, account and transaction. */
 export interface AnchoredVersion {
   n: number;
   merkleRoot: string;
@@ -29,6 +30,9 @@ export interface AnchoredVersion {
   signature: string;
 }
 
+/**
+ * The versions written to chain by this run and how many were there already, or why the log was not anchored.
+ */
 export type AnchorResult =
   | { ok: true; publisher: Address; anchored: AnchoredVersion[]; alreadyOnChain: number }
   | { ok: false; issues: Issue[] };
@@ -95,6 +99,10 @@ export async function anchorLog(options: {
   };
 }
 
+/**
+ * What admitting a publisher did: the registry and publisher accounts, whether the registry was created on
+ * the way, and the transactions sent.
+ */
 export interface AdmitResult {
   config: Address;
   publisher: Address;

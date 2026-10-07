@@ -1,5 +1,6 @@
 // End-to-end run of the built CLI, the way a user would call it. `npm run e2e` builds first.
-// Talks to devnet for the status step; set E2E_OFFLINE=1 to skip that one step.
+// The network steps read public endpoints (Solana devnet and mainnet-beta, Ethereum, Base) and GitHub; set
+// E2E_OFFLINE=1 to skip them.
 import { spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import {

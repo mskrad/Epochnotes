@@ -8,6 +8,7 @@ import { type Entry, featureGatesOf } from './schema.js';
  */
 
 export const WATCHED_CLUSTERS = ['mainnet-beta', 'testnet', 'devnet'] as const;
+/** A Solana cluster the watcher reads. */
 export type WatchedCluster = (typeof WATCHED_CLUSTERS)[number];
 
 /** Marks a draft written by the watcher; the validator refuses an entry that still carries it. */
@@ -22,8 +23,9 @@ export function readsAsDraft(text: string): boolean {
   return MARKER_ANY_SPELLING.test(plain) || plain.includes(DRAFT_PLACEHOLDER);
 }
 
+/** A feature gate as agave declares it: module, address, the name it is registered under. */
 export interface DeclaredFeature {
-  /** The module path in agave, `full_inflation::devnet_and_testnet::enable` for a nested one. */
+  /** The module path in agave, `full_inflation::mainnet::certusone::vote` for a nested one. */
   module: string;
   address: string;
   /** The text agave registers the feature under, `SIMD-0525: Reduce slot time to 200ms`. */
@@ -34,6 +36,7 @@ export interface DeclaredFeature {
 
 type WatchState = 'absent' | 'scheduled' | 'active' | 'unknown';
 
+/** A declared gate with its state on every watched cluster. */
 export interface WatchedFeature extends DeclaredFeature {
   state: Record<WatchedCluster, WatchState>;
   /** The activation slot on the clusters where the feature is active. */
@@ -42,6 +45,7 @@ export interface WatchedFeature extends DeclaredFeature {
   unknownBecause?: Partial<Record<WatchedCluster, string>>;
 }
 
+/** Everything one look read, kept to compare the next look with. */
 export interface WatchSnapshot {
   watcher: 1;
   agave: { repository: string; commit: string; retrieved: string };
@@ -50,6 +54,7 @@ export interface WatchSnapshot {
   features: WatchedFeature[];
 }
 
+/** A gate whose state on one cluster differs from the last snapshot. */
 export interface WatchChange {
   module: string;
   address: string;
@@ -61,6 +66,7 @@ export interface WatchChange {
   entry?: string;
 }
 
+/** A draft entry written by the watcher, and the gates it covers. */
 export interface WatchDraft {
   /** File name for the draft, `simd-0525.yaml`. */
   file: string;
@@ -68,6 +74,9 @@ export interface WatchDraft {
   features: string[];
 }
 
+/**
+ * What a look found: counts, gates on the way to mainnet-beta, what changed since the last look, and drafts.
+ */
 export interface WatchReport {
   /** True on the first run: nothing to compare with, the snapshot becomes the baseline. */
   baseline: boolean;
@@ -261,6 +270,7 @@ sources:
   return { file: `${slugOf(first)}.yaml`, yaml, features: features.map((feature) => feature.module) };
 }
 
+/** What one look needs: the agave source, the clusters, the last snapshot if any, and the registry. */
 export interface WatchOptions {
   /** The text of agave's feature-set/src/lib.rs at `agave.commit`. */
   agaveSource: string;

@@ -56,6 +56,7 @@ export interface SolanaReadSource extends FeatureAccountSource {
   getGenesisHash(): Promise<string>;
 }
 
+/** The state of a Solana feature account in the shape every chain shares. */
 export function activationStateOfFeature(state: FeatureState): ActivationState {
   switch (state.state) {
     case 'absent':
@@ -131,11 +132,6 @@ export function unsupportedReader(chain: string): ActivationReader {
 }
 
 /**
- * The reader for a chain behind an endpoint. Chosen by the full CAIP-2 id, not by its namespace: one namespace
- * can hold chains read differently (bip122 holds Bitcoin and Zcash). Solana is the exception that proves it:
- * every Solana cluster is read the same way, and which one an endpoint serves is learned from the endpoint.
- */
-/**
  * For an endpoint given without a chain: it is asked as Solana, then as an EVM chain, and read as the one it
  * answers to. The report names the chain it found; when it answers to neither, both reasons are given.
  */
@@ -166,6 +162,11 @@ export function detectingReader(rpcUrl: string): ActivationReader {
   };
 }
 
+/**
+ * The reader for a chain behind an endpoint. Chosen by the full CAIP-2 id, not by its namespace: one namespace
+ * can hold chains read differently (bip122 holds Bitcoin and Zcash). Solana is the exception that proves it:
+ * every Solana cluster is read the same way, and which one an endpoint serves is learned from the endpoint.
+ */
 export function activationReaderFor(chain: string | undefined, rpcUrl: string): ActivationReader {
   if (chain === undefined) return detectingReader(rpcUrl);
   if (namespaceOf(chain) === 'solana') return solanaActivationReader(rpcFeatureAccountSource(rpcUrl));
@@ -179,6 +180,7 @@ export function appliesTo(activation: Activation, chain: string): boolean {
   return activation.chain === chain || activation.chain === namespaceOf(chain);
 }
 
+/** The state of one activation of one entry on the chain that was read. */
 export interface ActivationReading {
   entry: string;
   rev: number;
@@ -187,6 +189,10 @@ export interface ActivationReading {
   status: ActivationState;
 }
 
+/**
+ * One reading of one chain: which chain answered and how that was known, the point it was read at, every
+ * state.
+ */
 export interface ChainReading {
   /** The CAIP-2 id of the chain that answered. */
   chain: string;

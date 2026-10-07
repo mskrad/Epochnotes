@@ -42,6 +42,7 @@ import { GENESIS } from './chains.js';
 import type { Issue } from './validate.js';
 import { GENESIS_ROOT, type Manifest } from './version.js';
 
+/** The registry program deployed on devnet. */
 export const REGISTRY_PROGRAM_ID: Address = address('Diad4BcYWeB3Epgma7RZFNWspm5gpdtTLnwoj3UWEcdy');
 const SYSTEM_PROGRAM = address('11111111111111111111111111111111');
 
@@ -85,6 +86,7 @@ const versionArgsCodec = getStructCodec([
   ['uri', text],
 ]);
 
+/** A publisher as the registry program records it. */
 export interface OnchainPublisher {
   address: Address;
   authority: string;
@@ -95,6 +97,7 @@ export interface OnchainPublisher {
   latestRoot: string;
 }
 
+/** A version of a publisher's log as the registry program records it. */
 export interface OnchainVersion {
   address: Address;
   publisher: string;
@@ -110,15 +113,18 @@ export interface OnchainVersion {
 const seed = (value: string) => new TextEncoder().encode(value);
 const u64le = (value: bigint) => Uint8Array.from(getU64Codec().encode(value));
 
+/** The address of the registry's single config account. */
 export async function configAddress(programId = REGISTRY_PROGRAM_ID): Promise<Address> {
   return (await getProgramDerivedAddress({ programAddress: programId, seeds: [seed('config')] }))[0];
 }
 
+/** The address of the publisher account of a key. */
 export async function publisherAddress(authority: string, programId = REGISTRY_PROGRAM_ID): Promise<Address> {
   const seeds = [seed('publisher'), getAddressEncoder().encode(address(authority))];
   return (await getProgramDerivedAddress({ programAddress: programId, seeds }))[0];
 }
 
+/** The address of version `n` of a publisher's log. */
 export async function versionAddress(
   authority: string,
   n: bigint,
@@ -128,6 +134,7 @@ export async function versionAddress(
   return (await getProgramDerivedAddress({ programAddress: programId, seeds }))[0];
 }
 
+/** The address of the revocation record of an entry id for a publisher. */
 export async function revocationAddress(
   authority: string,
   entryId: string,
@@ -148,6 +155,7 @@ function decodeAccount<T>(
   return codec.decode(data, 8);
 }
 
+/** A publisher account from its raw data; throws when the data is not one. */
 export function decodePublisher(at: Address, data: Uint8Array): OnchainPublisher {
   const raw = decodeAccount('Publisher', data, publisherCodec);
   return {
@@ -161,6 +169,7 @@ export function decodePublisher(at: Address, data: Uint8Array): OnchainPublisher
   };
 }
 
+/** A version account from its raw data; throws when the data is not one. */
 export function decodeVersion(at: Address, data: Uint8Array): OnchainVersion {
   const raw = decodeAccount('RegistryVersion', data, versionCodec);
   return {
@@ -190,6 +199,7 @@ const writableSigner = (at: Address) => ({ address: at, role: AccountRole.WRITAB
 const writable = (at: Address) => ({ address: at, role: AccountRole.WRITABLE });
 const readonly = (at: Address) => ({ address: at, role: AccountRole.READONLY });
 
+/** Creates the registry and makes `admin` its admin. */
 export async function initializeInstruction(
   admin: Address,
   programId = REGISTRY_PROGRAM_ID,
@@ -202,6 +212,7 @@ export async function initializeInstruction(
   );
 }
 
+/** Admits a publisher key; only the admin signs it. */
 export async function registerPublisherInstruction(
   admin: Address,
   authority: string,
@@ -221,6 +232,7 @@ export async function registerPublisherInstruction(
   return instruction(programId, 'register_publisher', args, accounts);
 }
 
+/** What a version account records about a manifest. */
 export interface VersionArgs {
   n: bigint;
   merkleRoot: string;
@@ -230,6 +242,7 @@ export interface VersionArgs {
   uri: string;
 }
 
+/** The fields of a manifest that go on chain. */
 export const versionArgsOf = (manifest: Manifest): VersionArgs => ({
   n: BigInt(manifest.n),
   merkleRoot: manifest.merkle_root,
@@ -239,6 +252,7 @@ export const versionArgsOf = (manifest: Manifest): VersionArgs => ({
   uri: manifest.uri,
 });
 
+/** Appends a version to the publisher's log; the program refuses one that does not continue it. */
 export async function publishVersionInstruction(
   authority: Address,
   version: VersionArgs,
@@ -260,6 +274,7 @@ export async function publishVersionInstruction(
   return instruction(programId, 'publish_version', [u64le(version.n), Uint8Array.from(encoded)], accounts);
 }
 
+/** Suspends or restores a publisher; only the admin signs it. */
 export async function setPublisherActiveInstruction(
   admin: Address,
   authority: string,
@@ -279,6 +294,10 @@ export async function setPublisherActiveInstruction(
   );
 }
 
+/**
+ * Records that the publisher withdraws an entry; the account is derived from the signer, so nobody revokes in
+ * another's name.
+ */
 export async function revokeEntryInstruction(
   authority: Address,
   entryId: string,
@@ -299,6 +318,9 @@ export async function revokeEntryInstruction(
   );
 }
 
+/**
+ * Where the registry program is reached: the JSON-RPC and websocket endpoints, and its id if not the deployed one.
+ */
 export interface Cluster {
   rpcUrl: string;
   wsUrl: string;
@@ -314,6 +336,9 @@ export function clusterFromRpcUrl(rpcUrl: string): Cluster {
   };
 }
 
+/**
+ * A signer from a keypair file in `solana-keygen` format. The error never quotes the file: it is a secret.
+ */
 export async function loadSigner(keyFile: string): Promise<KeyPairSigner> {
   try {
     return await createKeyPairSignerFromBytes(
@@ -355,6 +380,7 @@ async function fetchAccount(cluster: Cluster, at: Address): Promise<Uint8Array |
   return value === null ? undefined : Uint8Array.from(Buffer.from(value.data[0], 'base64'));
 }
 
+/** The publisher account of a key, or undefined when the key was never admitted. */
 export async function fetchPublisher(
   cluster: Cluster,
   authority: string,
@@ -364,6 +390,7 @@ export async function fetchPublisher(
   return data === undefined ? undefined : decodePublisher(at, data);
 }
 
+/** Version `n` of a publisher as recorded on chain, or undefined when it is not there. */
 export async function fetchVersion(
   cluster: Cluster,
   authority: string,
@@ -413,6 +440,7 @@ export async function assertWritable(cluster: Cluster): Promise<void> {
   if (refusal !== undefined) throw new Error(refusal);
 }
 
+/** The record that a publisher withdrew an entry, and at which version of its log. */
 export interface OnchainRevocation {
   address: Address;
   entryId: string;

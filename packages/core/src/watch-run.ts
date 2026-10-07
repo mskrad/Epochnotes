@@ -25,7 +25,6 @@ async function fetchText(url: string, accept?: string): Promise<string> {
   return response.text();
 }
 
-/** The commit agave's default branch points at now: the snapshot names it, so a reading can be repeated. */
 function agaveHeadFromGit(): string {
   const listed = execFileSync('git', ['ls-remote', AGAVE, 'refs/heads/master'], {
     encoding: 'utf8',
@@ -35,8 +34,10 @@ function agaveHeadFromGit(): string {
   return listed.split(/\s/)[0] ?? '';
 }
 
+/** The commit agave's default branch points at now: the snapshot names it, so a reading can be repeated. */
 async function agaveHead(): Promise<string> {
   let sha: string;
+  let answeredBy = 'the GitHub API';
   try {
     sha = (
       await fetchText(
@@ -47,6 +48,7 @@ async function agaveHead(): Promise<string> {
   } catch (apiError) {
     try {
       sha = agaveHeadFromGit().trim();
+      answeredBy = 'git ls-remote';
     } catch (gitError) {
       throw new Error(
         `neither the GitHub API (${messageOf(apiError)}) nor git ls-remote (${messageOf(gitError)}) named the head of agave; pass --agave-ref <commit>`,
@@ -54,7 +56,9 @@ async function agaveHead(): Promise<string> {
     }
   }
   if (!/^[0-9a-f]{40}$/.test(sha))
-    throw new Error(`GitHub answered "${sha.slice(0, 60)}" for the head of agave`);
+    throw new Error(
+      `${answeredBy} answered "${sha.slice(0, 60)}" for the head of agave, not a commit; pass --agave-ref <commit>`,
+    );
   return sha;
 }
 

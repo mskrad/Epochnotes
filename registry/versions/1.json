@@ -1,0 +1,13 @@
+{
+  "manifest_version": 1,
+  "publisher": "6VGzWhwbqcYjxWZePEonjkqC77PnWkZDrKyTwyZs2gDb",
+  "n": 1,
+  "merkle_root": "77216c0c0956a559fe9566e1506f57599a8a7df4309a5324c1422a155a39b734",
+  "prev_root": "0000000000000000000000000000000000000000000000000000000000000000",
+  "entry_count": 5,
+  "content_hash": "0568a7b83d0fca3516401abc293a0bfa6ee07e1fadeed3a078102e7fe5132c1f",
+  "uri": "https://mskrad.github.io/Epochnotes/registry/versions/77216c0c0956a559fe9566e1506f57599a8a7df4309a5324c1422a155a39b734.jsonl",
+  "published": "2026-10-07",
+  "revoked": [],
+  "signature": "4071a6027f033e40f44268646db53867f9f7729abc221dc3e1a08dd2120d119a9d711cbe7e85b0cf2ce9879bfa5cbbc7cf1348ddcdfeb844b34ab89e1cfea108"
+}

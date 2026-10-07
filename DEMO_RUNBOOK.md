@@ -203,8 +203,8 @@ revoking an entry, and the write gate that refuses any cluster but devnet and a 
 
 ## What this demo does not show
 
-- A published version of the real registry. It is signed after release; until then every reader here is
-  trusting a key they generated themselves.
+- The real registry. Its version 1 is signed and kept in `registry/versions`; this runbook signs a log of its
+  own instead, so every reader here trusts a key they generated themselves.
 - `--onchain` against the demo log: the demo key is not an admitted publisher, so the comparison refuses.
   The on-chain path is covered by step 8 instead.
 - Anything written to mainnet. Every mainnet command in this runbook only reads.

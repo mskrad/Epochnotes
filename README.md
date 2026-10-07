@@ -4,7 +4,7 @@ A signed registry of network changes on Solana, Ethereum and Base — and the ch
 
 An upgrade lands, a call or a contract check that worked for a year starts failing, and the answer lives in a SIMD or an EIP, a client's configuration and the chain itself — three places, none of them your code. Epochnotes keeps that answer as a signed entry, tells you where it applies in your repository, and reads the activation status from each chain at the moment you ask: a feature account on Solana, the head block and the header field a fork adds on Ethereum and Base. One signed version covers every chain it names. When it cannot verify what it reads, it refuses to answer rather than guess; when it had nothing to check something against, it says so instead of reporting a clean result.
 
-Status: pre-release. The first signed version of the registry is published after release, so today every reader signs a log of their own — [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) walks through it end to end in about ten minutes. Nothing here has been audited.
+Status: pre-release. Version 1 of the registry is signed and kept in `registry/versions`; it is served at https://mskrad.github.io/Epochnotes/registry/versions/ once the repository is public, and it is not anchored on chain yet. [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) walks through the whole path with a log of your own in about ten minutes. Nothing here has been audited.
 
 ## Layout
 

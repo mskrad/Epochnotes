@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Epochnotes</title>
+<meta name="description" content="A signed registry of network changes on Solana, Ethereum and Base, and the checks built on it.">
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a64;--card:#ffffff;--line:#e4e1d8;--accent:#5b3fd6;--tag:#efecf9;--ok:#1f7a4d;--ok-bg:#e3f4ea;--warn:#8a5a00;--warn-bg:#fbf0d9;--off:#5f5f5f;--off-bg:#eeeeec;--bad:#a8324a;--bad-bg:#f8e3e7;--code:#f3f1ec}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--fg:#ebeae6;--muted:#a3a29b;--card:#1b1b1f;--line:#2e2e34;--accent:#a996ff;--tag:#26223a;--ok:#7fd6a5;--ok-bg:#163326;--warn:#f0c46a;--warn-bg:#3a2e12;--off:#b5b5b0;--off-bg:#2a2a2e;--bad:#f39aac;--bad-bg:#3d1c24;--code:#232328}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:960px;margin:0 auto;padding:0 16px 64px}
+a{color:var(--accent);overflow-wrap:anywhere}
+code{font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+pre code{background:none;padding:0}
+.hero{padding:56px 0 24px}
+.hero h1{font-size:2.4rem;margin:0 0 8px;letter-spacing:-0.02em}
+.hero p{font-size:1.15rem;max-width:44em;margin:0 0 12px}
+h2{font-size:1.5rem;margin:48px 0 12px;letter-spacing:-0.01em}
+h3{margin:0 0 6px;font-size:1.15rem}
+h4{margin:14px 0 4px;font-size:0.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em}
+.muted{color:var(--muted)}
+.small{font-size:0.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.entry{margin-bottom:14px}
+.entry ul{margin:4px 0;padding-left:20px}
+.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{display:inline-block;background:var(--tag);border-radius:999px;padding:0 9px;font-size:0.8rem;line-height:1.6}
+.label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.85em}
+details{margin-top:10px}
+summary{cursor:pointer;color:var(--accent)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:0.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.state{display:inline-block;border-radius:6px;padding:0 7px;font-size:0.8rem;line-height:1.7}
+.state.active{color:var(--ok);background:var(--ok-bg)}
+.state.scheduled{color:var(--warn);background:var(--warn-bg)}
+.state.absent{color:var(--off);background:var(--off-bg)}
+.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
+.roadmap li{margin:4px 0}
+footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:0.9rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<section class="hero">
+<h1>Epochnotes</h1>
+<p>A signed registry of network changes on Solana, Ethereum and Base — and the checks built on it: what breaks in your code, where, and how to fix it.</p>
+<p class="muted">Pre-release. Nothing here has been audited. <a href="https://github.com/mskrad/Epochnotes">Source on GitHub</a> · <a href="registry/versions/1.json">version 1 of the signed log</a></p>
+</section>
+
+<section>
+<h2>How it works</h2>
+<div class="grid">
+<div class="card"><h3>Signed entries</h3><p>Each change is an entry built from primary sources — a SIMD or an EIP, the client's code, the chain itself. A version of the registry is a Merkle root, signed by its publisher and anchored by a program on Solana devnet.</p></div>
+<div class="card"><h3>Checks</h3><p><code>check repo</code> finds the code a change breaks; <code>check rpc</code> asks a provider, read-only, whether it behaves as the entry says; <code>status</code> reads the activation from each chain at the moment you ask.</p></div>
+<div class="card"><h3>Watcher</h3><p>Every day it reads the feature gates agave declares and their state on three Solana clusters, and drafts an entry for what moved outside the registry. A person finishes the draft from the SIMD and signs it.</p></div>
+</div>
+</section>
+
+<section>
+<h2>What the Solana watcher sees</h2>
+<p>Read on 2026-10-07 from agave <a href="https://github.com/anza-xyz/agave/tree/56379e3332c166b0de75b7e45ea1d63dd6755f30">56379e3332c1</a> and three clusters (mainnet-beta slot 454188547, testnet slot 449591129, devnet slot 508415912): <strong>290</strong> feature gates declared, <strong>11</strong> of them covered by the registry.</p>
+<h3>On the way to mainnet-beta (6)</h3>
+<p class="muted">Not active on mainnet-beta yet, but active on testnet or devnet, or already scheduled on mainnet-beta.</p>
+<div class="scroll"><table>
+<thead><tr><th>Gate</th><th>SIMD</th><th>mainnet-beta</th><th>testnet</th><th>devnet</th><th>Entry</th></tr></thead>
+<tbody>
+<tr>
+<td><code>virtual_address_space_adjustments</code><br><span class="muted">SIMD-0460: Virtual Address Space Adjustments</span></td>
+<td><a href="https://github.com/solana-foundation/solana-improvement-documents/tree/main/proposals">SIMD-0460</a></td>
+<td><span class="state unknown">unknown</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><span class="state uncovered">not yet</span></td>
+</tr>
+<tr>
+<td><code>account_data_direct_mapping</code><br><span class="muted">enable account data direct mapping</span></td>
+<td>—</td>
+<td><span class="state absent">absent</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><span class="state uncovered">not yet</span></td>
+</tr>
+<tr>
+<td><code>alpenglow</code><br><span class="muted">SIMD-0326: Alpenglow: new consensus algorithm</span></td>
+<td><a href="https://github.com/solana-foundation/solana-improvement-documents/tree/main/proposals">SIMD-0326</a></td>
+<td><span class="state absent">absent</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><a href="#alpenglow"><code>alpenglow</code></a></td>
+</tr>
+<tr>
+<td><code>direct_account_pointers_in_program_input</code><br><span class="muted">SIMD-0449: Direct Account Pointers in Program Input</span></td>
+<td><a href="https://github.com/solana-foundation/solana-improvement-documents/tree/main/proposals">SIMD-0449</a></td>
+<td><span class="state absent">absent</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><span class="state uncovered">not yet</span></td>
+</tr>
+<tr>
+<td><code>enable_sha512_syscall</code><br><span class="muted">SIMD-0512: SHA512 Syscall</span></td>
+<td><a href="https://github.com/solana-foundation/solana-improvement-documents/tree/main/proposals">SIMD-0512</a></td>
+<td><span class="state absent">absent</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><span class="state uncovered">not yet</span></td>
+</tr>
+<tr>
+<td><code>reduce_slot_time_to_200ms</code><br><span class="muted">SIMD-0525: Reduce slot time to 200ms</span></td>
+<td><a href="https://github.com/solana-foundation/solana-improvement-documents/tree/main/proposals">SIMD-0525</a></td>
+<td><span class="state scheduled">scheduled</span></td><td><span class="state active">active</span></td><td><span class="state active">active</span></td>
+<td><a href="#slot-duration"><code>slot-duration</code></a></td>
+</tr>
+</tbody>
+</table></div>
+</section>
+
+<section>
+<h2>The registry (5 entries)</h2>
+<article class="card entry" id="alpenglow">
+<header>
+<h3>Alpenglow</h3>
+<p class="meta"><span class="tag">SIMD-0326</span><span class="tag chain">Solana</span><span class="muted">entry <code>alpenglow</code> · rev 1</span></p>
+</header>
+<h4>What breaks</h4>
+<ul><li><span class="tag surface">stream</span> Votes stop being transactions on chain: validators send them directly to each other. Initially a validator admission ticket reproduces the incentives of today&#39;s vote transaction fees. Voting is not invisible afterwards: for rewards, the leader of slot s+8 can post up to two vote aggregates for slot s. Code that reads individual vote transactions out of blocks no longer finds them.</li><li><span class="tag surface">rpc</span> Optimistic confirmation is superseded by faster actual finality; the SIMD names this as the most visible change.</li></ul>
+<h4>How to fix it</h4>
+<ul><li>Do not derive validator activity from vote transactions in blocks, and review code that relies on optimistic confirmation as something distinct from finality.</li></ul>
+<details>
+<summary>Activations (1) and sources (2)</summary>
+<ul class="small"><li><span class="label">alpenglow</span> — feature gate <code>A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS</code><br><span class="muted">Feature gate registered in agave as &quot;SIMD-0326: Alpenglow: new consensus algorithm&quot;.</span></li></ul>
+<ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li></ul>
+</details>
+</article>
+<article class="card entry" id="eip-7702">
+<header>
+<h3>Set Code for EOAs</h3>
+<p class="meta"><span class="tag">EIP-7702</span><span class="tag chain">Ethereum</span><span class="tag chain">Base</span><span class="muted">entry <code>eip-7702</code> · rev 1 · 3 static rule(s), 2 RPC probe(s)</span></p>
+</header>
+<h4>What breaks</h4>
+<ul><li><span class="tag surface">program</span> EIP-7702 breaks the invariant that msg.sender == tx.origin holds only in the top frame of a transaction: a delegated account can make several calls in one transaction. Reentrancy guards of the style require(tx.origin == msg.sender) and atomic sandwich protections that rely on tx.origin no longer hold. Using that check only to know that the sender is an EOA is, by the EIP&#39;s own reading, not affected.</li><li><span class="tag surface">program</span> An account delegated under EIP-7702 has code: the delegation indicator, 0xef0100 followed by the address of the delegate, and EXTCODESIZE returns 23 for it. A check that reads code as &quot;a contract&quot; or no code as &quot;an EOA&quot; — an isContract call, a test of code.length or extcodesize — now takes a delegated EOA for a contract.</li><li><span class="tag surface">program</span> OpenZeppelin&#39;s SignatureChecker.isValidSignatureNow checks an ECDSA signature only when the signer has no code, and otherwise asks the signer for ERC-1271. A delegated EOA has code, so its ECDSA signature is not checked as such: it is valid only if the delegate implements ERC-1271 and accepts it.</li><li><span class="tag surface">wallet</span> OpenZeppelin&#39;s ERC721Utils.checkOnERC721Received calls onERC721Received on any recipient with code, and reverts when the call fails or returns another value. A safe transfer or a safe mint to a delegated EOA reverts unless its delegate implements the receiver.</li><li><span class="tag surface">sdk</span> eth_getCode of a delegated EOA returns the 23-byte delegation indicator, and the account still sends transactions. Telling contracts from EOAs by whether eth_getCode is empty no longer works.</li></ul>
+<h4>How to fix it</h4>
+<ul><li>Replace a reentrancy guard built on tx.origin == msg.sender with one held in a transient storage variable, as the EIP suggests. A sandwich protection built on tx.origin has no replacement in the EIP, which calls relying on it a bad practice: it has to be designed again, not patched.</li><li>Where it matters whether an account is a delegated EOA, read the first three bytes of its code: 0xef0100 marks the delegation indicator (OpenZeppelin&#39;s EIP7702Utils.fetchDelegate returns the delegate), and decide explicitly how such an account is treated — for a signature, ECDSA, ERC-1271, or both.</li><li>A contract meant to be a delegate implements the receiver hooks the accounts that delegate to it rely on, such as onERC721Received: OpenZeppelin&#39;s ERC721Utils calls it on every recipient with code.</li></ul>
+<details>
+<summary>Activations (2) and sources (16)</summary>
+<ul class="small"><li><span class="label">prague</span> — ethereum at 2025-05-07T10:05:11Z<br><span class="muted">Prague, the execution layer of the Pectra upgrade: go-ethereum sets PragueTime to this time for mainnet, and EIP-7600 lists EIP-7702 and EIP-7685 among its EIPs.</span></li><li><span class="label">isthmus</span> — base at 2025-05-09T16:00:01Z<br><span class="muted">Isthmus, the OP Stack upgrade that brings the Pectra execution layer, EIP-7702 included, to the chain; on OP Stack chains requestsHash is always sha256(&#39;&#39;), the hash of no requests, so its presence marks the fork.</span></li></ul>
+<ul class="small"><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md">github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7600.md">github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7600.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7685.md">github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7685.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/ethereum/go-ethereum/blob/c9a2bc73c847319a8faa57de59e42c0efc420682/params/config.go">github.com/ethereum/go-ethereum/blob/c9a2bc73c847319a8faa57de59e42c0efc420682/params/config.go</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:1 eth_getBlockByNumber 22431083 and 22431084 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">docs</span> <a href="https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/overview.md">github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/overview.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">docs</span> <a href="https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/exec-engine.md">github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/exec-engine.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/base/base/blob/fa0f64d32012efa9b0934bfe1dd074a4aed329c7/crates/common/chains/src/config.rs">github.com/base/base/blob/fa0f64d32012efa9b0934bfe1dd074a4aed329c7/crates/common/chains/src/config.rs</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/ethereum-optimism/superchain-registry/blob/5b055be4d294ce43814a44c8839d89b2436dc8aa/superchain/configs/mainnet/base.toml">github.com/ethereum-optimism/superchain-registry/blob/5b055be4d294ce43814a44c8839d89b2436dc8aa/superchain/configs/mainnet/base.toml</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:8453 eth_getBlockByNumber 30008526 and 30008527 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/utils/cryptography/SignatureChecker.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/utils/cryptography/SignatureChecker.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:1 eth_getCode 0xc3ad9002556803615d2f5784c752c3277246c5e7 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:8453 eth_getTransactionByHash 0xf46de53cfe2be13579e3c7093767837f7e5d503f6e6aa3b0e905fef33f72101f <span class="muted">retrieved 2026-10-06</span></li><li><span class="tag">source-code</span> <a href="https://github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11">github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11</a> <span class="muted">retrieved 2026-10-02</span></li></ul>
+</details>
+</article>
+<article class="card entry" id="rent-simd-0437">
+<header>
+<h3>Incrementally Reduce lamports_per_byte to 696</h3>
+<p class="meta"><span class="tag">SIMD-0437</span><span class="tag chain">Solana</span><span class="muted">entry <code>rent-simd-0437</code> · rev 1</span></p>
+</header>
+<h4>What breaks</h4>
+<ul><li><span class="tag surface">economics</span> The minimum balance of an account is (128 + data size in bytes) * lamports_per_byte, and every step lowers lamports_per_byte. An account funded at an earlier, higher minimum keeps the difference: the SIMD allows reducing the balance to the new minimum, it does not return anything by itself.</li><li><span class="tag surface">sdk</span> A lamports_per_byte value compiled into a client or program goes stale at every step: on activation the value changes in the bank and in the Rent sysvar, while DEFAULT_LAMPORTS_PER_BYTE in the SDKs is updated only after activation. The SIMD calls the reduction strictly a relaxation: existing program logic keeps working, so a stale higher constant overpays rather than fails.</li><li><span class="tag surface">program</span> The reduction is not guaranteed to be one-way. The SIMD states that rent can be increased back to the legacy value in case of excessive state growth, noting that SIMD-0392 allows this without significant disruption to existing accounts; agave already declares a gate set_lamports_per_byte_to_6960, registered as &quot;SIMD-0438: Reset lamports per byte to legacy value of 6960&quot;. A minimum balance fixed at a reduced value can therefore become too low for newly created accounts.</li></ul>
+<h4>How to fix it</h4>
+<ul><li>Take the minimum balance from the cluster at run time (the Rent sysvar in programs, getMinimumBalanceForRentExemption in clients) instead of a compiled-in lamports_per_byte.</li></ul>
+<details>
+<summary>Activations (5) and sources (3)</summary>
+<ul class="small"><li><span class="label">set_lamports_per_byte_to_6333</span> — feature gate <code>4a6f7o7iTcA8hRDCrPLkSatnt5Ykxiu36wo5p1Tt12wC</code><br><span class="muted">Step 1 of 5. Sets lamports_per_byte to 6333 (from 6960).</span></li><li><span class="label">set_lamports_per_byte_to_5080</span> — feature gate <code>61BtM7BkDEE8Yq5fskEVAQT9mYA8qCejJWoLe5apqg81</code><br><span class="muted">Step 2 of 5. Sets lamports_per_byte to 5080.</span></li><li><span class="label">set_lamports_per_byte_to_2575</span> — feature gate <code>rntCigrTppP5JdZz7K8TyN9sMzLdAcXp8SejYpVpX6D</code><br><span class="muted">Step 3 of 5. Sets lamports_per_byte to 2575.</span></li><li><span class="label">set_lamports_per_byte_to_1322</span> — feature gate <code>rntD7invRBswCAdKtRsh1G4psKjrPdS3BKqtnA78C7N</code><br><span class="muted">Step 4 of 5. Sets lamports_per_byte to 1322.</span></li><li><span class="label">set_lamports_per_byte_to_696</span> — feature gate <code>rntTjNZ9boq8owDxjGVFHPfWNQPDaKiM5JcjxmDGg47</code><br><span class="muted">Step 5 of 5. Sets lamports_per_byte to 696.</span></li></ul>
+<ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getAccountInfo SysvarRent111111111111111111111111111111111 at slot 448085582 <span class="muted">retrieved 2026-09-18</span></li></ul>
+</details>
+</article>
+<article class="card entry" id="slot-duration">
+<header>
+<h3>Reduce Slot Times</h3>
+<p class="meta"><span class="tag">SIMD-0525</span><span class="tag chain">Solana</span><span class="muted">entry <code>slot-duration</code> · rev 1</span></p>
+</header>
+<h4>What breaks</h4>
+<ul><li><span class="tag surface">program</span> A duration expressed in slots shrinks in wall-clock time with every stage: the SIMD tells dapp developers and off-chain services to stop assuming that 400 ms * slots is a stable conversion. A timer of N slots lasts half as long at 200 ms as it did at 400 ms.</li><li><span class="tag surface">sdk</span> SDK constants stay at their 400 ms values at first: static constants for default slot duration, ticks per second, slots per year and slot-to-time conversion may keep describing 400 ms while the cluster runs 350, 300, 250 or 200 ms banks.</li><li><span class="tag surface">economics</span> Per-slot limits scale down in proportion to the slot time so that the wall-clock rate stays approximately the same. From the 400 ms baseline of 60,000,000 the maximum block compute units become 37,500,000 at 250 ms and 30,000,000 at 200 ms; the maximum writable-account compute units go from 24,000,000 to 15,000,000 and 12,000,000. The ratios apply to whatever baseline is active: with the 100,000,000 block limit of SIMD-0286 the values are 62,500,000 and 50,000,000. Code tuned to the per-block or per-account limit of a 400 ms slot exceeds the scaled one.</li><li><span class="tag surface">program</span> An epoch stays 432,000 slots, so it lasts half as long at 200 ms as at 400 ms. Anything scheduled per epoch happens twice as often in wall-clock time.</li></ul>
+<h4>How to fix it</h4>
+<ul><li>Keep slot counts only where slot semantics are intended; where a duration means wall-clock time, do not derive it from a fixed milliseconds-per-slot constant. The SIMD advises preferring cluster-provided timing parameters once they are available.</li></ul>
+<details>
+<summary>Activations (4) and sources (2)</summary>
+<ul class="small"><li><span class="label">reduce_slot_time_to_350ms</span> — feature gate <code>iBRL5RuWhw4yqaAZu96RUULHckHTZAoe2b77qaV38JZ</code><br><span class="muted">Target slot time 350 ms. Takes effect one epoch after the gate is activated.</span></li><li><span class="label">reduce_slot_time_to_300ms</span> — feature gate <code>iBRLL3k18HST852F1Mf3Lv83waTNQmmqvKDxvYGwQFL</code><br><span class="muted">Target slot time 300 ms. Takes effect one epoch after the gate is activated.</span></li><li><span class="label">reduce_slot_time_to_250ms</span> — feature gate <code>iBRLMc81UjRa8fn8A6eE8bJTnRbgQoPTynM51akENCV</code><br><span class="muted">Target slot time 250 ms. Takes effect one epoch after the gate is activated.</span></li><li><span class="label">reduce_slot_time_to_200ms</span> — feature gate <code>iBRLjhJnkmDZgNoZRDMW11d8ZV7HvsL3vAyRjZB5npW</code><br><span class="muted">Target slot time 200 ms. Takes effect one epoch after the gate is activated.</span></li></ul>
+<ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li></ul>
+</details>
+</article>
+<article class="card entry" id="tx-v1">
+<header>
+<h3>Transaction V1 Format</h3>
+<p class="meta"><span class="tag">SIMD-0385</span><span class="tag chain">Solana</span><span class="muted">entry <code>tx-v1</code> · rev 1 · 9 static rule(s), 1 RPC probe(s)</span></p>
+</header>
+<h4>What breaks</h4>
+<ul><li><span class="tag surface">rpc</span> getTransaction, and getBlock with transactionDetails full or accounts, fail with JSON-RPC error -32015 &quot;Transaction version (1) is not supported by the requesting client&quot; when the request omits maxSupportedTransactionVersion or sets it to 0 and the result contains a version 1 transaction. getBlock with transactionDetails signatures or none is not affected.</li><li><span class="tag surface">decoder</span> A serialized version 1 transaction starts with the version byte 129 (0x81). A decoder written for the legacy and version 0 layouts has no branch for that value.</li><li><span class="tag surface">sdk</span> @solana/kit 8.0.0 removed three compute-unit-limit helpers from @solana/kit in favour of resource-limit helpers that also set the loaded accounts data size limit for version 1 transactions, and removed the fixed transaction size constants from @solana/transactions because version 1 transactions have a larger size limit.</li><li><span class="tag surface">decoder</span> The maximum size of a version 1 transaction is 4096 bytes; the prior maximum was 1232. A buffer or a size check fixed at 1232 bytes is too small for a valid version 1 transaction.</li><li><span class="tag surface">sdk</span> @solana/web3.js 1.98.4 cannot read a version 1 transaction even when maxSupportedTransactionVersion is 1: getTransaction and getParsedTransaction throw a StructError on the version field, and getBlock fails the same way. 1.99.0 reads all three and returns a MessageV1.</li></ul>
+<h4>How to fix it</h4>
+<ul><li>Pass maxSupportedTransactionVersion 1 in getTransaction and getBlock; with @solana/web3.js this also needs version 1.99.0 or later.</li><li>When moving to @solana/kit 8.0.0 or later, replace the compute-unit-limit helpers with the resource-limit helpers named in the release notes.</li><li>Set the maximum supported transaction version to 1 in the configuration of the RPC client (Some(1) in Rust, rpc.MaxSupportedTransactionVersion1 or uint64(1) in Go, max_supported_transaction_version=1 in Python), and check that the client library in use can decode a version 1 transaction.</li></ul>
+<details>
+<summary>Activations (1) and sources (7)</summary>
+<ul class="small"><li><span class="label">enable_tx_v1</span> — feature gate <code>txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL</code><br><span class="muted">Feature gate registered in agave as &quot;SIMD-0385: Transaction V1&quot;.</span></li></ul>
+<ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getBlock slot 448063686 <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5 <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">release</span> <a href="https://github.com/anza-xyz/kit/releases/tag/v8.0.0">github.com/anza-xyz/kit/releases/tag/v8.0.0</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5 through @solana/web3.js <span class="muted">retrieved 2026-09-18</span></li></ul>
+</details>
+</article>
+</section>
+
+<section>
+<h2>Check it yourself</h2>
+<pre><code>epochnotes registry read --json --status mainnet-beta   # verified entries and the state of each activation
+epochnotes status --chain base                          # every activation the registry names on Base
+epochnotes check repo &lt;path&gt;                            # where a change breaks this code
+epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provider behave as the entry says
+epochnotes watch solana                                 # what moved on Solana since the last look</code></pre>
+<p class="muted">When it cannot verify what it reads, it refuses to answer rather than guess.</p>
+</section>
+
+<section class="roadmap">
+<h2>Roadmap</h2>
+<div class="grid">
+<div class="card"><h3>Now</h3><ul>
+<li>Entries for Solana, Ethereum and Base in one signed log, verified offline and against the program on devnet</li>
+<li>Static rules for TypeScript, JavaScript, Rust, Go, Python, Solidity and lockfiles; read-only RPC probes</li>
+<li>Rent held above the minimum: scan, close plan, withdraw template</li>
+<li>A Claude skill that answers from the verified registry only</li>
+<li>The Solana watcher, run daily by a scheduled Claude task that drafts from the SIMD</li>
+</ul></div>
+<div class="card"><h3>Next</h3><ul>
+<li>The first signed version of the registry, published here, and the packages on npm</li>
+<li>Watchers for Ethereum and Base: fork times in the client configurations</li>
+<li>A notification when something outside the registry moves</li>
+<li>This page updated from each watcher report</li>
+<li>Entries for the gates already on the way to mainnet-beta</li>
+</ul></div>
+</div>
+</section>
+
+<footer>
+<p>Generated by <code>npm run site</code> from <code>registry/entries</code> and the watcher report of 2026-10-07. <a href="https://github.com/mskrad/Epochnotes">mskrad/Epochnotes</a></p>
+</footer>
+</main>
+</body>
+</html>

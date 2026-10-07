@@ -1,0 +1,83 @@
+{
+  "agave": {
+    "repository": "https://github.com/anza-xyz/agave",
+    "commit": "56379e3332c166b0de75b7e45ea1d63dd6755f30",
+    "retrieved": "2026-10-07"
+  },
+  "clusters": {
+    "mainnet-beta": {
+      "slot": "454188547"
+    },
+    "testnet": {
+      "slot": "449591129"
+    },
+    "devnet": {
+      "slot": "508415912"
+    }
+  },
+  "declared": 290,
+  "inRegistry": 11,
+  "upcoming": [
+    {
+      "module": "virtual_address_space_adjustments",
+      "simd": "SIMD-0460",
+      "description": "SIMD-0460: Virtual Address Space Adjustments",
+      "state": {
+        "mainnet-beta": "unknown",
+        "testnet": "active",
+        "devnet": "active"
+      }
+    },
+    {
+      "module": "account_data_direct_mapping",
+      "description": "enable account data direct mapping",
+      "state": {
+        "mainnet-beta": "absent",
+        "testnet": "active",
+        "devnet": "active"
+      }
+    },
+    {
+      "module": "alpenglow",
+      "simd": "SIMD-0326",
+      "description": "SIMD-0326: Alpenglow: new consensus algorithm",
+      "state": {
+        "mainnet-beta": "absent",
+        "testnet": "active",
+        "devnet": "active"
+      },
+      "entry": "alpenglow"
+    },
+    {
+      "module": "direct_account_pointers_in_program_input",
+      "simd": "SIMD-0449",
+      "description": "SIMD-0449: Direct Account Pointers in Program Input",
+      "state": {
+        "mainnet-beta": "absent",
+        "testnet": "active",
+        "devnet": "active"
+      }
+    },
+    {
+      "module": "enable_sha512_syscall",
+      "simd": "SIMD-0512",
+      "description": "SIMD-0512: SHA512 Syscall",
+      "state": {
+        "mainnet-beta": "absent",
+        "testnet": "active",
+        "devnet": "active"
+      }
+    },
+    {
+      "module": "reduce_slot_time_to_200ms",
+      "simd": "SIMD-0525",
+      "description": "SIMD-0525: Reduce slot time to 200ms",
+      "state": {
+        "mainnet-beta": "scheduled",
+        "testnet": "active",
+        "devnet": "active"
+      },
+      "entry": "slot-duration"
+    }
+  ]
+}

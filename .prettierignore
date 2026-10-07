@@ -9,3 +9,5 @@ Cargo.lock
 corpus/pairs/**/before.*
 corpus/pairs/**/after.*
 corpus/pairs/**/sample.*
+
+index.html

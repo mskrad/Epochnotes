@@ -83,6 +83,7 @@ export {
   watchSolana,
 } from './watch.js';
 export { type WatchFiles, watchSolanaFiles } from './watch-run.js';
+export { renderSite, type SiteWatch, siteWatchOf } from './site.js';
 export { EVM_GENESIS, evmActivationReader, evmActivationState } from './evm-activation.js';
 export { call, httpJsonRpc, type JsonRpc } from './json-rpc.js';
 export {

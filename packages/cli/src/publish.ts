@@ -18,7 +18,6 @@ interface Paths {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Adds `publish` and `verify` to the `registry` command. */
 export function addVersionCommands(registry: Command): void {
   registry
     .command('publish')

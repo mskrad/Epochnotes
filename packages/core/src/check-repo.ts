@@ -26,7 +26,8 @@ const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules']);
 const MAX_FILE_BYTES = 1024 * 1024;
 /**
  * Lockfiles are generated too, but they are the only place a dependency version can be read from. Of 95
- * lockfiles in the field corpus three were above one MiB, the largest 1.5 MiB; monorepos grow well past that.
+ * lockfiles measured in open-source repositories three were above one MiB, the largest 1.5 MiB; monorepos grow
+ * well past that.
  */
 const MAX_LOCKFILE_BYTES = 64 * 1024 * 1024;
 
@@ -225,7 +226,6 @@ function sourceFiles(root: string): {
 
 class UnparsableLockfile extends Error {}
 
-/** The lockfile names, by the format they are read as. */
 const LOCKFILE_FORMAT: Record<string, 'package-lock' | 'yarn' | 'pnpm' | 'cargo'> = {
   'package-lock.json': 'package-lock',
   'npm-shrinkwrap.json': 'package-lock',

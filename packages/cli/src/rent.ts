@@ -34,7 +34,6 @@ import {
   withSource,
 } from './read.js';
 
-/** Lamports as SOL, rounded to three decimals. */
 const sol = (lamports: bigint): string => {
   const thousandths = (lamports + 500_000n) / 1_000_000n;
   return `${thousandths / 1000n}.${(thousandths % 1000n).toString().padStart(3, '0')} SOL`;

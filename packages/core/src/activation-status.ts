@@ -29,8 +29,9 @@ export type ActivationState =
   /** Known to the chain, not reached yet. */
   | { state: 'scheduled' }
   /**
-   * In force. `confirmedBy` says what showed it: the feature account itself, a block header field, the node's
-   * own report, or only the time or height compared with the head.
+   * In force. `confirmedBy` says what showed it: the feature account itself, a block header field, or only the
+   * time or height compared with the head. `node` (the node's own report) and `chain-data` (other data on chain)
+   * are kept for adapters that read them; no adapter of this version sets them.
    */
   | {
       state: 'active';

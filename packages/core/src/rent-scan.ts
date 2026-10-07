@@ -97,8 +97,9 @@ export interface RentScanReport {
     steps: { rate: bigint; label: string; gate: string; status: FeatureState }[];
   };
   method: string;
-  /** `unreliable`: a sample whose standard error is more than a quarter of the estimate. Do not quote it. */
   /**
+   * `exact`: every account was read. `estimate`: a sample, within its standard error.
+   * `unreliable`: a sample whose standard error is more than a quarter of the estimate. Do not quote it.
    * `partial`: a sample that leaves accounts out by construction (those too short to hold the sampled byte)
    * and could not read them separately. The figures are a lower bound of the sampled kind, not an estimate of
    * the whole program.

@@ -365,7 +365,7 @@ describe('check repo', () => {
       JSON.stringify({ packages: { 'node_modules/@solana/web3.js': { version: '1.98.4' } } }) +
       ' '.repeat(padding);
 
-    it('reads a lockfile larger than the limit for source files: three of 95 in the field corpus were', () => {
+    it('reads a lockfile larger than the limit for source files, as real lockfiles of large projects are', () => {
       const small = check(repo('lock-small', { 'package-lock.json': lock(0) }));
       const large = check(repo('lock-large', { 'package-lock.json': lock(2 * 1024 * 1024) }));
       expect(small.findings.map((finding) => finding.excerpt)).toEqual(['@solana/web3.js@1.98.4']);

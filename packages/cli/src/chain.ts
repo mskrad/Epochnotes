@@ -19,7 +19,6 @@ const chainCommand = (registry: Command, name: string, description: string) =>
     .addOption(rpcUrlOption())
     .option('--json', 'print the result as JSON');
 
-/** Adds the on-chain commands to `registry`. */
 export function addChainCommands(registry: Command): void {
   chainCommand(registry, 'anchor', 'Write to chain every version of the log that is not there yet.')
     .requiredOption('--key <file>', 'publisher keypair; it signs and pays for the transactions')

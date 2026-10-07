@@ -15,7 +15,7 @@ export const CLUSTERS = {
   localnet: 'http://127.0.0.1:8899',
 } as const;
 
-/** A Solana cluster with a public endpoint known to this library. */
+/** A Solana cluster this library has an endpoint for: a public one, or a validator on this machine. */
 export type Cluster = keyof typeof CLUSTERS;
 
 const FEATURE_PROGRAM = 'Feature111111111111111111111111111111111111';

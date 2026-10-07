@@ -33,6 +33,7 @@ Use warm backgrounds, ample space, fine rules, restrained rectangular panels and
 
 - `mark.svg`: scalable standalone mark.
 - `icon.png`: transparent 180 × 180 icon.
+- `project-logo.png`: 1024 × 1024 logo on white for project submission forms and dark host pages; editable source in `project-logo.svg`.
 - `github-banner.svg`: README cover, 1280 × 640.
 - `social.png`: 1280 × 640 social preview; upload it in GitHub repository Settings → General → Social preview.
 - `social.svg`: editable source for the social preview.

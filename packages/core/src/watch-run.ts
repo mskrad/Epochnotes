@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -25,17 +26,39 @@ async function fetchText(url: string, accept?: string): Promise<string> {
 }
 
 /** The commit agave's default branch points at now: the snapshot names it, so a reading can be repeated. */
+function agaveHeadFromGit(): string {
+  const listed = execFileSync('git', ['ls-remote', AGAVE, 'refs/heads/master'], {
+    encoding: 'utf8',
+    timeout: TIMEOUT_MS,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+  });
+  return listed.split(/\s/)[0] ?? '';
+}
+
 async function agaveHead(): Promise<string> {
-  const sha = (
-    await fetchText(
-      'https://api.github.com/repos/anza-xyz/agave/commits/master',
-      'application/vnd.github.sha',
-    )
-  ).trim();
+  let sha: string;
+  try {
+    sha = (
+      await fetchText(
+        'https://api.github.com/repos/anza-xyz/agave/commits/master',
+        'application/vnd.github.sha',
+      )
+    ).trim();
+  } catch (apiError) {
+    try {
+      sha = agaveHeadFromGit().trim();
+    } catch (gitError) {
+      throw new Error(
+        `neither the GitHub API (${messageOf(apiError)}) nor git ls-remote (${messageOf(gitError)}) named the head of agave; pass --agave-ref <commit>`,
+      );
+    }
+  }
   if (!/^[0-9a-f]{40}$/.test(sha))
     throw new Error(`GitHub answered "${sha.slice(0, 60)}" for the head of agave`);
   return sha;
 }
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 function snapshotAt(path: string): WatchSnapshot {
   let parsed: unknown;

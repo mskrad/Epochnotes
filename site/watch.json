@@ -1,18 +1,18 @@
 {
   "agave": {
     "repository": "https://github.com/anza-xyz/agave",
-    "commit": "56379e3332c166b0de75b7e45ea1d63dd6755f30",
+    "commit": "61400ebdf88f2468b8abd2f7775abdc05ba523d8",
     "retrieved": "2026-10-07"
   },
   "clusters": {
     "mainnet-beta": {
-      "slot": "454188547"
+      "slot": "454210948"
     },
     "testnet": {
-      "slot": "449591129"
+      "slot": "449618672"
     },
     "devnet": {
-      "slot": "508415912"
+      "slot": "508441070"
     }
   },
   "declared": 290,

@@ -5,55 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Epochnotes</title>
 <meta name="description" content="A signed registry of network changes on Solana, Ethereum and Base, and the checks built on it.">
+<meta property="og:title" content="Epochnotes — read the layers of change">
+<meta property="og:description" content="A field journal for network changes. Signed records, clear impact, and checks you can run.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mskrad.github.io/Epochnotes/">
+<meta property="og:image" content="https://mskrad.github.io/Epochnotes/assets/brand/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20300%22%20aria-hidden%3D%22true%22%20focusable%3D%22false%22%3E%3Cpath%20fill%3D%22%23302c28%22%20d%3D%22M38%20111C51%2076%2088%2078%20113%2050C145%2015%20189%2016%20207%2053C215%2074%20244%2072%20260%20110C222%20125%20202%20106%20172%20109C122%20121%2086%2083%2038%20111Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23d1b897%22%20d%3D%22M32%20122C81%2092%20120%20132%20172%20121C208%20112%20231%20136%20267%20119L270%20157C219%20176%20190%20153%20151%20167C98%20185%2061%20152%2017%20168C18%20150%2025%20133%2032%20122Z%22%2F%3E%0A%3Cpath%20fill%3D%22%2398664b%22%20d%3D%22M15%20180C65%20163%2095%20195%20153%20179C189%20169%20209%20185%20241%20173L221%20215C184%20237%20144%20215%20111%20224C75%20234%2047%20216%2017%20221C7%20206%208%20190%2015%20180Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23bc6239%22%20d%3D%22M252%20172L278%20155C292%20179%20283%20199%20264%20211L239%20225L228%20215Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23302c28%22%20d%3D%22M22%20233C63%20230%2078%20247%20113%20237C151%20226%20183%20250%20220%20228L249%20242C222%20261%20203%20286%20179%20282L63%20269C41%20267%2030%20252%2022%20233Z%22%2F%3E%3C%2Fsvg%3E">
 <style>
-:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a64;--card:#ffffff;--line:#e4e1d8;--accent:#5b3fd6;--tag:#efecf9;--ok:#1f7a4d;--ok-bg:#e3f4ea;--warn:#8a5a00;--warn-bg:#fbf0d9;--off:#5f5f5f;--off-bg:#eeeeec;--bad:#a8324a;--bad-bg:#f8e3e7;--code:#f3f1ec}
-@media (prefers-color-scheme:dark){:root{--bg:#121214;--fg:#ebeae6;--muted:#a3a29b;--card:#1b1b1f;--line:#2e2e34;--accent:#a996ff;--tag:#26223a;--ok:#7fd6a5;--ok-bg:#163326;--warn:#f0c46a;--warn-bg:#3a2e12;--off:#b5b5b0;--off-bg:#2a2a2e;--bad:#f39aac;--bad-bg:#3d1c24;--code:#232328}}
+:root{color-scheme:light dark;--bg:#f5f1e9;--fg:#302c28;--muted:#74675a;--card:#fcfaf5;--line:#d8cdbf;--accent:#934521;--tag:#eae1d4;--ok:#33634b;--ok-bg:#e2ecdf;--warn:#775122;--warn-bg:#efe1c7;--off:#685e55;--off-bg:#e9e4dc;--bad:#943c39;--bad-bg:#f2dfd9;--code:#eae3d8;--serif:Georgia,"Times New Roman",serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#211f1c;--fg:#f0e9df;--muted:#c0b1a0;--card:#2b2824;--line:#4b433a;--accent:#eda579;--tag:#43382d;--ok:#b4d5b8;--ok-bg:#2c3d30;--warn:#ebcb91;--warn-bg:#453820;--off:#c3b7aa;--off-bg:#3b3530;--bad:#f0aaa0;--bad-bg:#4c2d29;--code:#36302a}.brand svg path:first-child,.brand svg path:last-child,.specimen svg path:first-child,.specimen svg path:last-child{fill:#a89c8d}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:960px;margin:0 auto;padding:0 16px 64px}
-a{color:var(--accent);overflow-wrap:anywhere}
-code{font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
-pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
-pre code{background:none;padding:0}
-.hero{padding:56px 0 24px}
-.hero h1{font-size:2.4rem;margin:0 0 8px;letter-spacing:-0.02em}
-.hero p{font-size:1.15rem;max-width:44em;margin:0 0 12px}
-h2{font-size:1.5rem;margin:48px 0 12px;letter-spacing:-0.01em}
-h3{margin:0 0 6px;font-size:1.15rem}
-h4{margin:14px 0 4px;font-size:0.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em}
-.muted{color:var(--muted)}
-.small{font-size:0.9rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.card{overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
-.entry{margin-bottom:14px}
-.entry ul{margin:4px 0;padding-left:20px}
-.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.tag{display:inline-block;background:var(--tag);border-radius:999px;padding:0 9px;font-size:0.8rem;line-height:1.6}
-.label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.85em}
-details{margin-top:10px}
-summary{cursor:pointer;color:var(--accent)}
-.scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:0.9rem}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600}
-.state{display:inline-block;border-radius:6px;padding:0 7px;font-size:0.8rem;line-height:1.7}
-.state.active{color:var(--ok);background:var(--ok-bg)}
-.state.scheduled{color:var(--warn);background:var(--warn-bg)}
-.state.absent{color:var(--off);background:var(--off-bg)}
-.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
-.roadmap li{margin:4px 0}
-footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:0.9rem;color:var(--muted)}
+html{scroll-padding-top:24px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:#d1b897;color:#302c28}
+main{max-width:1184px;margin:auto;padding:0 32px 48px}
+a{color:var(--accent);overflow-wrap:anywhere;text-underline-offset:4px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:5px}
+.skip{position:absolute;left:24px;top:-100px;padding:8px 16px;background:var(--card);z-index:2}.skip:focus{top:12px}
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:10px;align-items:center;color:var(--fg);font:26px/1 var(--serif);text-decoration:none}.brand svg{width:42px;height:42px}
+nav{display:flex;flex-wrap:wrap;gap:24px;font-size:14px}nav a{color:var(--fg);text-decoration:none}
+.hero{display:grid;grid-template-columns:1.45fr 1fr;gap:48px;align-items:center;padding:80px 0 52px}
+.eyebrow,.section-label,.specimen-caption{font:12px/1.6 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{margin:0 0 24px}
+h1{font:clamp(48px,6vw,82px)/1.04 var(--serif);letter-spacing:-.045em;margin:0 0 24px;text-wrap:balance}
+.hero .intro{font-size:18px;line-height:1.65;max-width:54ch;margin:0 0 28px;color:var(--muted);text-wrap:pretty}
+.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.button{display:inline-block;padding:11px 20px;border:1px solid var(--line);border-radius:4px;text-decoration:none;font-size:14px;font-weight:600;color:var(--fg)}
+.button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.button:hover{border-color:var(--accent)}
+.specimen{margin:0;text-align:center;position:relative;padding:32px 24px;background:var(--card);border:1px solid var(--line);border-radius:48% 48% 4px 4px}
+.specimen svg{display:block;width:100%;max-width:340px;margin:auto}.specimen-caption{margin-top:20px}
+.edition{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--muted);font:12px/1.7 var(--mono)}
+section:not(.hero){margin-top:72px}
+.section-label{margin:0 0 10px}
+h2{font:clamp(30px,4vw,42px)/1.15 var(--serif);letter-spacing:-.025em;margin:0 0 28px;text-wrap:balance}
+h3{font:26px/1.2 var(--serif);margin:0 0 12px;text-wrap:balance}
+h4{margin:22px 0 8px;font:12px/1.6 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+p{max-width:72ch}li{margin:8px 0}
+.muted{color:var(--muted)}.small{font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.card{min-width:0;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:28px}
+.grid .card{border-top:3px solid #d1b897}.grid .card:nth-child(2){border-top-color:#98664b}.grid .card:nth-child(3){border-top-color:#bc6239}
+.card p:last-child{margin-bottom:0}
+.entry{margin-bottom:20px;border-left:4px solid #d1b897}.entry:nth-of-type(3n+2){border-left-color:#98664b}.entry:nth-of-type(3n){border-left-color:#bc6239}
+.entry h3{font-size:28px}.entry ul{margin:4px 0;padding-left:20px}
+.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
+.tag{display:inline-block;background:var(--tag);border-radius:3px;padding:2px 8px;font:12px/1.6 var(--mono)}
+.label{font:0.85em var(--mono)}
+code{font:0.85em var(--mono);background:var(--code);padding:2px 5px;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--fg);color:var(--bg);padding:24px;border-radius:4px;overflow-x:auto;font:13px/1.8 var(--mono)}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}
+details{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}summary{cursor:pointer;color:var(--accent);font-size:14px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
+.state{display:inline-block;border-radius:3px;padding:2px 7px;font:12px/1.6 var(--mono);white-space:nowrap}
+.state.active{color:var(--ok);background:var(--ok-bg)}.state.scheduled{color:var(--warn);background:var(--warn-bg)}.state.absent{color:var(--off);background:var(--off-bg)}.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
+.roadmap .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+@media(max-width:760px){main{padding:0 20px 32px}.masthead{align-items:flex-start;gap:16px;flex-direction:column}nav{gap:20px}.hero{grid-template-columns:1fr;gap:32px;padding:48px 0 32px}.specimen{width:100%;max-width:340px;margin:auto;padding:24px}.specimen svg{max-width:220px}section:not(.hero){margin-top:48px}.grid,.roadmap .grid{grid-template-columns:1fr}.card{padding:22px}h3,.entry h3{font-size:24px}.edition{display:block}.edition span{display:block}.scroll{max-width:100%}th,td{padding:12px}pre{padding:18px}}
+@media(prefers-reduced-motion:no-preference){a{transition:color .15s,border-color .15s}}
 </style>
 </head>
 <body>
-<main>
+<a class="skip" href="#content">Skip to content</a>
+<main id="content">
+<header class="masthead">
+<a class="brand" href="#content" aria-label="Epochnotes home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true" focusable="false"><path fill="#302c28" d="M38 111C51 76 88 78 113 50C145 15 189 16 207 53C215 74 244 72 260 110C222 125 202 106 172 109C122 121 86 83 38 111Z"/>
+<path fill="#d1b897" d="M32 122C81 92 120 132 172 121C208 112 231 136 267 119L270 157C219 176 190 153 151 167C98 185 61 152 17 168C18 150 25 133 32 122Z"/>
+<path fill="#98664b" d="M15 180C65 163 95 195 153 179C189 169 209 185 241 173L221 215C184 237 144 215 111 224C75 234 47 216 17 221C7 206 8 190 15 180Z"/>
+<path fill="#bc6239" d="M252 172L278 155C292 179 283 199 264 211L239 225L228 215Z"/>
+<path fill="#302c28" d="M22 233C63 230 78 247 113 237C151 226 183 250 220 228L249 242C222 261 203 286 179 282L63 269C41 267 30 252 22 233Z"/></svg><span>Epochnotes</span></a>
+<nav aria-label="Main navigation"><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a><a href="https://github.com/mskrad/Epochnotes">GitHub ↗</a></nav>
+</header>
 <section class="hero">
-<h1>Epochnotes</h1>
-<p>A signed registry of network changes on Solana, Ethereum and Base — and the checks built on it: what breaks in your code, where, and how to fix it.</p>
-<p class="muted">Pre-release. Nothing here has been audited. <a href="https://github.com/mskrad/Epochnotes">Source on GitHub</a> · <a href="registry/versions/1.json">version 1 of the signed log</a></p>
+<div>
+<p class="eyebrow">A field journal for network changes</p>
+<h1>Read the layers<br>of change.</h1>
+<p class="intro">A signed registry of network changes on Solana, Ethereum and Base. Understand what breaks in your code, where, and how to fix it.</p>
+<div class="actions"><a class="button primary" href="#registry">Explore the registry</a><a class="button" href="#get-started">Run your first check</a></div>
+</div>
+<figure class="specimen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true" focusable="false"><path fill="#302c28" d="M38 111C51 76 88 78 113 50C145 15 189 16 207 53C215 74 244 72 260 110C222 125 202 106 172 109C122 121 86 83 38 111Z"/>
+<path fill="#d1b897" d="M32 122C81 92 120 132 172 121C208 112 231 136 267 119L270 157C219 176 190 153 151 167C98 185 61 152 17 168C18 150 25 133 32 122Z"/>
+<path fill="#98664b" d="M15 180C65 163 95 195 153 179C189 169 209 185 241 173L221 215C184 237 144 215 111 224C75 234 47 216 17 221C7 206 8 190 15 180Z"/>
+<path fill="#bc6239" d="M252 172L278 155C292 179 283 199 264 211L239 225L228 215Z"/>
+<path fill="#302c28" d="M22 233C63 230 78 247 113 237C151 226 183 250 220 228L249 242C222 261 203 286 179 282L63 269C41 267 30 252 22 233Z"/></svg><figcaption class="specimen-caption">Epochnotes / A record of changing epochs</figcaption></figure>
 </section>
+<div class="edition"><span>5 entries · Solana / Ethereum / Base · Signed log v1</span><span>Pre-release · Not audited · <a href="registry/versions/1.json">Read the signed manifest ↗</a></span></div>
 
 <section>
+<p class="section-label">01 / From source to understanding</p>
 <h2>How it works</h2>
 <div class="grid">
 <div class="card"><h3>Signed entries</h3><p>Each change is an entry built from primary sources — a SIMD or an EIP, the client's code, the chain itself. A version of the registry is a Merkle root, signed by its publisher and anchored by a program on Solana devnet.</p></div>
@@ -62,7 +104,8 @@ footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-si
 </div>
 </section>
 
-<section>
+<section id="watcher">
+<p class="section-label">02 / The latest field reading</p>
 <h2>What the Solana watcher sees</h2>
 <p>Read on 2026-10-07 from agave <a href="https://github.com/anza-xyz/agave/tree/61400ebdf88f2468b8abd2f7775abdc05ba523d8">61400ebdf88f</a> and three clusters (mainnet-beta slot 454210948, testnet slot 449618672, devnet slot 508441070): <strong>290</strong> feature gates declared, <strong>11</strong> of them covered by the registry.</p>
 <h3>On the way to mainnet-beta (6)</h3>
@@ -110,7 +153,8 @@ footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-si
 </table></div>
 </section>
 
-<section>
+<section id="registry">
+<p class="section-label">03 / Layers in the record</p>
 <h2>The registry (5 entries)</h2>
 <article class="card entry" id="alpenglow">
 <header>
@@ -189,8 +233,13 @@ footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-si
 </article>
 </section>
 
-<section>
+<section id="get-started">
+<p class="section-label">04 / Put the record to work</p>
 <h2>Check it yourself</h2>
+<p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
+<pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
+curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o epochnotes-publishers.json
+export EPOCHNOTES_PUBLISHERS=./epochnotes-publishers.json</code></pre>
 <pre><code>epochnotes registry read --json --status mainnet-beta   # verified entries and the state of each activation
 epochnotes status --chain base                          # every activation the registry names on Base
 epochnotes check repo &lt;path&gt;                            # where a change breaks this code
@@ -200,6 +249,7 @@ epochnotes watch solana                                 # what moved on Solana s
 </section>
 
 <section class="roadmap">
+<p class="section-label">05 / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
@@ -210,7 +260,7 @@ epochnotes watch solana                                 # what moved on Solana s
 <li>The Solana watcher, run daily by a scheduled Claude task that drafts from the SIMD</li>
 </ul></div>
 <div class="card"><h3>Next</h3><ul>
-<li>The first signed version of the registry, published here, and the packages on npm</li>
+<li>Anchor the first signed version of the registry on Solana devnet</li>
 <li>Watchers for Ethereum and Base: fork times in the client configurations</li>
 <li>A notification when something outside the registry moves</li>
 <li>This page updated from each watcher report</li>

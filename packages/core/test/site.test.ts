@@ -40,7 +40,10 @@ describe('the project page', () => {
 
   it('loads nothing from elsewhere', () => {
     const page = renderSite(entries, watch);
-    expect(page).not.toMatch(/<script|<link|<img|<iframe|\ssrc=|@import|url\(/i);
+    expect(page).not.toMatch(/<script|<img|<iframe|\ssrc=|@import|url\(/i);
+    expect(page.match(/<link\b[^>]*>/g)).toEqual([
+      expect.stringMatching(/^<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/),
+    ]);
   });
 
   it('shows the text of an entry as text, and links only to https', () => {
@@ -91,7 +94,9 @@ describe('the project page', () => {
     );
     expect(page).not.toContain('href="javascript:');
     expect(
-      page.match(/href="([^"]*)"/g)?.every((href) => /^href="(https:\/\/|#|registry\/)/.test(href)),
+      page
+        .match(/href="([^"]*)"/g)
+        ?.every((href) => /^href="(https:\/\/|#|registry\/|data:image\/svg\+xml,)/.test(href)),
     ).toBe(true);
   });
 

@@ -1,5 +1,7 @@
 import { chainNameOf } from './chains.js';
 import { activationsOf, type Activation, type Entry, subjectOf } from './schema.js';
+import { MARK } from './site-brand.js';
+import { STYLE } from './site-style.js';
 import { WATCHED_CLUSTERS, type WatchedCluster, type WatchReport } from './watch.js';
 
 /** The part of a watcher report the project page shows. */
@@ -135,44 +137,6 @@ ${rows}
 </table></div>`;
 }
 
-const STYLE = `:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a64;--card:#ffffff;--line:#e4e1d8;--accent:#5b3fd6;--tag:#efecf9;--ok:#1f7a4d;--ok-bg:#e3f4ea;--warn:#8a5a00;--warn-bg:#fbf0d9;--off:#5f5f5f;--off-bg:#eeeeec;--bad:#a8324a;--bad-bg:#f8e3e7;--code:#f3f1ec}
-@media (prefers-color-scheme:dark){:root{--bg:#121214;--fg:#ebeae6;--muted:#a3a29b;--card:#1b1b1f;--line:#2e2e34;--accent:#a996ff;--tag:#26223a;--ok:#7fd6a5;--ok-bg:#163326;--warn:#f0c46a;--warn-bg:#3a2e12;--off:#b5b5b0;--off-bg:#2a2a2e;--bad:#f39aac;--bad-bg:#3d1c24;--code:#232328}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:960px;margin:0 auto;padding:0 16px 64px}
-a{color:var(--accent);overflow-wrap:anywhere}
-code{font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
-pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
-pre code{background:none;padding:0}
-.hero{padding:56px 0 24px}
-.hero h1{font-size:2.4rem;margin:0 0 8px;letter-spacing:-0.02em}
-.hero p{font-size:1.15rem;max-width:44em;margin:0 0 12px}
-h2{font-size:1.5rem;margin:48px 0 12px;letter-spacing:-0.01em}
-h3{margin:0 0 6px;font-size:1.15rem}
-h4{margin:14px 0 4px;font-size:0.95rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em}
-.muted{color:var(--muted)}
-.small{font-size:0.9rem}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.card{overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
-.entry{margin-bottom:14px}
-.entry ul{margin:4px 0;padding-left:20px}
-.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.tag{display:inline-block;background:var(--tag);border-radius:999px;padding:0 9px;font-size:0.8rem;line-height:1.6}
-.label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.85em}
-details{margin-top:10px}
-summary{cursor:pointer;color:var(--accent)}
-.scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:0.9rem}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600}
-.state{display:inline-block;border-radius:6px;padding:0 7px;font-size:0.8rem;line-height:1.7}
-.state.active{color:var(--ok);background:var(--ok-bg)}
-.state.scheduled{color:var(--warn);background:var(--warn-bg)}
-.state.absent{color:var(--off);background:var(--off-bg)}
-.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
-.roadmap li{margin:4px 0}
-footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);font-size:0.9rem;color:var(--muted)}`;
-
 /**
  * The project page as one self-contained HTML document: no script, no external resource, every value escaped.
  */
@@ -188,19 +152,37 @@ export function renderSite(entries: Entry[], watch?: SiteWatch): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Epochnotes</title>
 <meta name="description" content="A signed registry of network changes on Solana, Ethereum and Base, and the checks built on it.">
+<meta property="og:title" content="Epochnotes — read the layers of change">
+<meta property="og:description" content="A field journal for network changes. Signed records, clear impact, and checks you can run.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mskrad.github.io/Epochnotes/">
+<meta property="og:image" content="https://mskrad.github.io/Epochnotes/assets/brand/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,${encodeURIComponent(MARK)}">
 <style>
 ${STYLE}
 </style>
 </head>
 <body>
-<main>
+<a class="skip" href="#content">Skip to content</a>
+<main id="content">
+<header class="masthead">
+<a class="brand" href="#content" aria-label="Epochnotes home">${MARK}<span>Epochnotes</span></a>
+<nav aria-label="Main navigation"><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
+</header>
 <section class="hero">
-<h1>Epochnotes</h1>
-<p>A signed registry of network changes on ${chains.slice(0, -1).map(escapeHtml).join(', ')}${chains.length > 1 ? ' and ' : ''}${escapeHtml(chains.at(-1) ?? '')} — and the checks built on it: what breaks in your code, where, and how to fix it.</p>
-<p class="muted">Pre-release. Nothing here has been audited. ${link(REPOSITORY, 'Source on GitHub')} · <a href="registry/versions/1.json">version 1 of the signed log</a></p>
+<div>
+<p class="eyebrow">A field journal for network changes</p>
+<h1>Read the layers<br>of change.</h1>
+<p class="intro">A signed registry of network changes on ${chains.slice(0, -1).map(escapeHtml).join(', ')}${chains.length > 1 ? ' and ' : ''}${escapeHtml(chains.at(-1) ?? '')}. Understand what breaks in your code, where, and how to fix it.</p>
+<div class="actions"><a class="button primary" href="#registry">Explore the registry</a><a class="button" href="#get-started">Run your first check</a></div>
+</div>
+<figure class="specimen">${MARK}<figcaption class="specimen-caption">Epochnotes / A record of changing epochs</figcaption></figure>
 </section>
+<div class="edition"><span>${sorted.length} entries · ${chains.map(escapeHtml).join(' / ')} · Signed log v1</span><span>Pre-release · Not audited · <a href="registry/versions/1.json">Read the signed manifest ↗</a></span></div>
 
 <section>
+<p class="section-label">01 / From source to understanding</p>
 <h2>How it works</h2>
 <div class="grid">
 <div class="card"><h3>Signed entries</h3><p>Each change is an entry built from primary sources — a SIMD or an EIP, the client's code, the chain itself. A version of the registry is a Merkle root, signed by its publisher and anchored by a program on Solana devnet.</p></div>
@@ -209,18 +191,25 @@ ${STYLE}
 </div>
 </section>
 
-<section>
+<section id="watcher">
+<p class="section-label">02 / The latest field reading</p>
 <h2>What the Solana watcher sees</h2>
 ${watchSection(watch)}
 </section>
 
-<section>
+<section id="registry">
+<p class="section-label">03 / Layers in the record</p>
 <h2>The registry (${sorted.length} entries)</h2>
 ${sorted.map(entryCard).join('\n')}
 </section>
 
-<section>
+<section id="get-started">
+<p class="section-label">04 / Put the record to work</p>
 <h2>Check it yourself</h2>
+<p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
+<pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
+curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o epochnotes-publishers.json
+export EPOCHNOTES_PUBLISHERS=./epochnotes-publishers.json</code></pre>
 <pre><code>epochnotes registry read --json --status mainnet-beta   # verified entries and the state of each activation
 epochnotes status --chain base                          # every activation the registry names on Base
 epochnotes check repo &lt;path&gt;                            # where a change breaks this code
@@ -230,6 +219,7 @@ epochnotes watch solana                                 # what moved on Solana s
 </section>
 
 <section class="roadmap">
+<p class="section-label">05 / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
@@ -240,7 +230,7 @@ epochnotes watch solana                                 # what moved on Solana s
 <li>The Solana watcher, run daily by a scheduled Claude task that drafts from the SIMD</li>
 </ul></div>
 <div class="card"><h3>Next</h3><ul>
-<li>The first signed version of the registry, published here, and the packages on npm</li>
+<li>Anchor the first signed version of the registry on Solana devnet</li>
 <li>Watchers for Ethereum and Base: fork times in the client configurations</li>
 <li>A notification when something outside the registry moves</li>
 <li>This page updated from each watcher report</li>

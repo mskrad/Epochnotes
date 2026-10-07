@@ -20,6 +20,7 @@
     "verify": "npm run verify:ts && npm run build:program",
     "schema:write": "npm run build && node scripts/write-schema.mjs && prettier --write registry/schema.json",
     "site": "npm run build && node scripts/write-site.mjs",
+    "brand": "npm run build && node scripts/write-brand.mjs",
     "typecheck:tests": "tsc -p tsconfig.tests.json",
     "e2e": "npm run build && node scripts/e2e.mjs",
     "corpus:check": "npm run build && node scripts/check-corpus.mjs",

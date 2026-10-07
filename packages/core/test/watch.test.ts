@@ -129,6 +129,7 @@ describe('reading the gates agave declares', () => {
       `${'declare_id!("'.repeat(20_000)}`,
       `${'a'.repeat(1_000_000)}`,
       `${'a:'.repeat(500_000)}`,
+      `${' pub mod a {\n'.repeat(100_000)}${' solana_pubkey::declare_id!("A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS");\n'.repeat(100_000)}`,
     ].join('\n');
     const started = performance.now();
     expect(parseAgaveFeatures(hostile)).toEqual([]);
@@ -277,7 +278,15 @@ describe('the snapshot of the last look', () => {
     const work = mkdtempSync(join(tmpdir(), 'epochnotes-watch-'));
     try {
       const state = join(work, 'state.json');
-      for (const content of ['{"watcher":1}', 'null', '{"watcher":1,"features":[null]}', '[1]', 'nope']) {
+      for (const content of [
+        '{"watcher":1}',
+        'null',
+        '{"watcher":1,"features":[null]}',
+        '[1]',
+        'nope',
+        '{"watcher":1,"features":[{"module":"x","address":"x","state":{}}]}',
+        '{"watcher":1,"features":[{"module":"x","address":"x","state":{"mainnet-beta":"bogus","testnet":"active","devnet":"active"}}]}',
+      ]) {
         writeFileSync(state, content);
         await expect(
           watchSolanaFiles({
@@ -354,6 +363,18 @@ describe('a draft', () => {
     expect(pathsOf(done.replace("title: 'Vote State v4'", "title: 'DRAFT: Vote State v4'"))).toEqual([
       'subject.title',
     ]);
+  });
+
+  it('does not take ordinary prose for a draft', () => {
+    const done = finished(draftEntry([feature('vote_state_v4')], AGAVE).yaml);
+    for (const prose of [
+      'Overdraft: fees rise.',
+      'Per the SIMD draft: vote accounts change.',
+      'The layout is not written yet.',
+    ])
+      expect(pathsOf(done.replace('summary: Vote accounts change layout.', `summary: '${prose}'`))).toEqual(
+        [],
+      );
   });
 
   it('keeps quotes and nested module names in a description intact', () => {

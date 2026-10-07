@@ -12,10 +12,10 @@ export type WatchedCluster = (typeof WATCHED_CLUSTERS)[number];
 
 /** Marks a draft written by the watcher; the validator refuses an entry that still carries it. */
 export const DRAFT_MARKER = 'DRAFT:';
-export const DRAFT_PLACEHOLDER = 'not written yet';
+export const DRAFT_PLACEHOLDER = '- not written yet.';
 
 const INVISIBLE = /[\u00ad\u200b-\u200f\u2060\ufeff]/g;
-const MARKER_ANY_SPELLING = /draft\s*:/;
+const MARKER_ANY_SPELLING = /^\s*draft\s*:/;
 
 export function readsAsDraft(text: string): boolean {
   const plain = text.normalize('NFKC').replace(INVISIBLE, '').toLowerCase();
@@ -86,6 +86,7 @@ const MODULE_OPEN = /^(\s*)pub mod (\w+) \{\s*$/;
 const BLOCK_CLOSE = /^(\s*)\}\s*$/;
 const DECLARE = /declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)/;
 const ID_CALL = '::id(),';
+const DEEPEST_FEATURE_MODULE = 8;
 const PATH_CHARACTER = /[\w:]/;
 const LINE_CONTINUATION = 'line-continuation';
 
@@ -146,7 +147,7 @@ export function parseAgaveFeatures(text: string): DeclaredFeature[] {
     if (open !== null) {
       const indent = (open[1] ?? '').length;
       if (indent === 0) stack.length = 0;
-      stack.push({ name: open[2] ?? '', indent });
+      if (stack.length < DEEPEST_FEATURE_MODULE) stack.push({ name: open[2] ?? '', indent });
       return;
     }
     const close = BLOCK_CLOSE.exec(line);
@@ -248,9 +249,9 @@ applies:
 ${activations}
 breaks:
   - surface: program
-    summary: ${quoted(`${DRAFT_MARKER} what this change breaks, in the words of its SIMD - ${DRAFT_PLACEHOLDER}.`)}
+    summary: ${quoted(`${DRAFT_MARKER} what this change breaks, in the words of its SIMD ${DRAFT_PLACEHOLDER}`)}
 fix:
-  - summary: ${quoted(`${DRAFT_MARKER} how to fix it, from the SIMD - ${DRAFT_PLACEHOLDER}.`)}
+  - summary: ${quoted(`${DRAFT_MARKER} how to fix it, from the SIMD ${DRAFT_PLACEHOLDER}`)}
 sources:
   - kind: source-code
     ref: ${agave.repository}/blob/${agave.commit}/feature-set/src/lib.rs

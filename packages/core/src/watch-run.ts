@@ -3,10 +3,17 @@ import { dirname, join } from 'node:path';
 
 import { CLUSTERS, rpcFeatureAccountSource } from './feature-status.js';
 import { validatePath } from './load.js';
-import { type WatchReport, watchReportMarkdown, type WatchSnapshot, watchSolana } from './watch.js';
+import {
+  WATCHED_CLUSTERS,
+  type WatchReport,
+  watchReportMarkdown,
+  type WatchSnapshot,
+  watchSolana,
+} from './watch.js';
 
 const AGAVE = 'https://github.com/anza-xyz/agave';
 const TIMEOUT_MS = 30_000;
+const KNOWN_STATES = new Set<unknown>(['absent', 'scheduled', 'active', 'unknown']);
 
 async function fetchText(url: string, accept?: string): Promise<string> {
   const response = await fetch(url, {
@@ -46,7 +53,11 @@ function snapshotAt(path: string): WatchSnapshot {
     snapshot.features.length > 0 &&
     snapshot.features.every(
       (feature) =>
-        typeof feature?.address === 'string' && typeof feature.state === 'object' && feature.state !== null,
+        typeof feature?.address === 'string' &&
+        typeof feature.module === 'string' &&
+        typeof feature.state === 'object' &&
+        feature.state !== null &&
+        WATCHED_CLUSTERS.every((cluster) => KNOWN_STATES.has(feature.state[cluster])),
     );
   if (!wellFormed) throw new Error(`${path} is not a snapshot this watcher wrote`);
   return snapshot as WatchSnapshot;

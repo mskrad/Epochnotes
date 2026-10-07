@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -12,6 +14,7 @@ import {
   validatePath,
   watchReportMarkdown,
   watchSolana,
+  watchSolanaFiles,
 } from '../src/index.js';
 
 const excerpt = readFileSync(new URL('./fixtures/agave/feature-set-excerpt.rs', import.meta.url), 'utf8');
@@ -124,10 +127,41 @@ describe('reading the gates agave declares', () => {
       `x${'::x'.repeat(50_000)}::id(),${' '.repeat(50_000)}`,
       `    "${'\\'.repeat(100_000)}`,
       `${'declare_id!("'.repeat(20_000)}`,
+      `${'a'.repeat(1_000_000)}`,
+      `${'a:'.repeat(500_000)}`,
     ].join('\n');
     const started = performance.now();
     expect(parseAgaveFeatures(hostile)).toEqual([]);
     expect(performance.now() - started).toBeLessThan(1_000);
+  });
+});
+
+describe('reading what the file says, not what it seems to say', () => {
+  const ALPENGLOW_NAME = 'SIMD-0326: Alpenglow: new consensus algorithm';
+  const nameOf = (source: string, module: string) =>
+    parseAgaveFeatures(source).find((feature) => feature.module === module)?.description;
+
+  it('skips commented-out registrations', () => {
+    const commented = excerpt.replace(
+      '        (secp256k1_program_enabled::id(), "secp256k1 program"),',
+      '        // (alpenglow::id(), "fake"),\n        (secp256k1_program_enabled::id(), "secp256k1 program"),',
+    );
+    expect(nameOf(commented, 'alpenglow')).toBe(ALPENGLOW_NAME);
+  });
+
+  it('reads escaped quotes and backslashes inside a name', () => {
+    const escaped = excerpt.replace('"secp256k1 program"', String.raw`"secp256k1 \"program\" C:\\"`);
+    expect(nameOf(escaped, 'secp256k1_program_enabled')).toBe('secp256k1 "program" C:\\');
+  });
+
+  it('keeps reading after a module whose closing brace is indented unlike its opening', () => {
+    const skewed = excerpt.replace(
+      'pub mod alpenglow {\n    solana_pubkey::declare_id!("A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS");\n}',
+      'pub mod alpenglow {\n    solana_pubkey::declare_id!("A1pengvuM6JEcyNuTnMqepBKhwHE3N6PmUrdATGawhJS");\n  }',
+    );
+    expect(parseAgaveFeatures(skewed).map((feature) => feature.module)).toEqual(
+      parseAgaveFeatures(excerpt).map((feature) => feature.module),
+    );
   });
 });
 
@@ -238,40 +272,94 @@ describe('watching the clusters', () => {
   });
 });
 
+describe('the snapshot of the last look', () => {
+  it('is refused before anything is read or written when this watcher did not write it', async () => {
+    const work = mkdtempSync(join(tmpdir(), 'epochnotes-watch-'));
+    try {
+      const state = join(work, 'state.json');
+      for (const content of ['{"watcher":1}', 'null', '{"watcher":1,"features":[null]}', '[1]', 'nope']) {
+        writeFileSync(state, content);
+        await expect(
+          watchSolanaFiles({
+            state,
+            out: join(work, 'out'),
+            registry: new URL('../../../registry/entries', import.meta.url).pathname,
+          }),
+        ).rejects.toThrow(state);
+        expect(readFileSync(state, 'utf8')).toBe(content);
+      }
+      expect(readdirSync(work)).toEqual(['state.json']);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('a draft', () => {
   const features = parseAgaveFeatures(excerpt);
   const feature = (module: string) => features.find((item) => item.module === module) as DeclaredFeature;
+  const SIMD_SOURCE = `  - kind: simd
+    ref: https://github.com/solana-foundation/solana-improvement-documents/blob/${'b'.repeat(40)}/proposals/0185-vote-account-v4.md
+    retrieved: '2026-10-07'
+`;
+  const finished = (yaml: string) =>
+    `${yaml
+      .replace(/summary: 'DRAFT: what this change breaks[^']*'/, 'summary: Vote accounts change layout.')
+      .replace(
+        /summary: 'DRAFT: how to fix it[^']*'/,
+        'summary: Read vote accounts with the v4 layout.',
+      )}${SIMD_SOURCE}`;
+  const pathsOf = (yaml: string) => {
+    const result = validateEntryYaml(yaml);
+    return result.ok ? [] : result.issues.map((issue) => issue.path);
+  };
 
-  it('is a schema-2 entry the validator refuses only for its DRAFT: markers, and says how to finish it', () => {
+  it('is a schema-2 entry the validator refuses, saying how to finish it, and accepts once a person finished it', () => {
     const draft = draftEntry([feature('vote_state_v4')], AGAVE);
     const result = validateEntryYaml(draft.yaml);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.issues.map((issue) => issue.path)).toEqual(['breaks[0].summary', 'fix[0].summary']);
+    expect(result.issues.map((issue) => issue.path)).toEqual([
+      'breaks[0].summary',
+      'fix[0].summary',
+      'sources',
+    ]);
     expect(result.issues[0]).toMatchObject({
       message: 'Entry is a draft written by the watcher',
       hint: 'Write what the primary source says, add it to sources, and remove every DRAFT: marker.',
     });
-    // Written out by a person, it passes.
-    const written = draft.yaml
-      .replace(
-        "'DRAFT: what this change breaks, in the words of its SIMD - not written yet.'",
-        'Vote accounts change layout.',
-      )
-      .replace(
-        "'DRAFT: how to fix it, from the SIMD - not written yet.'",
-        'Read vote accounts with the v4 layout.',
-      );
-    expect(validateEntryYaml(written)).toMatchObject({
+    expect(result.issues[2]?.message).toBe('Entry about SIMD-0185 does not cite the SIMD');
+    expect(validateEntryYaml(finished(draft.yaml))).toMatchObject({
       ok: true,
       entry: { id: 'simd-0185', schema_version: 2 },
     });
   });
 
+  it('is still refused when only its markers were stripped, or the marker is spelled another way', () => {
+    const draft = draftEntry([feature('vote_state_v4')], AGAVE).yaml;
+    expect(pathsOf(`${draft.replaceAll('DRAFT: ', '')}${SIMD_SOURCE}`)).toEqual([
+      'breaks[0].summary',
+      'fix[0].summary',
+    ]);
+    const done = finished(draft);
+    for (const spelling of ['draft:', 'DRAFT :', 'DRAFT\uff1a', 'DR\u200bAFT:'])
+      expect(
+        pathsOf(
+          done.replace(
+            'summary: Vote accounts change layout.',
+            `summary: '${spelling} Vote accounts change layout.'`,
+          ),
+        ),
+      ).toEqual(['breaks[0].summary']);
+    expect(pathsOf(done.replace("title: 'Vote State v4'", "title: 'DRAFT: Vote State v4'"))).toEqual([
+      'subject.title',
+    ]);
+  });
+
   it('keeps quotes and nested module names in a description intact', () => {
     for (const module of ['credits_auto_rewind', 'full_inflation::mainnet::certusone::vote']) {
       const draft = draftEntry([feature(module)], AGAVE);
-      const result = validateEntryYaml(draft.yaml.replaceAll('DRAFT: ', ''));
+      const result = validateEntryYaml(finished(draft.yaml));
       expect(result.ok, draft.yaml).toBe(true);
       if (!result.ok) continue;
       const entry = result.entry as Entry & { applies: { activations: { label: string; effect: string }[] } };

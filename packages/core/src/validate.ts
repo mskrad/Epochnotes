@@ -4,7 +4,7 @@ import { parse as parseYaml, YAMLParseError } from 'yaml';
 import type { z } from 'zod';
 
 import { SOLANA_CHAINS } from './chains.js';
-import { DRAFT_MARKER } from './watch.js';
+import { DRAFT_MARKER, readsAsDraft } from './watch.js';
 import {
   activationsOf,
   type Entry,
@@ -13,6 +13,7 @@ import {
   PROBE_CLUSTERS,
   PROBE_METHODS,
   READABLE_SCHEMA_VERSIONS,
+  subjectOf,
 } from './schema.js';
 
 /** One validation problem: where it is, what is wrong, and what to do about it. */
@@ -155,14 +156,21 @@ function semanticIssues(entry: Entry): Issue[] {
   [
     ...entry.breaks.map((item, index) => [`breaks[${index}].summary`, item.summary] as const),
     ...entry.fix.map((item, index) => [`fix[${index}].summary`, item.summary] as const),
+    ['subject.title', subjectOf(entry).title ?? ''] as const,
   ].forEach(([path, summary]) => {
-    if (summary.includes(DRAFT_MARKER))
+    if (readsAsDraft(summary))
       issues.push({
         path,
         message: 'Entry is a draft written by the watcher',
         hint: `Write what the primary source says, add it to sources, and remove every ${DRAFT_MARKER} marker.`,
       });
   });
+  if (subjectOf(entry).standard === 'simd' && !entry.sources.some((source) => source.kind === 'simd'))
+    issues.push({
+      path: 'sources',
+      message: `Entry about ${subjectOf(entry).name} does not cite the SIMD`,
+      hint: 'Add the SIMD as a source: kind: simd, ref: its file in solana-improvement-documents at a commit.',
+    });
   const activations = entry.schema_version === 2 ? 'activations' : 'gates';
   activationsOf(entry).forEach((gate, index) => {
     if (gate.kind === 'feature-account' && !isAddress(gate.address)) {

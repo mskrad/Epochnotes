@@ -12,6 +12,15 @@ export type WatchedCluster = (typeof WATCHED_CLUSTERS)[number];
 
 /** Marks a draft written by the watcher; the validator refuses an entry that still carries it. */
 export const DRAFT_MARKER = 'DRAFT:';
+export const DRAFT_PLACEHOLDER = 'not written yet';
+
+const INVISIBLE = /[\u00ad\u200b-\u200f\u2060\ufeff]/g;
+const MARKER_ANY_SPELLING = /draft\s*:/;
+
+export function readsAsDraft(text: string): boolean {
+  const plain = text.normalize('NFKC').replace(INVISIBLE, '').toLowerCase();
+  return MARKER_ANY_SPELLING.test(plain) || plain.includes(DRAFT_PLACEHOLDER);
+}
 
 export interface DeclaredFeature {
   /** The module path in agave, `full_inflation::devnet_and_testnet::enable` for a nested one. */
@@ -76,29 +85,54 @@ export interface WatchReport {
 const MODULE_OPEN = /^(\s*)pub mod (\w+) \{\s*$/;
 const BLOCK_CLOSE = /^(\s*)\}\s*$/;
 const DECLARE = /declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)/;
-const NAME_KEY = /([\w:]+)::id\(\),\s*(?:"([^"]*)")?/;
-/**
- * A string literal starting on a line, as Rust writes it: it may run over several lines, each ended by a
- * backslash that swallows the line break and the indentation after it. At most a few lines are read.
- */
-function textFrom(lines: string[], start: number): string | undefined {
-  const first = lines[start]?.trimStart() ?? '';
-  if (!first.startsWith('"')) return undefined;
+const ID_CALL = '::id(),';
+const PATH_CHARACTER = /[\w:]/;
+const LINE_CONTINUATION = 'line-continuation';
+
+function rustStringFrom(lines: string[], start: number, opening: string): string | undefined {
+  if (!opening.startsWith('"')) return undefined;
   let text = '';
+  let piece = opening.slice(1);
   for (let at = start; at < Math.min(lines.length, start + 8); at += 1) {
-    const piece = at === start ? first.slice(1) : (lines[at] ?? '').trimStart();
-    const end = piece.search(/(?<!\\)"/);
-    if (end !== -1) return (text + piece.slice(0, end)).replaceAll('\\"', '"');
-    text += piece.endsWith('\\') ? piece.slice(0, -1) : piece;
+    let continued = false;
+    for (let index = 0; index < piece.length; index += 1) {
+      const character = piece[index];
+      if (character === '"') return text;
+      if (character !== '\\') {
+        text += character;
+        continue;
+      }
+      const escaped = index + 1 < piece.length ? piece[index + 1] : LINE_CONTINUATION;
+      if (escaped === LINE_CONTINUATION) continued = true;
+      else text += escaped === 'n' ? '\n' : escaped;
+      index += 1;
+    }
+    if (!continued) return undefined;
+    piece = (lines[at + 1] ?? '').trimStart();
   }
   return undefined;
+}
+
+function registration(lines: string[], index: number): { module: string; name?: string } | undefined {
+  const line = lines[index] ?? '';
+  const call = line.indexOf(ID_CALL);
+  if (call === -1) return undefined;
+  let begin = call;
+  while (begin > 0 && PATH_CHARACTER.test(line[begin - 1] ?? '')) begin -= 1;
+  if (begin === call) return undefined;
+  const rest = line.slice(call + ID_CALL.length).trimStart();
+  const name =
+    rest === ''
+      ? rustStringFrom(lines, index + 1, (lines[index + 1] ?? '').trimStart())
+      : rustStringFrom(lines, index, rest);
+  return { module: line.slice(begin, call), ...(name === undefined ? {} : { name }) };
 }
 
 /**
  * The feature gates agave declares, read line by line in one pass: a module opens on its own line, its
  * declare_id may sit on any line inside it, modules nest (`full_inflation`), and the names live in
- * FEATURE_NAMES as `module::id(), "text"`, on one line or two. Nothing here backtracks: the file is data from
- * another repository.
+ * FEATURE_NAMES as `module::id(), "text"`, on one line or two. Every step is linear in the line: the file is
+ * data from another repository.
  */
 export function parseAgaveFeatures(text: string): DeclaredFeature[] {
   const lines = text.split('\n');
@@ -106,10 +140,11 @@ export function parseAgaveFeatures(text: string): DeclaredFeature[] {
   const stack: { name: string; indent: number }[] = [];
   const names = new Map<string, string>();
   lines.forEach((line, index) => {
+    const content = line.trimStart();
+    if (content.startsWith('//')) return;
     const open = MODULE_OPEN.exec(line);
     if (open !== null) {
       const indent = (open[1] ?? '').length;
-      // A module at the left margin starts afresh: whatever was left open was not a feature module.
       if (indent === 0) stack.length = 0;
       stack.push({ name: open[2] ?? '', indent });
       return;
@@ -117,20 +152,18 @@ export function parseAgaveFeatures(text: string): DeclaredFeature[] {
     const close = BLOCK_CLOSE.exec(line);
     if (close !== null) {
       const indent = (close[1] ?? '').length;
-      if (stack.length > 0 && stack[stack.length - 1]?.indent === indent) stack.pop();
+      while (stack.length > 0 && (stack[stack.length - 1]?.indent ?? 0) >= indent) stack.pop();
       return;
     }
+    if (content !== '' && content.length === line.length) stack.length = 0;
     const declared = DECLARE.exec(line);
     if (declared !== null && stack.length > 0) {
       features.push({ module: stack.map((item) => item.name).join('::'), address: declared[1] ?? '' });
       return;
     }
-    const key = NAME_KEY.exec(line);
-    if (key !== null && stack.length === 0) {
-      const description = key[2] ?? textFrom(lines, index + 1);
-      // The first registration wins: a later `x::id(), "…"` (a test, a comment) cannot rename a gate.
-      if (description !== undefined && !names.has(key[1] ?? '')) names.set(key[1] ?? '', description);
-    }
+    const registered = stack.length === 0 ? registration(lines, index) : undefined;
+    if (registered?.name !== undefined && !names.has(registered.module))
+      names.set(registered.module, registered.name);
   });
   // A gate is what FEATURE_NAMES registers: a declare_id nested in a feature module (a program buffer) is not one.
   return features
@@ -215,9 +248,9 @@ applies:
 ${activations}
 breaks:
   - surface: program
-    summary: ${quoted(`${DRAFT_MARKER} what this change breaks, in the words of its SIMD - not written yet.`)}
+    summary: ${quoted(`${DRAFT_MARKER} what this change breaks, in the words of its SIMD - ${DRAFT_PLACEHOLDER}.`)}
 fix:
-  - summary: ${quoted(`${DRAFT_MARKER} how to fix it, from the SIMD - not written yet.`)}
+  - summary: ${quoted(`${DRAFT_MARKER} how to fix it, from the SIMD - ${DRAFT_PLACEHOLDER}.`)}
 sources:
   - kind: source-code
     ref: ${agave.repository}/blob/${agave.commit}/feature-set/src/lib.rs

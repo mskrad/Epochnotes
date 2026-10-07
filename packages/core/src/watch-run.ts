@@ -30,6 +30,28 @@ async function agaveHead(): Promise<string> {
   return sha;
 }
 
+function snapshotAt(path: string): WatchSnapshot {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`${path} is not JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const snapshot = parsed as Partial<WatchSnapshot> | null;
+  const wellFormed =
+    snapshot !== null &&
+    typeof snapshot === 'object' &&
+    snapshot.watcher === 1 &&
+    Array.isArray(snapshot.features) &&
+    snapshot.features.length > 0 &&
+    snapshot.features.every(
+      (feature) =>
+        typeof feature?.address === 'string' && typeof feature.state === 'object' && feature.state !== null,
+    );
+  if (!wellFormed) throw new Error(`${path} is not a snapshot this watcher wrote`);
+  return snapshot as WatchSnapshot;
+}
+
 export interface WatchFiles {
   /** The snapshot of the last look: read when present, replaced after a successful look. */
   state: string;
@@ -50,11 +72,7 @@ export async function watchSolanaFiles(files: WatchFiles): Promise<WatchReport> 
     throw new Error(`--agave-ref takes a full commit hash (40 hex characters), not "${files.agaveRef}"`);
   const registry = validatePath(files.registry);
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
-  const previous = existsSync(files.state)
-    ? (JSON.parse(readFileSync(files.state, 'utf8')) as WatchSnapshot)
-    : undefined;
-  if (previous !== undefined && previous.watcher !== 1)
-    throw new Error(`${files.state} is not a snapshot this watcher wrote`);
+  const previous = existsSync(files.state) ? snapshotAt(files.state) : undefined;
   const commit = files.agaveRef ?? (await agaveHead());
   const agaveSource = await fetchText(
     `https://raw.githubusercontent.com/anza-xyz/agave/${commit}/feature-set/src/lib.rs`,

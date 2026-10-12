@@ -60,7 +60,7 @@ npm run corpus:check  # the corpus manifest, its files and the detection engine 
 ```bash
 epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, activation status with chain and slot
 epochnotes registry read --json --status ethereum       # the same version, read on Ethereum: block, time, what confirmed each fork
-epochnotes status --chain base                          # every activation the registry names on Base
+epochnotes registry read --status base                  # the same entries, read on Base
 epochnotes check repo <path> --versions <dir-or-url>    # detection rules taken from the verified version
 epochnotes check rpc --rpc-url <endpoint>               # read-only probe: does this provider behave as the entry says
 ```

@@ -1,18 +1,18 @@
 {
   "agave": {
     "repository": "https://github.com/anza-xyz/agave",
-    "commit": "61400ebdf88f2468b8abd2f7775abdc05ba523d8",
-    "retrieved": "2026-10-07"
+    "commit": "f77bee3ed4eff4e1ffe600d0279e66a3098939b1",
+    "retrieved": "2026-10-12"
   },
   "clusters": {
     "mainnet-beta": {
-      "slot": "454210948"
+      "slot": "456084801"
     },
     "testnet": {
-      "slot": "449618672"
+      "slot": "451627085"
     },
     "devnet": {
-      "slot": "508441070"
+      "slot": "510298516"
     }
   },
   "declared": 290,
@@ -67,17 +67,6 @@
         "testnet": "active",
         "devnet": "active"
       }
-    },
-    {
-      "module": "reduce_slot_time_to_200ms",
-      "simd": "SIMD-0525",
-      "description": "SIMD-0525: Reduce slot time to 200ms",
-      "state": {
-        "mainnet-beta": "scheduled",
-        "testnet": "active",
-        "devnet": "active"
-      },
-      "entry": "slot-duration"
     }
   ]
 }

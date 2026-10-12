@@ -211,10 +211,9 @@ ${sorted.map(entryCard).join('\n')}
 curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o epochnotes-publishers.json
 export EPOCHNOTES_PUBLISHERS=./epochnotes-publishers.json</code></pre>
 <pre><code>epochnotes registry read --json --status mainnet-beta   # verified entries and the state of each activation
-epochnotes status --chain base                          # every activation the registry names on Base
+epochnotes registry read --status base                  # the same entries, read on Base
 epochnotes check repo &lt;path&gt;                            # where a change breaks this code
-epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provider behave as the entry says
-epochnotes watch solana                                 # what moved on Solana since the last look</code></pre>
+epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provider behave as the entry says</code></pre>
 <p class="muted">When it cannot verify what it reads, it refuses to answer rather than guess.</p>
 </section>
 
@@ -223,14 +222,15 @@ epochnotes watch solana                                 # what moved on Solana s
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
-<li>Entries for Solana, Ethereum and Base in one signed log, verified offline and against the program on devnet</li>
+<li>Entries for Solana, Ethereum and Base in one signed log, anchored and verified against the program on Solana devnet</li>
+<li>Free and open source (MIT): a public good for developers</li>
 <li>Static rules for TypeScript, JavaScript, Rust, Go, Python, Solidity and lockfiles; read-only RPC probes</li>
 <li>Rent held above the minimum: scan, close plan, withdraw template</li>
 <li>A Claude skill that answers from the verified registry only</li>
 <li>The Solana watcher, run daily by a scheduled Claude task that drafts from the SIMD</li>
 </ul></div>
 <div class="card"><h3>Next</h3><ul>
-<li>Anchor the first signed version of the registry on Solana devnet</li>
+<li><code>status</code> and <code>watch</code> read the signed log, not only a clone of the repository</li>
 <li>Watchers for Ethereum and Base: fork times in the client configurations</li>
 <li>A notification when something outside the registry moves</li>
 <li>This page updated from each watcher report</li>

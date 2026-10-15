@@ -168,14 +168,14 @@ ${STYLE}
 <main id="content">
 <header class="masthead">
 <a class="brand" href="#content" aria-label="Epochnotes home">${MARK}<span>Epochnotes</span></a>
-<nav aria-label="Main navigation"><a href="#claude">Ask Claude</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
+<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
 </header>
 <section class="hero">
 <div>
 <p class="eyebrow">A field journal for network changes</p>
 <h1>Read the layers<br>of change.</h1>
 <p class="intro">A signed registry of network changes on ${chains.slice(0, -1).map(escapeHtml).join(', ')}${chains.length > 1 ? ' and ' : ''}${escapeHtml(chains.at(-1) ?? '')}. Understand what breaks in your code, where, and how to fix it.</p>
-<div class="actions"><a class="button primary" href="#claude">Ask Claude</a><a class="button" href="#registry">Explore the registry</a></div>
+<div class="actions"><a class="button primary" href="#agents">Ask your AI agent</a><a class="button" href="#registry">Explore the registry</a></div>
 </div>
 <figure class="specimen">${MARK}<figcaption class="specimen-caption">Epochnotes / A record of changing epochs</figcaption></figure>
 </section>
@@ -191,29 +191,38 @@ ${STYLE}
 </div>
 </section>
 
-<section id="claude">
+<section id="agents">
 <p class="section-label">02 / The easiest way in</p>
-<h2>Ask Claude</h2>
-<p>The Epochnotes skill lets you ask in plain words: is this upgrade live, and does my project break? Claude answers from the signed registry, not from what it remembers, and checks your code with the same tool.</p>
+<h2>Ask your AI agent</h2>
+<p>The Epochnotes skill lets you ask in plain words: is this upgrade live, and does my project break? Your agent answers from the signed registry, not from what it remembers, and checks your code with the same tool. It works with any agent that can run a command in your terminal: Claude Code, Codex and others.</p>
 <div class="grid">
 <div class="card"><h3>Answers from the registry</h3><p>Every answer names the registry version, its signature and the slot or block it read the status from. If the registry cannot be verified, it does not answer at all.</p></div>
 <div class="card"><h3>Checks your whole project</h3><p>Code, contracts, lockfiles and your RPC provider: it runs the same checks as the command line and points at the line to fix.</p></div>
 <div class="card"><h3>Says what it did not check</h3><p>A rule that could not run, a file it did not read, a guess of its own: each is named, so silence never reads as a clean result.</p></div>
 </div>
 <h3>Install in a minute</h3>
-<p>Copy the skill into Claude Code (the terminal or the Code tab of Claude Desktop):</p>
-<pre><code>git clone --depth 1 https://github.com/mskrad/Epochnotes ~/epochnotes-src
-mkdir -p ~/.claude/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.claude/skills/</code></pre>
-<p>Optional: point it at the published log before you start Claude. Without this it names the published log and asks you first, because the publishers file is your trust anchor.</p>
+<p>Get the skill once:</p>
+<pre><code>git clone --depth 1 https://github.com/mskrad/Epochnotes ~/epochnotes-src</code></pre>
+<p>Then add it to your agent. The skill is one folder with a <code>SKILL.md</code> file, the common format for agent skills.</p>
+<pre><code># Claude Code (terminal, or the Code tab of Claude Desktop)
+mkdir -p ~/.claude/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.claude/skills/
+
+# Codex
+mkdir -p ~/.codex/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.codex/skills/
+
+# Any other agent: add this line to the project's AGENTS.md (or its own instructions file)
+For questions about network upgrades on Solana, Ethereum or Base, follow ~/epochnotes-src/skills/epochnotes/SKILL.md.</code></pre>
+<p>Optional: point it at the published log before you start the agent. Without this the skill names the published log and asks you first, because the publishers file is your trust anchor.</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
 curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o ~/.epochnotes-publishers.json
 export EPOCHNOTES_PUBLISHERS=~/.epochnotes-publishers.json</code></pre>
 <h3>Then ask</h3>
-<pre><code>/epochnotes Is transaction v1 live on Solana mainnet, and does this project break?
-/epochnotes What does EIP-7702 change for my contracts on Base?
-/epochnotes Check this project against recent network changes.</code></pre>
+<pre><code>Is transaction v1 live on Solana mainnet, and does this project break?
+What does EIP-7702 change for my contracts on Base?
+Check this project against recent network changes.</code></pre>
+<p class="muted">In Claude Code you can also call the skill by name: <code>/epochnotes</code> followed by the question.</p>
 <h3>A real answer</h3>
-<p class="muted">From a run on Oct 12, 2026, on a small demo app; shortened.</p>
+<p class="muted">From a run on Oct 12, 2026, in Claude Code on a small demo app; shortened.</p>
 <pre><code>Yes, transaction v1 is live on Solana mainnet, and my-app breaks.
 my-app/src/history.ts:6 calls getTransaction with maxSupportedTransactionVersion: 0.
 Fix (from the entry): pass 1; with @solana/web3.js use 1.99.0 or later.
@@ -258,7 +267,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 <li>Free and open source (MIT): a public good for developers</li>
 <li>Static rules for TypeScript, JavaScript, Rust, Go, Python, Solidity and lockfiles; read-only RPC probes</li>
 <li>Rent held above the minimum: scan, close plan, withdraw template</li>
-<li>A Claude skill that answers from the verified registry only</li>
+<li>An agent skill for Claude Code, Codex and others that answers from the verified registry only</li>
 <li>The Solana watcher, run daily by a scheduled Claude task that drafts from the SIMD</li>
 </ul></div>
 <div class="card"><h3>Next</h3><ul>

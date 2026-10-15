@@ -55,7 +55,7 @@ npm run corpus:check  # the corpus manifest, its files and the detection engine 
 
 ## For AI assistants
 
-`skills/epochnotes` is a Claude skill (copy the directory into `.claude/skills/`). It holds no facts about any change: it reads entries from the latest verified version, reads the activation status from the network, and refuses to answer when verification fails. The commands it uses work for any consumer:
+`skills/epochnotes` is an agent skill: one folder with a `SKILL.md`, the format Claude Code (`~/.claude/skills/`) and Codex (`~/.codex/skills/`) load; any other agent that can run a terminal command can follow the same file from its instructions (for example a line in the project's `AGENTS.md`). It holds no facts about any change: it reads entries from the latest verified version, reads the activation status from the network, and refuses to answer when verification fails. The commands it uses work for any consumer:
 
 ```bash
 epochnotes registry read --json --status mainnet-beta   # verified entries, their provenance, activation status with chain and slot

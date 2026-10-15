@@ -168,14 +168,14 @@ ${STYLE}
 <main id="content">
 <header class="masthead">
 <a class="brand" href="#content" aria-label="Epochnotes home">${MARK}<span>Epochnotes</span></a>
-<nav aria-label="Main navigation"><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
+<nav aria-label="Main navigation"><a href="#claude">Ask Claude</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
 </header>
 <section class="hero">
 <div>
 <p class="eyebrow">A field journal for network changes</p>
 <h1>Read the layers<br>of change.</h1>
 <p class="intro">A signed registry of network changes on ${chains.slice(0, -1).map(escapeHtml).join(', ')}${chains.length > 1 ? ' and ' : ''}${escapeHtml(chains.at(-1) ?? '')}. Understand what breaks in your code, where, and how to fix it.</p>
-<div class="actions"><a class="button primary" href="#registry">Explore the registry</a><a class="button" href="#get-started">Run your first check</a></div>
+<div class="actions"><a class="button primary" href="#claude">Ask Claude</a><a class="button" href="#registry">Explore the registry</a></div>
 </div>
 <figure class="specimen">${MARK}<figcaption class="specimen-caption">Epochnotes / A record of changing epochs</figcaption></figure>
 </section>
@@ -186,25 +186,57 @@ ${STYLE}
 <h2>How it works</h2>
 <div class="grid">
 <div class="card"><h3>Signed entries</h3><p>Each change is an entry built from primary sources — a SIMD or an EIP, the client's code, the chain itself. A version of the registry is a Merkle root, signed by its publisher and anchored by a program on Solana devnet.</p></div>
-<div class="card"><h3>Checks</h3><p><code>check repo</code> finds the code a change breaks; <code>check rpc</code> asks a provider, read-only, whether it behaves as the entry says; <code>status</code> reads the activation from each chain at the moment you ask.</p></div>
+<div class="card"><h3>Checks</h3><p><code>check repo</code> finds the code a change breaks; <code>check rpc</code> asks a provider, read-only, whether it behaves as the entry says; <code>registry read --status</code> reads the activation from each chain at the moment you ask.</p></div>
 <div class="card"><h3>Watcher</h3><p>Every day it reads the feature gates agave declares and their state on three Solana clusters, and drafts an entry for what moved outside the registry. A person finishes the draft from the SIMD and signs it.</p></div>
 </div>
 </section>
 
+<section id="claude">
+<p class="section-label">02 / The easiest way in</p>
+<h2>Ask Claude</h2>
+<p>The Epochnotes skill lets you ask in plain words: is this upgrade live, and does my project break? Claude answers from the signed registry, not from what it remembers, and checks your code with the same tool.</p>
+<div class="grid">
+<div class="card"><h3>Answers from the registry</h3><p>Every answer names the registry version, its signature and the slot or block it read the status from. If the registry cannot be verified, it does not answer at all.</p></div>
+<div class="card"><h3>Checks your whole project</h3><p>Code, contracts, lockfiles and your RPC provider: it runs the same checks as the command line and points at the line to fix.</p></div>
+<div class="card"><h3>Says what it did not check</h3><p>A rule that could not run, a file it did not read, a guess of its own: each is named, so silence never reads as a clean result.</p></div>
+</div>
+<h3>Install in a minute</h3>
+<p>Copy the skill into Claude Code (the terminal or the Code tab of Claude Desktop):</p>
+<pre><code>git clone --depth 1 https://github.com/mskrad/Epochnotes ~/epochnotes-src
+mkdir -p ~/.claude/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.claude/skills/</code></pre>
+<p>Optional: point it at the published log before you start Claude. Without this it names the published log and asks you first, because the publishers file is your trust anchor.</p>
+<pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
+curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o ~/.epochnotes-publishers.json
+export EPOCHNOTES_PUBLISHERS=~/.epochnotes-publishers.json</code></pre>
+<h3>Then ask</h3>
+<pre><code>/epochnotes Is transaction v1 live on Solana mainnet, and does this project break?
+/epochnotes What does EIP-7702 change for my contracts on Base?
+/epochnotes Check this project against recent network changes.</code></pre>
+<h3>A real answer</h3>
+<p class="muted">From a run on Oct 12, 2026, on a small demo app; shortened.</p>
+<pre><code>Yes, transaction v1 is live on Solana mainnet, and my-app breaks.
+my-app/src/history.ts:6 calls getTransaction with maxSupportedTransactionVersion: 0.
+Fix (from the entry): pass 1; with @solana/web3.js use 1.99.0 or later.
+
+Status:   active on mainnet-beta since slot 447120000, read at slot 456149984 (feature account)
+Registry: version 1, root 77216c0c..., signature verified, on-chain anchor matches
+Not checked: the web3.js version (my-app has no lockfile); the runtime probe</code></pre>
+</section>
+
 <section id="watcher">
-<p class="section-label">02 / The latest field reading</p>
+<p class="section-label">03 / The latest field reading</p>
 <h2>What the Solana watcher sees</h2>
 ${watchSection(watch)}
 </section>
 
 <section id="registry">
-<p class="section-label">03 / Layers in the record</p>
+<p class="section-label">04 / Layers in the record</p>
 <h2>The registry (${sorted.length} entries)</h2>
 ${sorted.map(entryCard).join('\n')}
 </section>
 
 <section id="get-started">
-<p class="section-label">04 / Put the record to work</p>
+<p class="section-label">05 / Put the record to work</p>
 <h2>Check it yourself</h2>
 <p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
@@ -218,7 +250,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <section class="roadmap">
-<p class="section-label">05 / What comes next</p>
+<p class="section-label">06 / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>

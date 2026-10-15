@@ -16,7 +16,7 @@ stop and remove it.
 
 ## 1. Read the registry
 
-Run the CLI (`npx epochnotes`, or `node packages/cli/bin/epochnotes.js` inside the Epochnotes repository):
+Run the CLI (`npx @epochnotes/cli`, or `node packages/cli/bin/epochnotes.js` inside the Epochnotes repository). The package is scoped: an unscoped `npx epochnotes` outside the repository would fetch whatever package holds that name.
 
 ```bash
 epochnotes registry read --json --status <chain>
@@ -24,7 +24,10 @@ epochnotes registry read --json --status <chain>
 
 - The log and the trusted publishers come from `--versions <dir-or-url>` and `--publishers <file>`, or from
   the environment variables `EPOCHNOTES_VERSIONS` and `EPOCHNOTES_PUBLISHERS`. If neither is set and the
-  defaults do not exist, ask the person where their registry log is. Do not invent a URL.
+  defaults do not exist, tell the person that the published log is
+  `https://mskrad.github.io/Epochnotes/registry/versions` and its publishers file is
+  `https://mskrad.github.io/Epochnotes/registry/publishers.json`, and ask before you download that file and use
+  them: the publishers file is the person's trust anchor, not yours to choose. Do not invent any other URL.
 - `<chain>` is the chain the person's project runs on: a CAIP-2 id, or a name — `mainnet-beta`, `devnet`,
   `testnet` for Solana, `ethereum` or `base`. If they did not say, ask; a project on several chains is read
   once per chain. If you must assume one, say which.

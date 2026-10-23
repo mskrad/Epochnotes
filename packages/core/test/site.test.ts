@@ -55,9 +55,16 @@ describe('the project page', () => {
     }
   });
 
-  it('loads nothing from elsewhere', () => {
+  it('loads only the bundled font and brand mark', () => {
     const page = renderSite(entries, watch);
-    expect(page).not.toMatch(/<script|<img|<iframe|\ssrc=|@import|url\(/i);
+    expect(page).not.toMatch(/<script|<iframe|<video|<audio|<object|<embed|@import/i);
+    expect(page.match(/\ssrc="[^"]*"/g)).toEqual([' src="assets/brand/mark.svg"']);
+    expect(page.match(/url\([^)]*\)/g)).toEqual(['url("assets/fonts/work-sans-latin.woff2")']);
+    expect(page.match(/<img\b[^>]*>/g)).toEqual([
+      '<img src="assets/brand/mark.svg" width="60" height="54" alt="">',
+    ]);
+    expect(existsSync(new URL('assets/fonts/work-sans-latin.woff2', root))).toBe(true);
+    expect(existsSync(new URL('assets/fonts/OFL.txt', root))).toBe(true);
     expect(page.match(/<link\b[^>]*>/g)).toEqual([
       expect.stringMatching(/^<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/),
     ]);
@@ -105,7 +112,13 @@ describe('the project page', () => {
     const page = renderSite([hostile, everywhere], hostileWatch);
     expect(page).not.toContain('<script>alert(1)');
     const tags = page.match(/<[^>]*>/g) ?? [];
-    expect(tags.filter((tag) => /^<(script|img|b)\b|\son\w+=|javascript:/i.test(tag))).toEqual([]);
+    expect(
+      tags.filter(
+        (tag) =>
+          /^<(script|b)\b|\son\w+=|javascript:/i.test(tag) ||
+          (/^<img\b/i.test(tag) && !tag.startsWith('<img src="assets/brand/mark.svg"')),
+      ),
+    ).toEqual([]);
     expect(page).toContain(
       '&lt;script&gt;alert(&quot;breaks&quot;)&lt;/script&gt; &amp; &lt;b&gt;bold&lt;/b&gt;',
     );
@@ -123,25 +136,23 @@ describe('the project page', () => {
       items: [finding, { ...finding, project: 'other/repo', outcome: 'merged' }],
     });
     const page = renderSite(entries, watch, shown);
-    expect(page).toContain('<a href="#findings">Found</a>');
-    expect(page).toContain('<strong>2</strong> reported, <strong>1</strong> already fixed and merged');
+    expect(page).toContain('<a href="#findings">Findings</a>');
+    expect(page).toContain('2 reports. 1 fix merged.');
     expect(page).toContain('<a href="https://github.com/owner/repo/issues/1">issue #1</a>');
-    expect(page).toContain(
-      '<a href="https://github.com/owner/repo">repo</a><br><span class="muted">owner</span>',
-    );
-    expect(page).toContain('<span class="state active">merged</span>');
-    expect(page).toContain('<span class="state scheduled">open</span>');
+    expect(page).toContain('<a href="https://github.com/owner/repo">owner/repo</a>');
+    expect(page).toContain('class="outcome-icon merged"');
+    expect(page).toContain('class="outcome-icon open"');
     expect(page).toContain('Outcomes as of 2026-10-23');
-    expect(page).toContain('04 / The latest field reading');
+    expect(page).toContain('id="watcher"');
   });
 
-  it('leaves the findings out, and the numbering as it was, when there are none', () => {
+  it('leaves the findings out when there are none', () => {
     for (const none of [undefined, { checked: '2026-10-23', items: [] }]) {
       const page = renderSite(entries, watch, none);
       expect(page).not.toContain('id="findings"');
       expect(page).not.toContain('href="#findings"');
-      expect(page).toContain('03 / The latest field reading');
-      expect(page).toContain('06 / What comes next');
+      expect(page).toContain('id="watcher"');
+      expect(page).toContain('<h2>Roadmap</h2>');
     }
   });
 
@@ -166,7 +177,20 @@ describe('the project page', () => {
     expect(page).not.toContain('<script>alert(1)');
     expect(page).not.toContain('href="javascript:');
     const tags = page.match(/<[^>]*>/g) ?? [];
-    expect(tags.filter((tag) => /^<(script|img)\b|\son\w+=|javascript:/i.test(tag))).toEqual([]);
+    expect(
+      tags.filter(
+        (tag) =>
+          /^<script\b|\son\w+=|javascript:/i.test(tag) ||
+          (/^<img\b/i.test(tag) && !tag.startsWith('<img src="assets/brand/mark.svg"')),
+      ),
+    ).toEqual([]);
+  });
+
+  it('keeps an invalid calendar date as written instead of normalizing it or refusing the page', () => {
+    for (const checked of ['2026-13-01', '2026-02-31']) {
+      const shown = siteFindingsOf({ checked, items: [finding] });
+      expect(renderSite(entries, watch, shown)).toContain(`Outcomes checked ${checked}.`);
+    }
   });
 
   it('refuses a findings file it cannot show as written', () => {

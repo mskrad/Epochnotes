@@ -29,3 +29,9 @@ key.json
 
 # the default output of `epochnotes watch solana`
 /watch/
+
+# local design workflows and review evidence
+/.taste-skill/
+**/.impeccable/
+**/PRODUCT.md
+**/DESIGN.md

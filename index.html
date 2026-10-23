@@ -5,98 +5,243 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Epochnotes</title>
 <meta name="description" content="A signed registry of network changes on Solana, Ethereum and Base, and the checks built on it.">
-<meta property="og:title" content="Epochnotes — read the layers of change">
-<meta property="og:description" content="A field journal for network changes. Signed records, clear impact, and checks you can run.">
+<meta property="og:title" content="Epochnotes — keep up with network changes">
+<meta property="og:description" content="Know what breaks in your code, with fixes tied to signed records and primary sources.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://mskrad.github.io/Epochnotes/">
 <meta property="og:image" content="https://mskrad.github.io/Epochnotes/assets/brand/social.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20300%22%20aria-hidden%3D%22true%22%20focusable%3D%22false%22%3E%3Cpath%20fill%3D%22%23302c28%22%20d%3D%22M38%20111C51%2076%2088%2078%20113%2050C145%2015%20189%2016%20207%2053C215%2074%20244%2072%20260%20110C222%20125%20202%20106%20172%20109C122%20121%2086%2083%2038%20111Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23d1b897%22%20d%3D%22M32%20122C81%2092%20120%20132%20172%20121C208%20112%20231%20136%20267%20119L270%20157C219%20176%20190%20153%20151%20167C98%20185%2061%20152%2017%20168C18%20150%2025%20133%2032%20122Z%22%2F%3E%0A%3Cpath%20fill%3D%22%2398664b%22%20d%3D%22M15%20180C65%20163%2095%20195%20153%20179C189%20169%20209%20185%20241%20173L221%20215C184%20237%20144%20215%20111%20224C75%20234%2047%20216%2017%20221C7%20206%208%20190%2015%20180Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23bc6239%22%20d%3D%22M252%20172L278%20155C292%20179%20283%20199%20264%20211L239%20225L228%20215Z%22%2F%3E%0A%3Cpath%20fill%3D%22%23302c28%22%20d%3D%22M22%20233C63%20230%2078%20247%20113%20237C151%20226%20183%20250%20220%20228L249%20242C222%20261%20203%20286%20179%20282L63%20269C41%20267%2030%20252%2022%20233Z%22%2F%3E%3C%2Fsvg%3E">
 <style>
-:root{color-scheme:light dark;--bg:#f5f1e9;--fg:#302c28;--muted:#74675a;--card:#fcfaf5;--line:#d8cdbf;--accent:#934521;--tag:#eae1d4;--ok:#33634b;--ok-bg:#e2ecdf;--warn:#775122;--warn-bg:#efe1c7;--off:#685e55;--off-bg:#e9e4dc;--bad:#943c39;--bad-bg:#f2dfd9;--code:#eae3d8;--serif:Georgia,"Times New Roman",serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
-@media(prefers-color-scheme:dark){:root{--bg:#211f1c;--fg:#f0e9df;--muted:#c0b1a0;--card:#2b2824;--line:#4b433a;--accent:#eda579;--tag:#43382d;--ok:#b4d5b8;--ok-bg:#2c3d30;--warn:#ebcb91;--warn-bg:#453820;--off:#c3b7aa;--off-bg:#3b3530;--bad:#f0aaa0;--bad-bg:#4c2d29;--code:#36302a}.brand svg path:first-child,.brand svg path:last-child,.specimen svg path:first-child,.specimen svg path:last-child{fill:#a89c8d}}
+@font-face{font-family:"Work Sans";src:url("assets/fonts/work-sans-latin.woff2") format("woff2");font-style:normal;font-weight:100 900;font-display:swap}
+:root{color-scheme:light;--bg:#f5f1e9;--fg:#302c28;--muted:#665d54;--card:#fcfaf5;--line:#d8cdbf;--accent:#934521;--tag:#eae1d4;--code:#eae3d8;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--face:"Work Sans",sans-serif;--ease:cubic-bezier(.16,1,.3,1);--margin:4vw}
 *{box-sizing:border-box}
-html{scroll-padding-top:24px}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+html{scroll-padding-top:24px;scrollbar-color:#98664b #f5f1e9}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--face);-webkit-font-smoothing:antialiased}
 ::selection{background:#d1b897;color:#302c28}
-main{max-width:1184px;margin:auto;padding:0 32px 48px}
+.wrap{width:100%;max-width:1760px;margin-inline:auto;padding-inline:var(--margin)}
 a{color:var(--accent);overflow-wrap:anywhere;text-underline-offset:4px;text-decoration-thickness:1px}
+a:focus-visible,summary:focus-visible{outline:2px solid currentColor;outline-offset:5px}
 a:hover{text-decoration-thickness:2px}
-a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:5px}
-.skip{position:absolute;left:24px;top:-100px;padding:8px 16px;background:var(--card);z-index:2}.skip:focus{top:12px}
-.masthead{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0;border-bottom:1px solid var(--line)}
-.brand{display:flex;gap:10px;align-items:center;color:var(--fg);font:26px/1 var(--serif);text-decoration:none}.brand svg{width:42px;height:42px}
-nav{display:flex;flex-wrap:wrap;gap:24px;font-size:14px}nav a{color:var(--fg);text-decoration:none}
-.hero{display:grid;grid-template-columns:1.45fr 1fr;gap:48px;align-items:center;padding:80px 0 52px}
-.eyebrow,.section-label,.specimen-caption{font:12px/1.6 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.eyebrow{margin:0 0 24px}
-h1{font:clamp(48px,6vw,82px)/1.04 var(--serif);letter-spacing:-.045em;margin:0 0 24px;text-wrap:balance}
-.hero .intro{font-size:18px;line-height:1.65;max-width:54ch;margin:0 0 28px;color:var(--muted);text-wrap:pretty}
-.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
-.button{display:inline-block;padding:11px 20px;border:1px solid var(--line);border-radius:4px;text-decoration:none;font-size:14px;font-weight:600;color:var(--fg)}
-.button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.button:hover{border-color:var(--accent)}
-.specimen{margin:0;text-align:center;position:relative;padding:32px 24px;background:var(--card);border:1px solid var(--line);border-radius:48% 48% 4px 4px}
-.specimen svg{display:block;width:100%;max-width:340px;margin:auto}.specimen-caption{margin-top:20px}
-.edition{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--muted);font:12px/1.7 var(--mono)}
-section:not(.hero){margin-top:72px}
-.section-label{margin:0 0 10px}
-h2{font:clamp(30px,4vw,42px)/1.15 var(--serif);letter-spacing:-.025em;margin:0 0 28px;text-wrap:balance}
-h3{font:26px/1.2 var(--serif);margin:0 0 12px;text-wrap:balance}
-h4{margin:22px 0 8px;font:12px/1.6 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+button,input,summary,a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.sr-only,.change-nav input{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.skip{opacity:0;position:absolute;left:24px;top:-100px;padding:8px 16px;background:var(--bg);z-index:2}.skip:focus{top:12px;opacity:1}
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:78px;padding-block:12px}
+.brand{display:flex;gap:16px;align-items:center;color:var(--fg);font-size:34px;font-weight:750;letter-spacing:-.04em;line-height:1;text-decoration:none;flex-shrink:0}.brand img{width:60px;height:54px}
+nav{display:flex;align-items:center;gap:32px;font-size:20px;line-height:1.2}nav a{color:var(--fg);text-decoration:none}
+.button{display:inline-flex;align-items:center;justify-content:center;gap:16px;padding:13px 24px;text-decoration:none;font-size:27px;font-weight:600;line-height:1.2;border-radius:6px;min-height:56px}
+.button.primary{background:#934521;color:#fcfaf5}
+nav .button{font-size:20px;min-height:52px;padding-inline:18px;gap:8px}
+.chevron,.external{display:inline-block;width:22px;height:22px;vertical-align:middle;flex-shrink:0}
+.hero{background:#302c28;color:#f5f1e9;padding-block:34px 16px}
+h1{font-size:clamp(52px,7.1vw,124px);font-weight:750;line-height:.9;letter-spacing:-.04em;margin:0;text-wrap:balance}
+h1 span{display:block}
+.hero .intro{font-size:clamp(22px,2.18vw,38px);line-height:1.1;max-width:900px;margin:8px 0 18px;color:#e4ddd4;letter-spacing:-.025em}
+.actions{display:flex;flex-wrap:wrap;gap:16px}
+.license{font-size:16px;line-height:1.3;margin:6px 0 10px;color:#e4ddd4}
+.explorer{background:#fcfaf5;color:#302c28;border-radius:8px;padding:22px;display:grid;grid-template-columns:22% minmax(0,1fr);gap:26px;min-height:368px;padding-bottom:18px}
+.change-nav{margin:0;padding:0 26px 0 0;border:0;border-right:1px solid #d8cdbf;min-width:0}
+.change-nav legend{float:left;width:100%;padding:0 6px;margin-bottom:8px;font-size:20px;line-height:1.6;color:#554c44}
+.change-nav label{display:block;position:relative;clear:both;font-size:20px;line-height:1.25;cursor:pointer}
+.change-nav label span{display:block;padding:10px 12px;border-radius:6px;transition:background-color 160ms var(--ease)}
+.change-nav label:has(input:checked) span{background:#eae1d4;font-weight:600;box-shadow:inset 3px 0 #934521}
+.change-nav label:has(input:focus-visible) span{outline:2px solid #934521;outline-offset:2px}
+.change-panel{display:none;min-width:0}.panel-0{display:block}.explorer:has(input:not(#change-0):checked) .panel-0{display:none}
+.change-panel header{position:relative;z-index:2}.change-panel header h2{font-size:32px;line-height:1.05;font-weight:750;letter-spacing:-.035em;margin:0}.change-panel header p{font-size:18px;line-height:1.25;margin:4px 0 0;color:#665d54}
+.source-flow{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) 18px minmax(0,1.15fr);gap:8px;align-items:stretch;margin-top:-12px;margin-left:44px;isolation:isolate;position:relative}
+.source-flow>.chevron{align-self:center;width:18px;height:18px;justify-self:center;color:#665d54;position:relative;z-index:3}
+.flow-cell{min-width:0;position:relative;padding:12px 18px;display:flex;flex-direction:column;align-items:flex-start;isolation:isolate}.flow-cell::before{content:"";position:absolute;inset:-6px -24px -2px -8px;background:#d1b897b8;transform:skewY(-3deg);transform-origin:left center;z-index:-1;border-radius:4px}.flow-cell:nth-of-type(2)::before{inset:-14px -24px -2px -16px;background:#d1b897c9}.flow-cell.impact::before{inset:-20px 0 -2px -16px;background:#f5f1e9;transform:skewY(-3deg)}
+.flow-cell p{font-size:16px;line-height:1.3;margin:0;color:#554c44;max-width:100%;overflow-wrap:anywhere}
+.flow-cell h3{font-size:24px;line-height:1.1;font-weight:700;letter-spacing:-.025em;margin:10px 0 2px;overflow-wrap:anywhere}
+.flow-cell a{display:inline-flex;align-items:center;gap:8px;margin-top:auto;padding-top:10px;font-size:18px;text-decoration:none;min-height:34px}
+.flow-cell a .external{width:20px;height:20px;order:-1}
+.impact .impact-statement{font-size:24px;font-weight:700;line-height:1.25;letter-spacing:-.025em;margin-top:12px;color:#302c28}
+.example-check{background:#eae7e2;margin:10px 0 0 44px;padding:6px 16px 10px;border-radius:6px}
+.example-check p{font-size:16px;line-height:1.35;margin:0 0 4px;color:#554c44}
+.example-check pre{padding:0;margin:0;background:transparent;color:#302c28;font-size:16px;line-height:1.6;overflow-x:auto}
+.before{color:#8c3f2d}.after{color:#27563d}
+.client-link{display:flex;align-items:center;gap:12px;margin:0 0 -4px 44px;min-height:40px;font-size:20px;line-height:1.25;color:#554c44;text-decoration:none}.client-link .chevron{width:16px;height:16px}
+.findings{padding-top:12px;padding-bottom:24px}
+.findings-heading{display:flex;justify-content:space-between;align-items:center;gap:32px;margin-bottom:12px}
+.findings h2{font-size:54px;line-height:1.1;letter-spacing:-.04em;font-weight:750;margin:0}
+.findings-heading p{font-size:21px;line-height:1.3;margin:0}
+.findings-proof{padding-left:36px;border-left:1px solid #d8cdbf}.findings-proof p{font-size:18px;font-weight:550;max-width:none}.findings-proof .muted{font-weight:400;margin-top:4px;font-size:16px}
+.finding{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:20px;align-items:start;padding-block:8px;border-top:1px solid #dfd5c8}
+.finding details{margin:0;padding:0;border:0;min-width:0}
+.finding summary{list-style:none;display:grid;grid-template-columns:42px 34% minmax(0,1fr);align-items:center;gap:20px;min-height:38px;font-size:18px;color:#302c28;cursor:pointer}
+.finding summary::-webkit-details-marker{display:none}
+.finding-project{color:#934521;font-weight:550;line-height:1.2;overflow-wrap:anywhere}
+.outcome-text{display:block;color:#665d54;font-weight:400;font-size:16px;margin-top:3px}
+.finding-summary{font-size:18px;line-height:1.3}
+.outcome-icon{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#934521;border:2px solid #934521}.outcome-icon.merged{color:#fcfaf5;background:#934521}.outcome-icon svg{width:24px;height:24px}
+.finding-pr{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-height:40px;font-size:16px;white-space:nowrap}
+.finding-pr .external{width:20px;height:20px}
+.finding-body{padding-left:62px;font-size:16px}.finding-body p{margin-block:12px}
+.more-findings{margin-top:12px}.more-findings>summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;color:#934521;font-size:18px;width:fit-content}.more-findings[open]>summary .chevron{transform:rotate(90deg)}
+.findings-method{font-size:16px;color:var(--muted);margin-top:16px;max-width:100ch}
+.page-content{padding-bottom:40px}
+.edition{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:24px;background:#eae1d4;font-size:16px}.edition a{display:inline-flex;align-items:center;gap:8px}
+.page-content section{margin-top:120px}
+h2{font-size:48px;line-height:1.1;font-weight:700;letter-spacing:-.035em;margin:0 0 24px;text-wrap:balance}
+h3{font-size:28px;line-height:1.2;font-weight:600;letter-spacing:-.025em;margin:0 0 12px;text-wrap:balance}
+h4{font-size:18px;font-weight:600;line-height:1.4;margin:28px 0 8px}
 p{max-width:72ch}li{margin:8px 0}
-.muted{color:var(--muted)}.small{font-size:14px}
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.card{min-width:0;overflow-wrap:anywhere;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:28px}
-.grid .card{border-top:3px solid #d1b897}.grid .card:nth-child(2){border-top-color:#98664b}.grid .card:nth-child(3){border-top-color:#bc6239}
-.card p:last-child{margin-bottom:0}
-.entry{margin-bottom:20px;border-left:4px solid #d1b897}.entry:nth-of-type(3n+2){border-left-color:#98664b}.entry:nth-of-type(3n){border-left-color:#bc6239}
-.entry h3{font-size:28px}.entry ul{margin:4px 0;padding-left:20px}
-.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px}
-.tag{display:inline-block;background:var(--tag);border-radius:3px;padding:2px 8px;font:12px/1.6 var(--mono)}
-.label{font:0.85em var(--mono)}
-code{font:0.85em var(--mono);background:var(--code);padding:2px 5px;border-radius:3px;overflow-wrap:anywhere}
-pre{background:var(--fg);color:var(--bg);padding:24px;border-radius:4px;overflow-x:auto;font:13px/1.8 var(--mono)}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}
-details{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}summary{cursor:pointer;color:var(--accent);font-size:14px}
-.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--card)}
-table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
-#findings table{min-width:680px}#findings td:first-child,#findings td a{white-space:nowrap}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
-.state{display:inline-block;border-radius:3px;padding:2px 7px;font:12px/1.6 var(--mono);white-space:nowrap}
-.state.active{color:var(--ok);background:var(--ok-bg)}.state.scheduled{color:var(--warn);background:var(--warn-bg)}.state.absent{color:var(--off);background:var(--off-bg)}.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
+.muted{color:var(--muted)}.small{font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px}
+.card{min-width:0;overflow-wrap:anywhere}.card p:last-child{margin-bottom:0}
+.entry{padding:0;margin:0 0 12px;background:#eae1d4;border-radius:6px}.entry>summary{display:block;position:relative;padding:24px 60px 24px 24px;list-style:none;color:#302c28}.entry>summary::-webkit-details-marker{display:none}.entry>summary::after{content:"";position:absolute;right:28px;top:32px;width:9px;height:9px;border-right:1.7px solid currentColor;border-bottom:1.7px solid currentColor;transform:rotate(-45deg)}.entry[open]>summary::after{transform:rotate(45deg)}.entry article{padding:0 24px 24px}.entry ul{margin:4px 0;padding-left:20px}.entry h3{font-size:28px;margin:0 0 10px}.entry-canonical{font-size:20px;font-weight:550}
+.meta{margin:0;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:16px}
+.tag{display:inline-block;background:#f5f1e9;padding:2px 8px;font-size:16px;line-height:1.5;border-radius:3px}.label{font-weight:550}
+code{font:.9em var(--mono);background:var(--code);padding:2px 5px;border-radius:3px;overflow-wrap:anywhere}
+pre{background:#302c28;color:#f5f1e9;padding:24px;border-radius:6px;overflow-x:auto;font:15px/1.8 var(--mono)}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}
+details{margin-top:24px}summary{cursor:pointer;color:var(--accent);font-size:16px;min-height:36px}
+.scroll{overflow-x:auto;max-width:100%;background:#fcfaf5}
+table{border-collapse:collapse;width:100%;font-size:16px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}th{background:#eae1d4;font-weight:600;font-size:16px;white-space:nowrap}
+.state{display:inline-block;border-radius:3px;padding:2px 7px;font-size:16px;white-space:nowrap;background:#eae1d4;color:#554c44}.state.active{color:#27563d;background:#e2ecdf}.state.scheduled{color:#775122;background:#efe1c7}.state.unknown,.state.uncovered{color:#943c39;background:#f2dfd9}
 .roadmap .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
-@media(max-width:760px){main{padding:0 20px 32px}.masthead{align-items:flex-start;gap:16px;flex-direction:column}nav{gap:20px}.hero{grid-template-columns:1fr;gap:32px;padding:48px 0 32px}.specimen{width:100%;max-width:340px;margin:auto;padding:24px}.specimen svg{max-width:220px}section:not(.hero){margin-top:48px}.grid,.roadmap .grid{grid-template-columns:1fr}.card{padding:22px}h3,.entry h3{font-size:24px}.edition{display:block}.edition span{display:block}.scroll{max-width:100%}th,td{padding:12px}pre{padding:18px}}
-@media(prefers-reduced-motion:no-preference){a{transition:color .15s,border-color .15s}}
+footer{margin-top:100px;padding-top:24px;font-size:16px;color:var(--muted)}.footer-brand{display:flex;align-items:center;justify-content:space-between;font-size:clamp(48px,8vw,124px);font-weight:750;line-height:1;letter-spacing:-.04em;color:#302c28;text-decoration:none}.footer-brand .chevron{width:48px;height:48px}
+.agent-capabilities{margin-block:36px;display:grid;gap:24px}.agent-capabilities>div{display:grid;grid-template-columns:28% minmax(0,1fr);gap:36px;align-items:baseline}.agent-capabilities h3{font-size:28px;margin:0}.agent-capabilities p{margin:0}
+.installation{padding:32px;background:#eae1d4;margin-block:36px}.installation>h3{margin-top:0}.agent-installers{margin-block:28px}.agent-installers>details{margin:0;padding:12px 0}.agent-installers>details>summary,.trust-setup>summary{font-size:20px;font-weight:550;min-height:44px}.trust-setup{margin-top:24px}.example-questions{list-style:none;margin:20px 0;padding:0;max-width:72ch}.example-questions li{background:#eae1d4;padding:16px 20px;font-size:20px;line-height:1.45;margin-block:8px}.agent-answer{margin-top:36px;padding:32px;background:#302c28;color:#f5f1e9;border-radius:6px}.agent-answer .muted{color:#d1b897}.agent-answer pre{margin:0;padding:0;white-space:pre-wrap;overflow-wrap:anywhere}.agent-answer pre code{overflow-wrap:anywhere}
+.scroll-hint{display:none}.scroll:focus-visible{outline:2px solid #934521;outline-offset:5px}#watcher table{min-width:700px}.roadmap .card{background:#eae1d4;padding:28px}
+
+@media(hover:hover) and (pointer:fine){.button:hover{background:#78391e;transform:translateY(-1px)}.change-nav label:hover span{background:#eae1d4}.finding summary:hover .finding-project,.client-link:hover{text-decoration:underline;text-underline-offset:4px}}
+.button{transition:transform 160ms var(--ease),background-color 160ms var(--ease)}.button:active{transform:scale(.98)}
+@media(prefers-reduced-motion:no-preference){.hero h1 span,.hero .intro,.hero .actions,.hero .license,.explorer,.source-flow .flow-cell,.example-check,.client-link{animation:arrive 480ms var(--ease) both}.hero h1 span:nth-child(2){animation-delay:50ms}.hero .intro{animation-delay:90ms}.hero .actions{animation-delay:130ms}.hero .license{animation-delay:160ms}.explorer{animation-delay:180ms}.source-flow .flow-cell:nth-of-type(2){animation-delay:220ms}.source-flow .flow-cell:nth-of-type(3){animation-delay:260ms}.example-check{animation-delay:300ms}.client-link{animation-delay:320ms}@keyframes arrive{from{opacity:.6;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}}
+@media(max-width:1100px){nav{gap:20px;font-size:16px}nav .button{font-size:16px}.brand{font-size:28px;gap:10px}.brand img{width:48px;height:44px}.flow-cell{padding:14px}.flow-cell p,.flow-cell a{font-size:16px}.flow-cell h3{font-size:23px}.impact .impact-statement{font-size:24px}.source-flow,.example-check,.client-link{margin-left:0}.source-flow{margin-top:16px}.explorer{grid-template-columns:20% minmax(0,1fr);gap:22px}.change-nav{padding-right:18px}.change-nav label,.change-nav legend{font-size:18px}.findings h2{font-size:42px}.findings-proof{padding-left:24px}.finding summary{grid-template-columns:32px 38% minmax(0,1fr);gap:14px}.finding-summary{font-size:16px}}
+@media(max-width:1000px){:root{--margin:20px}.masthead{flex-wrap:wrap;gap:12px;padding-block:14px}.brand{font-size:28px}.brand img{width:40px;height:38px}nav{width:100%;justify-content:space-between;gap:8px;font-size:14px}nav>a{display:inline-flex;align-items:center;min-height:40px}nav .button{display:none}.hero{padding-block:32px 20px}h1{font-size:clamp(38px,8.6vw,65px);line-height:1;letter-spacing:-.04em}.hero .intro{font-size:22px;line-height:1.3;max-width:38ch;margin:20px 0 24px}.desktop-break{display:none}.button{font-size:20px;min-height:52px;padding:13px 20px;gap:12px}.license{font-size:16px;margin:12px 0 24px}.explorer{display:block;padding:18px;min-height:0}.change-nav{border:0;padding:0;display:flex;flex-wrap:wrap;gap:4px;margin-bottom:22px}.change-nav legend{float:none;padding:0;margin-bottom:8px;font-size:16px}.change-nav label{font-size:16px;line-height:1.25}.change-nav label span{padding:12px}.change-nav label:has(input:checked) span{box-shadow:none;background:#d1b897}.change-panel header h2{font-size:30px}.change-panel header p{font-size:16px}.source-flow{display:grid;grid-template-columns:1fr;gap:8px;margin-top:18px}.source-flow>.chevron{transform:rotate(90deg);width:16px;height:16px}.flow-cell{padding:18px 16px;gap:0;margin-inline:4px}.flow-cell::before,.flow-cell:nth-of-type(2)::before,.flow-cell.impact::before{inset:0;transform:skewY(-1.5deg)}.flow-cell h3{font-size:24px;margin-top:6px}.flow-cell p,.flow-cell a{font-size:16px}.flow-cell a{min-height:44px;padding-top:10px}.impact .impact-statement{font-size:24px;line-height:1.25}.example-check{padding:14px;margin-top:12px}.example-check pre{font-size:12px;line-height:1.8}.client-link{font-size:16px;margin-top:10px;min-height:44px}.findings{padding-top:32px;padding-bottom:28px}.findings-heading{display:block;margin-bottom:22px}.findings h2{font-size:36px}.findings-heading p{font-size:18px;margin-top:8px}.findings-proof{border:0;padding:0;margin-top:20px}.findings-proof p{font-size:16px}.finding{grid-template-columns:minmax(0,1fr);gap:0;padding-block:16px}.finding summary{grid-template-columns:28px minmax(0,1fr);gap:10px;font-size:16px}.finding-summary{grid-column:2;margin-top:4px;font-size:16px}.finding-pr{justify-content:flex-start;margin-left:38px;min-height:44px;width:fit-content}.outcome-icon{width:26px;height:26px;align-self:start}.outcome-icon svg{width:20px;height:20px}.finding-body{padding-left:38px}.finding-project{font-size:16px}.outcome-text{font-size:16px}.findings-method{font-size:16px;margin-top:20px}.edition{display:block;padding:20px}.edition>span{display:block}.edition>span+span{margin-top:12px}.page-content section{margin-top:80px}.grid,.roadmap .grid{grid-template-columns:1fr;gap:32px}h2{font-size:36px}h3{font-size:26px}.entry>summary{padding:20px 44px 20px 20px}.entry>summary::after{right:20px;top:28px}.entry article{padding:0 20px 20px}.entry h3{font-size:24px}.entry .meta{font-size:16px}.installation,.agent-answer{padding:20px}.agent-capabilities>div{grid-template-columns:1fr;gap:8px}.agent-capabilities h3{font-size:24px}.example-questions li{font-size:18px;padding:16px}.agent-answer pre{font-size:13px}.roadmap .card{padding:24px}.footer-brand .chevron{width:32px;height:32px}.meta{font-size:16px}.scroll{max-width:100%}th,td{padding:12px}pre{padding:18px;font-size:13px}footer{margin-top:72px}}
+@media(min-width:641px) and (max-width:1000px){.source-flow{grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr) 18px minmax(0,1.15fr);gap:8px}.source-flow>.chevron{transform:none}.flow-cell::before,.flow-cell:nth-of-type(2)::before,.flow-cell.impact::before{inset:-6px -12px;transform:skewY(-2deg)}.flow-cell.impact::before{inset:-14px 0 -6px -10px}.flow-cell{padding:16px 12px;margin-inline:0}.source-flow .flow-cell h3{font-size:24px}.change-nav{gap:8px}.hero .intro{max-width:52ch}.grid{grid-template-columns:1fr}.agent-capabilities>div{grid-template-columns:28% minmax(0,1fr);gap:24px}.findings-heading{display:flex}.findings-proof{max-width:45%;margin-top:0}}
+@media(max-width:760px){.scroll-hint{display:block;font-size:16px;color:#665d54}}
+@media(max-width:360px){h1{font-size:9.5vw}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.explorer:has(#change-0:checked) .panel-0{display:block}
+.explorer:has(#change-1:checked) .panel-1{display:block}
+.explorer:has(#change-2:checked) .panel-2{display:block}
+.explorer:has(#change-3:checked) .panel-3{display:block}
+.explorer:has(#change-4:checked) .panel-4{display:block}
 </style>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
-<main id="content">
-<header class="masthead">
-<a class="brand" href="#content" aria-label="Epochnotes home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true" focusable="false"><path fill="#302c28" d="M38 111C51 76 88 78 113 50C145 15 189 16 207 53C215 74 244 72 260 110C222 125 202 106 172 109C122 121 86 83 38 111Z"/>
-<path fill="#d1b897" d="M32 122C81 92 120 132 172 121C208 112 231 136 267 119L270 157C219 176 190 153 151 167C98 185 61 152 17 168C18 150 25 133 32 122Z"/>
-<path fill="#98664b" d="M15 180C65 163 95 195 153 179C189 169 209 185 241 173L221 215C184 237 144 215 111 224C75 234 47 216 17 221C7 206 8 190 15 180Z"/>
-<path fill="#bc6239" d="M252 172L278 155C292 179 283 199 264 211L239 225L228 215Z"/>
-<path fill="#302c28" d="M22 233C63 230 78 247 113 237C151 226 183 250 220 228L249 242C222 261 203 286 179 282L63 269C41 267 30 252 22 233Z"/></svg><span>Epochnotes</span></a>
-<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a><a href="#findings">Found</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a><a href="https://github.com/mskrad/Epochnotes">GitHub ↗</a></nav>
+<header class="masthead wrap">
+<a class="brand" href="#content" aria-label="Epochnotes home"><img src="assets/brand/mark.svg" width="60" height="54" alt=""><span>Epochnotes</span></a>
+<nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#findings">Findings</a><a href="#registry">Registry</a><a href="https://github.com/mskrad/Epochnotes">GitHub</a><a class="button primary" href="#agents">Install the skill <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a></nav>
 </header>
+<main id="content">
 <section class="hero">
-<div>
-<p class="eyebrow">A field journal for network changes</p>
-<h1>Read the layers<br>of change.</h1>
-<p class="intro">A signed registry of network changes on Solana, Ethereum and Base. Understand what breaks in your code, where, and how to fix it.</p>
-<div class="actions"><a class="button primary" href="#agents">Ask your AI agent</a><a class="button" href="#registry">Explore the registry</a></div>
+<div class="wrap">
+<h1><span>Keep up with</span><span>network changes.</span></h1>
+<p class="intro">Know what breaks in your code, with fixes tied to<br class="desktop-break"> signed records and primary sources.</p>
+<div class="actions"><a class="button primary" href="#agents">Install the skill <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a></div>
+<p class="license">Free, open source, MIT.</p>
+<div class="explorer" data-ui>
+<fieldset class="change-nav"><legend>Network changes</legend><label><input type="radio" name="network-change" id="change-0" value="0" checked><span>Transaction v1</span></label><label><input type="radio" name="network-change" id="change-1" value="1"><span>EIP-7702</span></label><label><input type="radio" name="network-change" id="change-2" value="2"><span>Rent reduction</span></label><label><input type="radio" name="network-change" id="change-3" value="3"><span>Slot duration</span></label><label><input type="radio" name="network-change" id="change-4" value="4"><span>Alpenglow</span></label></fieldset>
+<div class="change-panels"><article class="change-panel panel-0" aria-label="Transaction v1 example">
+<header><h2>Transaction v1</h2><p>Solana</p></header>
+<div class="source-flow">
+<div class="flow-cell"><p>Primary source</p><h3>SIMD-0385</h3><p>Transaction v1 specification</p><a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md">View source <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell"><p>Signed record</p><h3>Transaction v1</h3><p>Solana · Registry v1</p><a href="#tx-v1">View record <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">RPC reads limited to version 0 can fail</p></div>
 </div>
-<figure class="specimen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true" focusable="false"><path fill="#302c28" d="M38 111C51 76 88 78 113 50C145 15 189 16 207 53C215 74 244 72 260 110C222 125 202 106 172 109C122 121 86 83 38 111Z"/>
-<path fill="#d1b897" d="M32 122C81 92 120 132 172 121C208 112 231 136 267 119L270 157C219 176 190 153 151 167C98 185 61 152 17 168C18 150 25 133 32 122Z"/>
-<path fill="#98664b" d="M15 180C65 163 95 195 153 179C189 169 209 185 241 173L221 215C184 237 144 215 111 224C75 234 47 216 17 221C7 206 8 190 15 180Z"/>
-<path fill="#bc6239" d="M252 172L278 155C292 179 283 199 264 211L239 225L228 215Z"/>
-<path fill="#302c28" d="M22 233C63 230 78 247 113 237C151 226 183 250 220 228L249 242C222 261 203 286 179 282L63 269C41 267 30 252 22 233Z"/></svg><figcaption class="specimen-caption">Epochnotes / A record of changing epochs</figcaption></figure>
+<div class="example-check"><p>Example check</p><pre><code><span class="before">−  maxSupportedTransactionVersion: 0</span>
+<span class="after">+  maxSupportedTransactionVersion: 1</span></code></pre></div>
+<a class="client-link" href="#tx-v1">Client-specific instructions in the record <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+</article><article class="change-panel panel-1" aria-label="EIP-7702 example">
+<header><h2>EIP-7702</h2><p>Ethereum · Base</p></header>
+<div class="source-flow">
+<div class="flow-cell"><p>Primary source</p><h3>EIP-7702</h3><p>Set Code for EOAs</p><a href="https://github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md">View source <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell"><p>Signed record</p><h3>EIP-7702</h3><p>Ethereum · Base · Registry v1</p><a href="#eip-7702">View record <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">EIP-7702 breaks the invariant that msg.sender == tx.origin holds only in the top frame of a transaction: a delegated account can make several calls in one transaction. Reentrancy guards of the style require(tx.origin == msg.sender) and atomic sandwich protections that rely on tx.origin no longer hold. Using that check only to know that the sender is an EOA is, by the EIP&#39;s own reading, not affected.</p></div>
+</div>
+<div class="example-check"><p>From the entry</p><p>Replace a reentrancy guard built on tx.origin == msg.sender with one held in a transient storage variable, as the EIP suggests. A sandwich protection built on tx.origin has no replacement in the EIP, which calls relying on it a bad practice: it has to be designed again, not patched.</p></div>
+<a class="client-link" href="#eip-7702">Client-specific instructions in the record <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+</article><article class="change-panel panel-2" aria-label="Rent reduction example">
+<header><h2>Rent reduction</h2><p>Solana</p></header>
+<div class="source-flow">
+<div class="flow-cell"><p>Primary source</p><h3>SIMD-0437</h3><p>Incrementally Reduce lamports_per_byte to 696</p><a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md">View source <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell"><p>Signed record</p><h3>Rent reduction</h3><p>Solana · Registry v1</p><a href="#rent-simd-0437">View record <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">The minimum balance of an account is (128 + data size in bytes) * lamports_per_byte, and every step lowers lamports_per_byte. An account funded at an earlier, higher minimum keeps the difference: the SIMD allows reducing the balance to the new minimum, it does not return anything by itself.</p></div>
+</div>
+<div class="example-check"><p>From the entry</p><p>Take the minimum balance from the cluster at run time (the Rent sysvar in programs, getMinimumBalanceForRentExemption in clients) instead of a compiled-in lamports_per_byte.</p></div>
+<a class="client-link" href="#rent-simd-0437">Client-specific instructions in the record <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+</article><article class="change-panel panel-3" aria-label="Slot duration example">
+<header><h2>Slot duration</h2><p>Solana</p></header>
+<div class="source-flow">
+<div class="flow-cell"><p>Primary source</p><h3>SIMD-0525</h3><p>Reduce Slot Times</p><a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md">View source <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell"><p>Signed record</p><h3>Slot duration</h3><p>Solana · Registry v1</p><a href="#slot-duration">View record <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">A duration expressed in slots shrinks in wall-clock time with every stage: the SIMD tells dapp developers and off-chain services to stop assuming that 400 ms * slots is a stable conversion. A timer of N slots lasts half as long at 200 ms as it did at 400 ms.</p></div>
+</div>
+<div class="example-check"><p>From the entry</p><p>Keep slot counts only where slot semantics are intended; where a duration means wall-clock time, do not derive it from a fixed milliseconds-per-slot constant. The SIMD advises preferring cluster-provided timing parameters once they are available.</p></div>
+<a class="client-link" href="#slot-duration">Client-specific instructions in the record <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+</article><article class="change-panel panel-4" aria-label="Alpenglow example">
+<header><h2>Alpenglow</h2><p>Solana</p></header>
+<div class="source-flow">
+<div class="flow-cell"><p>Primary source</p><h3>SIMD-0326</h3><p>Alpenglow</p><a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md">View source <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell"><p>Signed record</p><h3>Alpenglow</h3><p>Solana · Registry v1</p><a href="#alpenglow">View record <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></div>
+<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+<div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">Votes stop being transactions on chain: validators send them directly to each other. Initially a validator admission ticket reproduces the incentives of today&#39;s vote transaction fees. Voting is not invisible afterwards: for rewards, the leader of slot s+8 can post up to two vote aggregates for slot s. Code that reads individual vote transactions out of blocks no longer finds them.</p></div>
+</div>
+<div class="example-check"><p>From the entry</p><p>Do not derive validator activity from vote transactions in blocks, and review code that relies on optimistic confirmation as something distinct from finality.</p></div>
+<a class="client-link" href="#alpenglow">Client-specific instructions in the record <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
+</article></div>
+</div>
+</div>
 </section>
-<div class="edition"><span>5 entries · Solana / Ethereum / Base · Signed log v1</span><span>Pre-release · Not audited · <a href="registry/versions/1.json">Read the signed manifest ↗</a></span></div>
+<section class="findings wrap" id="findings">
+<div class="findings-heading"><div><h2>Found in the field</h2><p>Findings and fixes in public repositories.</p></div><div class="findings-proof"><p>59 public repositories checked. 9 reports. 2 fixes merged.</p><p class="muted">Outcomes checked 23 Oct 2026.</p></div></div>
+<article class="finding">
+<details><summary><span class="outcome-icon merged" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12 4 4 8-8"/></svg></span><span class="finding-project">solana-foundation/solana-com<span class="outcome-text">fix #2150 merged</span></span><span class="finding-summary">Slot-time page RPC reads</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The slot-time page read blocks with maxSupportedTransactionVersion 0, which the RPC refuses once a block holds a v1 transaction.</p><p><a href="https://github.com/solana-foundation/solana-com">solana-foundation/solana-com</a> · <a href="https://github.com/solana-foundation/solana-com/issues/2141">issue #2141</a> · 2026-10-07</p></div></details>
+<a class="finding-pr" href="https://github.com/solana-foundation/solana-com/pull/2150">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for solana-foundation/solana-com</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon merged" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12 4 4 8-8"/></svg></span><span class="finding-project">helius-labs/core-ai<span class="outcome-text">fix #190 merged</span></span><span class="finding-summary">MCP server and CLI full-block reads</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The MCP server and CLI asked for full blocks with maxSupportedTransactionVersion 0, so getBlock failed on v1 blocks.</p><p><a href="https://github.com/helius-labs/core-ai">helius-labs/core-ai</a> · <a href="https://github.com/helius-labs/core-ai/issues/183">issue #183</a> · 2026-10-14</p></div></details>
+<a class="finding-pr" href="https://github.com/helius-labs/core-ai/pull/190">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for helius-labs/core-ai</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">OpenZeppelin/openzeppelin-monitor<span class="outcome-text">PR #515 open</span></span><span class="finding-summary">Solana monitor full-block reads</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The Solana monitor could not load nearly any recent mainnet block: every getBlock failed with -32015.</p><p><a href="https://github.com/OpenZeppelin/openzeppelin-monitor">OpenZeppelin/openzeppelin-monitor</a> · <a href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">PR #515</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for OpenZeppelin/openzeppelin-monitor</span></a>
+</article>
+<details class="more-findings"><summary>All 9 reports <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></summary><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">wormhole-foundation/wormhole-sdk-ts<span class="outcome-text">PR #1049 open</span></span><span class="finding-summary">parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.</p><p><a href="https://github.com/wormhole-foundation/wormhole-sdk-ts">wormhole-foundation/wormhole-sdk-ts</a> · <a href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">PR #1049</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for wormhole-foundation/wormhole-sdk-ts</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">zenmoney/ZenPlugins<span class="outcome-text">PR #1213 open</span></span><span class="finding-summary">Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.</p><p><a href="https://github.com/zenmoney/ZenPlugins">zenmoney/ZenPlugins</a> · <a href="https://github.com/zenmoney/ZenPlugins/pull/1213">PR #1213</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/zenmoney/ZenPlugins/pull/1213">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for zenmoney/ZenPlugins</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">helius-labs/photon-explorer<span class="outcome-text">PR #5 open</span></span><span class="finding-summary">The explorer showed &quot;Failed to load transaction&quot; for any v1 transaction.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The explorer showed &quot;Failed to load transaction&quot; for any v1 transaction.</p><p><a href="https://github.com/helius-labs/photon-explorer">helius-labs/photon-explorer</a> · <a href="https://github.com/helius-labs/photon-explorer/pull/5">PR #5</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/helius-labs/photon-explorer/pull/5">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for helius-labs/photon-explorer</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">Squads-Protocol/public-v4-client<span class="outcome-text">PR #49 open</span></span><span class="finding-summary">The multisig lookup stopped at the first v1 transaction in a vault&#39;s history.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The multisig lookup stopped at the first v1 transaction in a vault&#39;s history.</p><p><a href="https://github.com/Squads-Protocol/public-v4-client">Squads-Protocol/public-v4-client</a> · <a href="https://github.com/Squads-Protocol/public-v4-client/issues/48">issue #48</a>, <a href="https://github.com/Squads-Protocol/public-v4-client/pull/49">PR #49</a> · 2026-10-22</p></div></details>
+<a class="finding-pr" href="https://github.com/Squads-Protocol/public-v4-client/pull/49">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for Squads-Protocol/public-v4-client</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">sendaifun/solana-new<span class="outcome-text">PR #62 open</span></span><span class="finding-summary">The debug-program agent skill taught a getTransaction call that fails on v1 transactions.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>The debug-program agent skill taught a getTransaction call that fails on v1 transactions.</p><p><a href="https://github.com/sendaifun/solana-new">sendaifun/solana-new</a> · <a href="https://github.com/sendaifun/solana-new/pull/62">PR #62</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/sendaifun/solana-new/pull/62">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for sendaifun/solana-new</span></a>
+</article><article class="finding">
+<details><summary><span class="outcome-icon open" aria-hidden="true"></span><span class="finding-project">sendaifun/solana-mpp<span class="outcome-text">PR #7 open</span></span><span class="finding-summary">Payment verification threw for a payment sent as a v1 transaction.</span><span class="sr-only"> — details and report</span></summary>
+<div class="finding-body"><p>Payment verification threw for a payment sent as a v1 transaction.</p><p><a href="https://github.com/sendaifun/solana-mpp">sendaifun/solana-mpp</a> · <a href="https://github.com/sendaifun/solana-mpp/pull/7">PR #7</a> · 2026-10-23</p></div></details>
+<a class="finding-pr" href="https://github.com/sendaifun/solana-mpp/pull/7">View PR <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg><span class="sr-only"> for sendaifun/solana-mpp</span></a>
+</article></details>
+<p class="findings-method">We ran <code>epochnotes check repo</code> over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. Outcomes as of 2026-10-23. An open pull request is a proposal, not an acceptance.</p>
+</section>
+<div class="page-content wrap">
+<div class="edition"><span>5 entries · Solana / Ethereum / Base · Signed log v1</span><span>Pre-release · Not audited · <a href="registry/versions/1.json">Read the signed manifest <svg class="external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H4v16h16v-6"/></svg></a></span></div>
 
-<section>
-<p class="section-label">01 / From source to understanding</p>
+<section id="how-it-works">
 <h2>How it works</h2>
 <div class="grid">
 <div class="card"><h3>Signed entries</h3><p>Each change is an entry built from primary sources — a SIMD or an EIP, the client's code, the chain itself. A version of the registry is a Merkle root, signed by its publisher and anchored by a program on Solana devnet.</p></div>
@@ -106,36 +251,34 @@ footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--line);font-si
 </section>
 
 <section id="agents">
-<p class="section-label">02 / The easiest way in</p>
-<h2>Ask your AI agent</h2>
+<h2>Ask your agent</h2>
 <p>The Epochnotes skill lets you ask in plain words: is this upgrade live, and does my project break? Your agent answers from the signed registry, not from what it remembers, and checks your code with the same tool. It works with any agent that can run a command in your terminal: Claude Code, Codex and others.</p>
-<div class="grid">
-<div class="card"><h3>Answers from the registry</h3><p>Every answer names the registry version, its signature and the slot or block it read the status from. If the registry cannot be verified, it does not answer at all.</p></div>
-<div class="card"><h3>Checks your whole project</h3><p>Code, contracts, lockfiles and your RPC provider: it runs the same checks as the command line and points at the line to fix.</p></div>
-<div class="card"><h3>Says what it did not check</h3><p>A rule that could not run, a file it did not read, a guess of its own: each is named, so silence never reads as a clean result.</p></div>
+<div class="agent-capabilities">
+<div><h3>Verified answers</h3><p>Every answer names the registry version, its signature and the slot or block it read the status from. If the registry cannot be verified, it does not answer at all.</p></div>
+<div><h3>Project checks</h3><p>Code, contracts, lockfiles and your RPC provider: it runs the same checks as the command line and points at the line to fix.</p></div>
+<div><h3>Explicit limits</h3><p>A rule that could not run, a file it did not read, a guess of its own: each is named, so silence never reads as a clean result.</p></div>
 </div>
+<div class="installation">
 <h3>Install in a minute</h3>
 <p>Get the skill once:</p>
 <pre><code>git clone --depth 1 https://github.com/mskrad/Epochnotes ~/epochnotes-src</code></pre>
 <p>Then add it to your agent. The skill is one folder with a <code>SKILL.md</code> file, the common format for agent skills.</p>
-<pre><code># Claude Code (terminal, or the Code tab of Claude Desktop)
-mkdir -p ~/.claude/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.claude/skills/
-
-# Codex
-mkdir -p ~/.codex/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.codex/skills/
-
-# Any other agent: add this line to the project's AGENTS.md (or its own instructions file)
-For questions about network upgrades on Solana, Ethereum or Base, follow ~/epochnotes-src/skills/epochnotes/SKILL.md.</code></pre>
+<div class="agent-installers">
+<details open><summary>Claude Code</summary><p>In your terminal, or the Code tab of Claude Desktop:</p><pre><code>mkdir -p ~/.claude/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.claude/skills/</code></pre></details>
+<details><summary>Codex</summary><pre><code>mkdir -p ~/.codex/skills &amp;&amp; cp -R ~/epochnotes-src/skills/epochnotes ~/.codex/skills/</code></pre></details>
+<details><summary>Other agents</summary><p>Add this line to the project's <code>AGENTS.md</code>, or its own instructions file:</p><pre><code>For questions about network upgrades on Solana, Ethereum or Base, follow ~/epochnotes-src/skills/epochnotes/SKILL.md.</code></pre></details>
+</div>
+<details class="trust-setup"><summary>Choose the published log</summary>
 <p>Optional: point it at the published log before you start the agent. Without this the skill names the published log and asks you first, because the publishers file is your trust anchor.</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
 curl -fsS https://mskrad.github.io/Epochnotes/registry/publishers.json -o ~/.epochnotes-publishers.json
 export EPOCHNOTES_PUBLISHERS=~/.epochnotes-publishers.json</code></pre>
+</details>
+</div>
 <h3>Then ask</h3>
-<pre><code>Is transaction v1 live on Solana mainnet, and does this project break?
-What does EIP-7702 change for my contracts on Base?
-Check this project against recent network changes.</code></pre>
+<ul class="example-questions"><li>Is transaction v1 live on Solana mainnet, and does this project break?</li><li>What does EIP-7702 change for my contracts on Base?</li><li>Check this project against recent network changes.</li></ul>
 <p class="muted">In Claude Code you can also call the skill by name: <code>/epochnotes</code> followed by the question.</p>
-<h3>A real answer</h3>
+<div class="agent-answer"><h3>A real answer</h3>
 <p class="muted">From a run on Oct 12, 2026, in Claude Code on a small demo app; shortened.</p>
 <pre><code>Yes, transaction v1 is live on Solana mainnet, and my-app breaks.
 my-app/src/history.ts:6 calls getTransaction with maxSupportedTransactionVersion: 0.
@@ -144,80 +287,17 @@ Fix (from the entry): pass 1; with @solana/web3.js use 1.99.0 or later.
 Status:   active on mainnet-beta since slot 447120000, read at slot 456149984 (feature account)
 Registry: version 1, root 77216c0c..., signature verified, on-chain anchor matches
 Not checked: the web3.js version (my-app has no lockfile); the runtime probe</code></pre>
+</div>
+<p>Prefer the terminal? <a href="#get-started">Use the CLI</a>.</p>
 </section>
 
-<section id="findings">
-<p class="section-label">03 / Found in the field</p>
-<h2>What it found in public code</h2>
-<p>We ran <code>epochnotes check repo</code> over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. <strong>9</strong> reported, <strong>2</strong> already fixed and merged.</p>
-<div class="scroll"><table>
-<thead><tr><th>Project</th><th>What broke</th><th>Report</th><th>Outcome</th></tr></thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/solana-foundation/solana-com">solana-com</a><br><span class="muted">solana-foundation</span></td>
-<td>The slot-time page read blocks with maxSupportedTransactionVersion 0, which the RPC refuses once a block holds a v1 transaction.</td>
-<td><a href="https://github.com/solana-foundation/solana-com/issues/2141">issue #2141</a></td>
-<td><span class="state active">merged</span> <a href="https://github.com/solana-foundation/solana-com/pull/2150">fix #2150</a><br><span class="muted">2026-10-07</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/helius-labs/core-ai">core-ai</a><br><span class="muted">helius-labs</span></td>
-<td>The MCP server and CLI asked for full blocks with maxSupportedTransactionVersion 0, so getBlock failed on v1 blocks.</td>
-<td><a href="https://github.com/helius-labs/core-ai/issues/183">issue #183</a></td>
-<td><span class="state active">merged</span> <a href="https://github.com/helius-labs/core-ai/pull/190">fix #190</a><br><span class="muted">2026-10-14</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/OpenZeppelin/openzeppelin-monitor">openzeppelin-monitor</a><br><span class="muted">OpenZeppelin</span></td>
-<td>The Solana monitor could not load nearly any recent mainnet block: every getBlock failed with -32015.</td>
-<td><a href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">PR #515</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">PR #515</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/wormhole-foundation/wormhole-sdk-ts">wormhole-sdk-ts</a><br><span class="muted">wormhole-foundation</span></td>
-<td>parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.</td>
-<td><a href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">PR #1049</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">PR #1049</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/zenmoney/ZenPlugins">ZenPlugins</a><br><span class="muted">zenmoney</span></td>
-<td>Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.</td>
-<td><a href="https://github.com/zenmoney/ZenPlugins/pull/1213">PR #1213</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/zenmoney/ZenPlugins/pull/1213">PR #1213</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/helius-labs/photon-explorer">photon-explorer</a><br><span class="muted">helius-labs</span></td>
-<td>The explorer showed &quot;Failed to load transaction&quot; for any v1 transaction.</td>
-<td><a href="https://github.com/helius-labs/photon-explorer/pull/5">PR #5</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/helius-labs/photon-explorer/pull/5">PR #5</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/Squads-Protocol/public-v4-client">public-v4-client</a><br><span class="muted">Squads-Protocol</span></td>
-<td>The multisig lookup stopped at the first v1 transaction in a vault&#39;s history.</td>
-<td><a href="https://github.com/Squads-Protocol/public-v4-client/issues/48">issue #48</a>, <a href="https://github.com/Squads-Protocol/public-v4-client/pull/49">PR #49</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/Squads-Protocol/public-v4-client/pull/49">PR #49</a><br><span class="muted">2026-10-22</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/sendaifun/solana-new">solana-new</a><br><span class="muted">sendaifun</span></td>
-<td>The debug-program agent skill taught a getTransaction call that fails on v1 transactions.</td>
-<td><a href="https://github.com/sendaifun/solana-new/pull/62">PR #62</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/sendaifun/solana-new/pull/62">PR #62</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-<tr>
-<td><a href="https://github.com/sendaifun/solana-mpp">solana-mpp</a><br><span class="muted">sendaifun</span></td>
-<td>Payment verification threw for a payment sent as a v1 transaction.</td>
-<td><a href="https://github.com/sendaifun/solana-mpp/pull/7">PR #7</a></td>
-<td><span class="state scheduled">open</span> <a href="https://github.com/sendaifun/solana-mpp/pull/7">PR #7</a><br><span class="muted">2026-10-23</span></td>
-</tr>
-</tbody>
-</table></div>
-<p class="muted">Outcomes as of 2026-10-23. An open pull request is a proposal, not an acceptance.</p>
-</section>
 <section id="watcher">
-<p class="section-label">04 / The latest field reading</p>
-<h2>What the Solana watcher sees</h2>
-<p>Read on 2026-10-15 from agave <a href="https://github.com/anza-xyz/agave/tree/929e9fb658d89b74b1142f31ae79feac820c7d95">929e9fb658d8</a> and three clusters (mainnet-beta slot 457175726, testnet slot 452698980, devnet slot 511293223): <strong>290</strong> feature gates declared, <strong>11</strong> of them covered by the registry.</p>
-<h3>On the way to mainnet-beta (5)</h3>
-<p class="muted">Not active on mainnet-beta yet, but active on testnet or devnet, or already scheduled on mainnet-beta.</p>
-<div class="scroll"><table>
+<h2>Solana watcher</h2>
+<p>Snapshot read on 2026-10-15 from agave <a href="https://github.com/anza-xyz/agave/tree/929e9fb658d89b74b1142f31ae79feac820c7d95">929e9fb658d8</a> and three clusters (mainnet-beta slot 457175726, testnet slot 452698980, devnet slot 511293223): <strong>290</strong> feature gates declared, <strong>11</strong> of them covered by the registry.</p>
+<h3>Upcoming gates (5)</h3>
+<p class="muted">At this reading: not active on mainnet-beta, but active on testnet or devnet, or already scheduled on mainnet-beta. States can have changed since this snapshot.</p>
+<p class="scroll-hint">Scroll the table horizontally to compare all three clusters.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Solana watcher snapshot"><table>
 <thead><tr><th>Gate</th><th>SIMD</th><th>mainnet-beta</th><th>testnet</th><th>devnet</th><th>Entry</th></tr></thead>
 <tbody>
 <tr>
@@ -255,13 +335,12 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 </section>
 
 <section id="registry">
-<p class="section-label">05 / Layers in the record</p>
 <h2>The registry (5 entries)</h2>
-<article class="card entry" id="alpenglow">
-<header>
+<div class="registry-entries" data-ui><details class="entry"><summary>
 <h3>Alpenglow</h3>
-<p class="meta"><span class="tag">SIMD-0326</span><span class="tag chain">Solana</span><span class="muted">entry <code>alpenglow</code> · rev 1</span></p>
-</header>
+<p class="meta"><span class="tag">SIMD-0326</span><span class="tag chain">Solana</span><span class="muted">entry <code>alpenglow</code> · rev 1</span></p></summary>
+<article id="alpenglow">
+<p class="entry-canonical">Alpenglow</p>
 <h4>What breaks</h4>
 <ul><li><span class="tag surface">stream</span> Votes stop being transactions on chain: validators send them directly to each other. Initially a validator admission ticket reproduces the incentives of today&#39;s vote transaction fees. Voting is not invisible afterwards: for rewards, the leader of slot s+8 can post up to two vote aggregates for slot s. Code that reads individual vote transactions out of blocks no longer finds them.</li><li><span class="tag surface">rpc</span> Optimistic confirmation is superseded by faster actual finality; the SIMD names this as the most visible change.</li></ul>
 <h4>How to fix it</h4>
@@ -272,11 +351,12 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 <ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0326-alpenglow.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li></ul>
 </details>
 </article>
-<article class="card entry" id="eip-7702">
-<header>
-<h3>Set Code for EOAs</h3>
-<p class="meta"><span class="tag">EIP-7702</span><span class="tag chain">Ethereum</span><span class="tag chain">Base</span><span class="muted">entry <code>eip-7702</code> · rev 1 · 3 static rule(s), 2 RPC probe(s)</span></p>
-</header>
+</details>
+<details class="entry"><summary>
+<h3>EIP-7702</h3>
+<p class="meta"><span class="tag">EIP-7702</span><span class="tag chain">Ethereum</span><span class="tag chain">Base</span><span class="muted">entry <code>eip-7702</code> · rev 1 · 3 static rule(s), 2 RPC probe(s)</span></p></summary>
+<article id="eip-7702">
+<p class="entry-canonical">Set Code for EOAs</p>
 <h4>What breaks</h4>
 <ul><li><span class="tag surface">program</span> EIP-7702 breaks the invariant that msg.sender == tx.origin holds only in the top frame of a transaction: a delegated account can make several calls in one transaction. Reentrancy guards of the style require(tx.origin == msg.sender) and atomic sandwich protections that rely on tx.origin no longer hold. Using that check only to know that the sender is an EOA is, by the EIP&#39;s own reading, not affected.</li><li><span class="tag surface">program</span> An account delegated under EIP-7702 has code: the delegation indicator, 0xef0100 followed by the address of the delegate, and EXTCODESIZE returns 23 for it. A check that reads code as &quot;a contract&quot; or no code as &quot;an EOA&quot; — an isContract call, a test of code.length or extcodesize — now takes a delegated EOA for a contract.</li><li><span class="tag surface">program</span> OpenZeppelin&#39;s SignatureChecker.isValidSignatureNow checks an ECDSA signature only when the signer has no code, and otherwise asks the signer for ERC-1271. A delegated EOA has code, so its ECDSA signature is not checked as such: it is valid only if the delegate implements ERC-1271 and accepts it.</li><li><span class="tag surface">wallet</span> OpenZeppelin&#39;s ERC721Utils.checkOnERC721Received calls onERC721Received on any recipient with code, and reverts when the call fails or returns another value. A safe transfer or a safe mint to a delegated EOA reverts unless its delegate implements the receiver.</li><li><span class="tag surface">sdk</span> eth_getCode of a delegated EOA returns the 23-byte delegation indicator, and the account still sends transactions. Telling contracts from EOAs by whether eth_getCode is empty no longer works.</li></ul>
 <h4>How to fix it</h4>
@@ -287,11 +367,12 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 <ul class="small"><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md">github.com/ethereum/EIPs/blob/bbc3f95844c37612a2f1b9e7477990bb717ecfa0/EIPS/eip-7702.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7600.md">github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7600.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">proposal</span> <a href="https://github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7685.md">github.com/ethereum/EIPs/blob/ac912ca6a9685590345dd8e5736cda75976d0131/EIPS/eip-7685.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/ethereum/go-ethereum/blob/c9a2bc73c847319a8faa57de59e42c0efc420682/params/config.go">github.com/ethereum/go-ethereum/blob/c9a2bc73c847319a8faa57de59e42c0efc420682/params/config.go</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:1 eth_getBlockByNumber 22431083 and 22431084 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">docs</span> <a href="https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/overview.md">github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/overview.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">docs</span> <a href="https://github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/exec-engine.md">github.com/ethereum-optimism/specs/blob/f7cefd23a79e072ea90e033dae5d2e3685d0f10c/specs/protocol/isthmus/exec-engine.md</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/base/base/blob/fa0f64d32012efa9b0934bfe1dd074a4aed329c7/crates/common/chains/src/config.rs">github.com/base/base/blob/fa0f64d32012efa9b0934bfe1dd074a4aed329c7/crates/common/chains/src/config.rs</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/ethereum-optimism/superchain-registry/blob/5b055be4d294ce43814a44c8839d89b2436dc8aa/superchain/configs/mainnet/base.toml">github.com/ethereum-optimism/superchain-registry/blob/5b055be4d294ce43814a44c8839d89b2436dc8aa/superchain/configs/mainnet/base.toml</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:8453 eth_getBlockByNumber 30008526 and 30008527 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/utils/cryptography/SignatureChecker.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/utils/cryptography/SignatureChecker.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/token/ERC721/utils/ERC721Utils.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">source-code</span> <a href="https://github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol">github.com/OpenZeppelin/openzeppelin-contracts/blob/40a51f7e78852e48d0b128d4ee3d620cbc7d35d8/contracts/account/utils/EIP7702Utils.sol</a> <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:1 eth_getCode 0xc3ad9002556803615d2f5784c752c3277246c5e7 <span class="muted">retrieved 2026-10-02</span></li><li><span class="tag">rpc-observation</span> eip155:8453 eth_getTransactionByHash 0xf46de53cfe2be13579e3c7093767837f7e5d503f6e6aa3b0e905fef33f72101f <span class="muted">retrieved 2026-10-06</span></li><li><span class="tag">source-code</span> <a href="https://github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11">github.com/taikoxyz/taiko-mono/commit/798c9f868bfb5eb4cbc5a08cb1d2940cd5eecd11</a> <span class="muted">retrieved 2026-10-02</span></li></ul>
 </details>
 </article>
-<article class="card entry" id="rent-simd-0437">
-<header>
-<h3>Incrementally Reduce lamports_per_byte to 696</h3>
-<p class="meta"><span class="tag">SIMD-0437</span><span class="tag chain">Solana</span><span class="muted">entry <code>rent-simd-0437</code> · rev 1</span></p>
-</header>
+</details>
+<details class="entry"><summary>
+<h3>Rent reduction</h3>
+<p class="meta"><span class="tag">SIMD-0437</span><span class="tag chain">Solana</span><span class="muted">entry <code>rent-simd-0437</code> · rev 1</span></p></summary>
+<article id="rent-simd-0437">
+<p class="entry-canonical">Incrementally Reduce lamports_per_byte to 696</p>
 <h4>What breaks</h4>
 <ul><li><span class="tag surface">economics</span> The minimum balance of an account is (128 + data size in bytes) * lamports_per_byte, and every step lowers lamports_per_byte. An account funded at an earlier, higher minimum keeps the difference: the SIMD allows reducing the balance to the new minimum, it does not return anything by itself.</li><li><span class="tag surface">sdk</span> A lamports_per_byte value compiled into a client or program goes stale at every step: on activation the value changes in the bank and in the Rent sysvar, while DEFAULT_LAMPORTS_PER_BYTE in the SDKs is updated only after activation. The SIMD calls the reduction strictly a relaxation: existing program logic keeps working, so a stale higher constant overpays rather than fails.</li><li><span class="tag surface">program</span> The reduction is not guaranteed to be one-way. The SIMD states that rent can be increased back to the legacy value in case of excessive state growth, noting that SIMD-0392 allows this without significant disruption to existing accounts; agave already declares a gate set_lamports_per_byte_to_6960, registered as &quot;SIMD-0438: Reset lamports per byte to legacy value of 6960&quot;. A minimum balance fixed at a reduced value can therefore become too low for newly created accounts.</li></ul>
 <h4>How to fix it</h4>
@@ -302,11 +383,12 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 <ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0437-incremental-rent-reduction.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getAccountInfo SysvarRent111111111111111111111111111111111 at slot 448085582 <span class="muted">retrieved 2026-09-18</span></li></ul>
 </details>
 </article>
-<article class="card entry" id="slot-duration">
-<header>
-<h3>Reduce Slot Times</h3>
-<p class="meta"><span class="tag">SIMD-0525</span><span class="tag chain">Solana</span><span class="muted">entry <code>slot-duration</code> · rev 1</span></p>
-</header>
+</details>
+<details class="entry"><summary>
+<h3>Slot duration</h3>
+<p class="meta"><span class="tag">SIMD-0525</span><span class="tag chain">Solana</span><span class="muted">entry <code>slot-duration</code> · rev 1</span></p></summary>
+<article id="slot-duration">
+<p class="entry-canonical">Reduce Slot Times</p>
 <h4>What breaks</h4>
 <ul><li><span class="tag surface">program</span> A duration expressed in slots shrinks in wall-clock time with every stage: the SIMD tells dapp developers and off-chain services to stop assuming that 400 ms * slots is a stable conversion. A timer of N slots lasts half as long at 200 ms as it did at 400 ms.</li><li><span class="tag surface">sdk</span> SDK constants stay at their 400 ms values at first: static constants for default slot duration, ticks per second, slots per year and slot-to-time conversion may keep describing 400 ms while the cluster runs 350, 300, 250 or 200 ms banks.</li><li><span class="tag surface">economics</span> Per-slot limits scale down in proportion to the slot time so that the wall-clock rate stays approximately the same. From the 400 ms baseline of 60,000,000 the maximum block compute units become 37,500,000 at 250 ms and 30,000,000 at 200 ms; the maximum writable-account compute units go from 24,000,000 to 15,000,000 and 12,000,000. The ratios apply to whatever baseline is active: with the 100,000,000 block limit of SIMD-0286 the values are 62,500,000 and 50,000,000. Code tuned to the per-block or per-account limit of a 400 ms slot exceeds the scaled one.</li><li><span class="tag surface">program</span> An epoch stays 432,000 slots, so it lasts half as long at 200 ms as at 400 ms. Anything scheduled per epoch happens twice as often in wall-clock time.</li></ul>
 <h4>How to fix it</h4>
@@ -317,11 +399,12 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 <ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li></ul>
 </details>
 </article>
-<article class="card entry" id="tx-v1">
-<header>
-<h3>Transaction V1 Format</h3>
-<p class="meta"><span class="tag">SIMD-0385</span><span class="tag chain">Solana</span><span class="muted">entry <code>tx-v1</code> · rev 1 · 9 static rule(s), 1 RPC probe(s)</span></p>
-</header>
+</details>
+<details class="entry"><summary>
+<h3>Transaction v1</h3>
+<p class="meta"><span class="tag">SIMD-0385</span><span class="tag chain">Solana</span><span class="muted">entry <code>tx-v1</code> · rev 1 · 9 static rule(s), 1 RPC probe(s)</span></p></summary>
+<article id="tx-v1">
+<p class="entry-canonical">Transaction V1 Format</p>
 <h4>What breaks</h4>
 <ul><li><span class="tag surface">rpc</span> getTransaction, and getBlock with transactionDetails full or accounts, fail with JSON-RPC error -32015 &quot;Transaction version (1) is not supported by the requesting client&quot; when the request omits maxSupportedTransactionVersion or sets it to 0 and the result contains a version 1 transaction. getBlock with transactionDetails signatures or none is not affected.</li><li><span class="tag surface">decoder</span> A serialized version 1 transaction starts with the version byte 129 (0x81). A decoder written for the legacy and version 0 layouts has no branch for that value.</li><li><span class="tag surface">sdk</span> @solana/kit 8.0.0 removed three compute-unit-limit helpers from @solana/kit in favour of resource-limit helpers that also set the loaded accounts data size limit for version 1 transactions, and removed the fixed transaction size constants from @solana/transactions because version 1 transactions have a larger size limit.</li><li><span class="tag surface">decoder</span> The maximum size of a version 1 transaction is 4096 bytes; the prior maximum was 1232. A buffer or a size check fixed at 1232 bytes is too small for a valid version 1 transaction.</li><li><span class="tag surface">sdk</span> @solana/web3.js 1.98.4 cannot read a version 1 transaction even when maxSupportedTransactionVersion is 1: getTransaction and getParsedTransaction throw a StructError on the version field, and getBlock fails the same way. 1.99.0 reads all three and returns a MessageV1.</li></ul>
 <h4>How to fix it</h4>
@@ -332,10 +415,10 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 <ul class="small"><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0385-transaction-v1.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">source-code</span> <a href="https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs">github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getBlock slot 448063686 <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5 <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">release</span> <a href="https://github.com/anza-xyz/kit/releases/tag/v8.0.0">github.com/anza-xyz/kit/releases/tag/v8.0.0</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">simd</span> <a href="https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md">github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0296-larger-transactions.md</a> <span class="muted">retrieved 2026-09-18</span></li><li><span class="tag">rpc-observation</span> mainnet-beta getTransaction 4PP1qEAF4NAKemZJrfGXhHV5yAQPwx2Dufs3Q8Gmeb7TEhHnaTQDC5RD147QVCXGfpJZFWdR1ENiUk59qToTp6K5 through @solana/web3.js <span class="muted">retrieved 2026-09-18</span></li></ul>
 </details>
 </article>
+</details></div>
 </section>
 
 <section id="get-started">
-<p class="section-label">06 / Put the record to work</p>
 <h2>Check it yourself</h2>
 <p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
@@ -349,7 +432,6 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <section class="roadmap">
-<p class="section-label">07 / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
@@ -371,8 +453,10 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <footer>
+<a class="footer-brand" href="#content">Epochnotes <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a>
 <p>Generated by <code>npm run site</code> from <code>registry/entries</code> and the watcher report of 2026-10-15, findings checked 2026-10-23. <a href="https://github.com/mskrad/Epochnotes">mskrad/Epochnotes</a></p>
 </footer>
+</div>
 </main>
 </body>
 </html>

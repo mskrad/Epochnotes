@@ -66,6 +66,7 @@ describe('the project page', () => {
     expect(existsSync(new URL('assets/fonts/work-sans-latin.woff2', root))).toBe(true);
     expect(existsSync(new URL('assets/fonts/OFL.txt', root))).toBe(true);
     expect(page.match(/<link\b[^>]*>/g)).toEqual([
+      '<link rel="preload" href="assets/fonts/work-sans-latin.woff2" as="font" type="font/woff2" crossorigin>',
       expect.stringMatching(/^<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/),
     ]);
   });
@@ -126,7 +127,11 @@ describe('the project page', () => {
     expect(
       page
         .match(/href="([^"]*)"/g)
-        ?.every((href) => /^href="(https:\/\/|#|registry\/|data:image\/svg\+xml,)/.test(href)),
+        ?.every((href) =>
+          /^href="(https:\/\/|#|registry\/|data:image\/svg\+xml,|assets\/fonts\/work-sans-latin\.woff2")/.test(
+            href,
+          ),
+        ),
     ).toBe(true);
   });
 

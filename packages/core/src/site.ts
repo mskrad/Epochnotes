@@ -299,6 +299,7 @@ export function renderSite(entries: Entry[], watch?: SiteWatch, findings?: SiteF
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preload" href="assets/fonts/work-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <title>Epochnotes</title>
 <meta name="description" content="A signed registry of network changes on Solana, Ethereum and Base, and the checks built on it.">
 <meta property="og:title" content="Epochnotes — keep up with network changes">

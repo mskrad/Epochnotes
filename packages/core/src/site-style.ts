@@ -1,4 +1,4 @@
-export const STYLE = `@font-face{font-family:"Work Sans";src:url("assets/fonts/work-sans-latin.woff2") format("woff2");font-style:normal;font-weight:100 900;font-display:swap}
+export const STYLE = `@font-face{font-family:"Work Sans";src:url("assets/fonts/work-sans-latin.woff2") format("woff2");font-style:normal;font-weight:100 900;font-display:optional}
 :root{color-scheme:light;--bg:#f5f1e9;--fg:#302c28;--muted:#665d54;--card:#fcfaf5;--line:#d8cdbf;--accent:#934521;--tag:#eae1d4;--code:#eae3d8;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--face:"Work Sans",sans-serif;--ease:cubic-bezier(.16,1,.3,1);--margin:4vw}
 *{box-sizing:border-box}
 html{scroll-padding-top:24px;scrollbar-color:#98664b #f5f1e9}

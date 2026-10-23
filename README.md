@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://mskrad.github.io/Epochnotes/">Explore the registry</a> ·
   <a href="#ask-your-ai-agent">Ask your AI agent</a> ·
+  <a href="#found-in-the-field">Found in the field</a> ·
   <a href="#quick-start">Get started</a> ·
   <a href="DEMO_RUNBOOK.md">Run the demo</a> ·
   <a href="assets/brand/STYLE.md">Visual identity</a>
@@ -92,6 +93,24 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe
 ```
 
 The commands the skill runs are listed under [For AI assistants](#for-ai-assistants).
+
+## Found in the field
+
+We ran `epochnotes check repo` over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. Nine are reported; two are already fixed and merged. Outcomes as of 2026-10-23; an open pull request is a proposal, not an acceptance.
+
+| Project                                                                                       | What broke                                                                                                                         | Report                                                                                                                                            | Outcome                                                                                    |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [solana-foundation/solana-com](https://github.com/solana-foundation/solana-com)               | The slot-time page read blocks with `maxSupportedTransactionVersion: 0`, which the RPC refuses once a block holds a v1 transaction | [issue #2141](https://github.com/solana-foundation/solana-com/issues/2141)                                                                        | merged: [fix #2150](https://github.com/solana-foundation/solana-com/pull/2150), 2026-10-07 |
+| [helius-labs/core-ai](https://github.com/helius-labs/core-ai)                                 | The MCP server and CLI asked for full blocks with version 0, so `getBlock` failed on v1 blocks                                     | [issue #183](https://github.com/helius-labs/core-ai/issues/183)                                                                                   | merged: [fix #190](https://github.com/helius-labs/core-ai/pull/190), 2026-10-14            |
+| [OpenZeppelin/openzeppelin-monitor](https://github.com/OpenZeppelin/openzeppelin-monitor)     | The Solana monitor could not load nearly any recent mainnet block                                                                  | [PR #515](https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515)                                                                          | open                                                                                       |
+| [wormhole-foundation/wormhole-sdk-ts](https://github.com/wormhole-foundation/wormhole-sdk-ts) | `parseTransaction` and `parseMessages` threw on v1 transactions, and Wormhole messages are already posted in them                  | [PR #1049](https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049)                                                                      | open                                                                                       |
+| [zenmoney/ZenPlugins](https://github.com/zenmoney/ZenPlugins)                                 | Solana wallet sync stopped with a `TypeError` when the sync window held one v1 transaction                                         | [PR #1213](https://github.com/zenmoney/ZenPlugins/pull/1213)                                                                                      | open                                                                                       |
+| [helius-labs/photon-explorer](https://github.com/helius-labs/photon-explorer)                 | The explorer showed "Failed to load transaction" for any v1 transaction                                                            | [PR #5](https://github.com/helius-labs/photon-explorer/pull/5)                                                                                    | open                                                                                       |
+| [Squads-Protocol/public-v4-client](https://github.com/Squads-Protocol/public-v4-client)       | The multisig lookup stopped at the first v1 transaction in a vault's history                                                       | [issue #48](https://github.com/Squads-Protocol/public-v4-client/issues/48), [PR #49](https://github.com/Squads-Protocol/public-v4-client/pull/49) | open                                                                                       |
+| [sendaifun/solana-new](https://github.com/sendaifun/solana-new)                               | The debug-program agent skill taught a `getTransaction` call that fails on v1                                                      | [PR #62](https://github.com/sendaifun/solana-new/pull/62)                                                                                         | open                                                                                       |
+| [sendaifun/solana-mpp](https://github.com/sendaifun/solana-mpp)                               | Payment verification threw for a payment sent as a v1 transaction                                                                  | [PR #7](https://github.com/sendaifun/solana-mpp/pull/7)                                                                                           | open                                                                                       |
+
+The same list, kept current, is on the [project page](https://mskrad.github.io/Epochnotes/#findings).
 
 ## Layout
 

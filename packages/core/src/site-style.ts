@@ -44,7 +44,8 @@ code{font:0.85em var(--mono);background:var(--code);padding:2px 5px;border-radiu
 pre{background:var(--fg);color:var(--bg);padding:24px;border-radius:4px;overflow-x:auto;font:13px/1.8 var(--mono)}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}
 details{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}summary{cursor:pointer;color:var(--accent);font-size:14px}
 .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--card)}
-table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+#findings table{min-width:680px}#findings td:first-child,#findings td a{white-space:nowrap}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
 .state{display:inline-block;border-radius:3px;padding:2px 7px;font:12px/1.6 var(--mono);white-space:nowrap}
 .state.active{color:var(--ok);background:var(--ok-bg)}.state.scheduled{color:var(--warn);background:var(--warn-bg)}.state.absent{color:var(--off);background:var(--off-bg)}.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
 .roadmap .grid{grid-template-columns:repeat(2,minmax(0,1fr))}

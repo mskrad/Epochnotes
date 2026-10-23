@@ -1,0 +1,104 @@
+{
+  "checked": "2026-10-23",
+  "items": [
+    {
+      "project": "solana-foundation/solana-com",
+      "repository": "https://github.com/solana-foundation/solana-com",
+      "broke": "The slot-time page read blocks with maxSupportedTransactionVersion 0, which the RPC refuses once a block holds a v1 transaction.",
+      "reported": [
+        { "text": "issue #2141", "url": "https://github.com/solana-foundation/solana-com/issues/2141" }
+      ],
+      "outcome": "merged",
+      "outcomeText": "fix #2150",
+      "outcomeUrl": "https://github.com/solana-foundation/solana-com/pull/2150",
+      "date": "2026-10-07"
+    },
+    {
+      "project": "helius-labs/core-ai",
+      "repository": "https://github.com/helius-labs/core-ai",
+      "broke": "The MCP server and CLI asked for full blocks with maxSupportedTransactionVersion 0, so getBlock failed on v1 blocks.",
+      "reported": [{ "text": "issue #183", "url": "https://github.com/helius-labs/core-ai/issues/183" }],
+      "outcome": "merged",
+      "outcomeText": "fix #190",
+      "outcomeUrl": "https://github.com/helius-labs/core-ai/pull/190",
+      "date": "2026-10-14"
+    },
+    {
+      "project": "OpenZeppelin/openzeppelin-monitor",
+      "repository": "https://github.com/OpenZeppelin/openzeppelin-monitor",
+      "broke": "The Solana monitor could not load nearly any recent mainnet block: every getBlock failed with -32015.",
+      "reported": [
+        { "text": "PR #515", "url": "https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515" }
+      ],
+      "outcome": "open",
+      "outcomeText": "PR #515",
+      "outcomeUrl": "https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515",
+      "date": "2026-10-23"
+    },
+    {
+      "project": "wormhole-foundation/wormhole-sdk-ts",
+      "repository": "https://github.com/wormhole-foundation/wormhole-sdk-ts",
+      "broke": "parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.",
+      "reported": [
+        { "text": "PR #1049", "url": "https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049" }
+      ],
+      "outcome": "open",
+      "outcomeText": "PR #1049",
+      "outcomeUrl": "https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049",
+      "date": "2026-10-23"
+    },
+    {
+      "project": "zenmoney/ZenPlugins",
+      "repository": "https://github.com/zenmoney/ZenPlugins",
+      "broke": "Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.",
+      "reported": [{ "text": "PR #1213", "url": "https://github.com/zenmoney/ZenPlugins/pull/1213" }],
+      "outcome": "open",
+      "outcomeText": "PR #1213",
+      "outcomeUrl": "https://github.com/zenmoney/ZenPlugins/pull/1213",
+      "date": "2026-10-23"
+    },
+    {
+      "project": "helius-labs/photon-explorer",
+      "repository": "https://github.com/helius-labs/photon-explorer",
+      "broke": "The explorer showed \"Failed to load transaction\" for any v1 transaction.",
+      "reported": [{ "text": "PR #5", "url": "https://github.com/helius-labs/photon-explorer/pull/5" }],
+      "outcome": "open",
+      "outcomeText": "PR #5",
+      "outcomeUrl": "https://github.com/helius-labs/photon-explorer/pull/5",
+      "date": "2026-10-23"
+    },
+    {
+      "project": "Squads-Protocol/public-v4-client",
+      "repository": "https://github.com/Squads-Protocol/public-v4-client",
+      "broke": "The multisig lookup stopped at the first v1 transaction in a vault's history.",
+      "reported": [
+        { "text": "issue #48", "url": "https://github.com/Squads-Protocol/public-v4-client/issues/48" },
+        { "text": "PR #49", "url": "https://github.com/Squads-Protocol/public-v4-client/pull/49" }
+      ],
+      "outcome": "open",
+      "outcomeText": "PR #49",
+      "outcomeUrl": "https://github.com/Squads-Protocol/public-v4-client/pull/49",
+      "date": "2026-10-22"
+    },
+    {
+      "project": "sendaifun/solana-new",
+      "repository": "https://github.com/sendaifun/solana-new",
+      "broke": "The debug-program agent skill taught a getTransaction call that fails on v1 transactions.",
+      "reported": [{ "text": "PR #62", "url": "https://github.com/sendaifun/solana-new/pull/62" }],
+      "outcome": "open",
+      "outcomeText": "PR #62",
+      "outcomeUrl": "https://github.com/sendaifun/solana-new/pull/62",
+      "date": "2026-10-23"
+    },
+    {
+      "project": "sendaifun/solana-mpp",
+      "repository": "https://github.com/sendaifun/solana-mpp",
+      "broke": "Payment verification threw for a payment sent as a v1 transaction.",
+      "reported": [{ "text": "PR #7", "url": "https://github.com/sendaifun/solana-mpp/pull/7" }],
+      "outcome": "open",
+      "outcomeText": "PR #7",
+      "outcomeUrl": "https://github.com/sendaifun/solana-mpp/pull/7",
+      "date": "2026-10-23"
+    }
+  ]
+}

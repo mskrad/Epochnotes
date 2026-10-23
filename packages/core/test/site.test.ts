@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   type Entry,
   renderSite,
+  type SiteFindings,
+  siteFindingsOf,
   type SiteWatch,
   siteWatchOf,
   validatePath,
@@ -17,10 +19,25 @@ const entries = validatePath(new URL('registry/entries', root).pathname).files.f
 );
 const watchFile = new URL('site/watch.json', root);
 const watch = existsSync(watchFile) ? (JSON.parse(readFileSync(watchFile, 'utf8')) as SiteWatch) : undefined;
+const findingsFile = new URL('site/findings.json', root);
+const findings = existsSync(findingsFile)
+  ? siteFindingsOf(JSON.parse(readFileSync(findingsFile, 'utf8')))
+  : undefined;
+
+const finding = {
+  project: 'owner/repo',
+  repository: 'https://github.com/owner/repo',
+  broke: 'It broke.',
+  reported: [{ text: 'issue #1', url: 'https://github.com/owner/repo/issues/1' }],
+  outcome: 'open',
+  outcomeText: 'PR #2',
+  outcomeUrl: 'https://github.com/owner/repo/pull/2',
+  date: '2026-10-23',
+};
 
 describe('the project page', () => {
   it('is what npm run site makes of the registry and the last watcher report', () => {
-    expect(readFileSync(new URL('index.html', root), 'utf8')).toBe(renderSite(entries, watch));
+    expect(readFileSync(new URL('index.html', root), 'utf8')).toBe(renderSite(entries, watch, findings));
   });
 
   it('names every entry, its primary sources, and the watcher reading', () => {
@@ -98,6 +115,77 @@ describe('the project page', () => {
         .match(/href="([^"]*)"/g)
         ?.every((href) => /^href="(https:\/\/|#|registry\/|data:image\/svg\+xml,)/.test(href)),
     ).toBe(true);
+  });
+
+  it('shows every finding with its report and outcome, and counts the merged ones', () => {
+    const shown = siteFindingsOf({
+      checked: '2026-10-23',
+      items: [finding, { ...finding, project: 'other/repo', outcome: 'merged' }],
+    });
+    const page = renderSite(entries, watch, shown);
+    expect(page).toContain('<a href="#findings">Found</a>');
+    expect(page).toContain('<strong>2</strong> reported, <strong>1</strong> already fixed and merged');
+    expect(page).toContain('<a href="https://github.com/owner/repo/issues/1">issue #1</a>');
+    expect(page).toContain(
+      '<a href="https://github.com/owner/repo">repo</a><br><span class="muted">owner</span>',
+    );
+    expect(page).toContain('<span class="state active">merged</span>');
+    expect(page).toContain('<span class="state scheduled">open</span>');
+    expect(page).toContain('Outcomes as of 2026-10-23');
+    expect(page).toContain('04 / The latest field reading');
+  });
+
+  it('leaves the findings out, and the numbering as it was, when there are none', () => {
+    for (const none of [undefined, { checked: '2026-10-23', items: [] }]) {
+      const page = renderSite(entries, watch, none);
+      expect(page).not.toContain('id="findings"');
+      expect(page).not.toContain('href="#findings"');
+      expect(page).toContain('03 / The latest field reading');
+      expect(page).toContain('06 / What comes next');
+    }
+  });
+
+  it('shows the text of a finding as text, and links only to https', () => {
+    const markup = '"\'><script>alert(1)</script>';
+    const hostile = {
+      checked: markup,
+      items: [
+        {
+          project: markup,
+          repository: 'javascript:alert(1)',
+          broke: markup,
+          reported: [{ text: markup, url: 'https://example.org/"onmouseover="alert(1)' }],
+          outcome: 'open',
+          outcomeText: markup,
+          outcomeUrl: 'javascript:alert(1)',
+          date: markup,
+        },
+      ],
+    } as SiteFindings;
+    const page = renderSite(entries, watch, hostile);
+    expect(page).not.toContain('<script>alert(1)');
+    expect(page).not.toContain('href="javascript:');
+    const tags = page.match(/<[^>]*>/g) ?? [];
+    expect(tags.filter((tag) => /^<(script|img)\b|\son\w+=|javascript:/i.test(tag))).toEqual([]);
+  });
+
+  it('refuses a findings file it cannot show as written', () => {
+    const valid = { checked: '2026-10-23', items: [finding] };
+    expect(siteFindingsOf(valid).items).toHaveLength(1);
+    const broken: unknown[] = [
+      null,
+      { items: [finding] },
+      { checked: '23.10.2026', items: [finding] },
+      { checked: '2026-10-23', items: [{ ...finding, outcome: 'accepted' }] },
+      { checked: '2026-10-23', items: [{ ...finding, outcomeUrl: 'http://github.com/owner/repo/pull/2' }] },
+      { checked: '2026-10-23', items: [{ ...finding, repository: 'javascript:alert(1)' }] },
+      { checked: '2026-10-23', items: [{ ...finding, reported: [] }] },
+      { checked: '2026-10-23', items: [{ ...finding, reported: [{ text: 'x', url: 'ftp://x' }] }] },
+      { checked: '2026-10-23', items: [{ ...finding, broke: '' }] },
+      { checked: '2026-10-23', items: [{ ...finding, date: 'yesterday' }] },
+      { checked: '2026-10-23', items: [null] },
+    ];
+    for (const data of broken) expect(() => siteFindingsOf(data)).toThrow();
   });
 
   it('says so when there is no watcher report yet', () => {

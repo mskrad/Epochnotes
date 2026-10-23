@@ -44,6 +44,68 @@ export function siteWatchOf(report: WatchReport): SiteWatch {
   };
 }
 
+/** A breakage found in someone else's repository, what was sent to its maintainers, and where it stands. */
+export interface SiteFinding {
+  project: string;
+  repository: string;
+  broke: string;
+  reported: { text: string; url: string }[];
+  outcome: 'merged' | 'open';
+  outcomeText: string;
+  outcomeUrl: string;
+  date: string;
+}
+
+/** The findings shown on the page, with the date their outcomes were last checked. */
+export interface SiteFindings {
+  checked: string;
+  items: SiteFinding[];
+}
+
+const isText = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+const isHttps = (value: unknown): value is string => isText(value) && /^https:\/\/[^\s"'<>]+$/.test(value);
+const isDate = (value: unknown): value is string => isText(value) && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+/**
+ * Reads the findings file of the page; throws on the first item it cannot show as written, because a
+ * claim about someone else's project must not be shown half-filled or with a link that is not https.
+ */
+export function siteFindingsOf(data: unknown): SiteFindings {
+  const file = data as { checked?: unknown; items?: unknown };
+  if (typeof data !== 'object' || data === null || !isDate(file.checked) || !Array.isArray(file.items))
+    throw new Error('it needs "checked" as YYYY-MM-DD and an "items" list');
+  const items = file.items.map((value: unknown, index): SiteFinding => {
+    const item = value as Record<string, unknown>;
+    const reported = item.reported as { text?: unknown; url?: unknown }[] | undefined;
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      !isText(item.project) ||
+      !isHttps(item.repository) ||
+      !isText(item.broke) ||
+      !Array.isArray(reported) ||
+      reported.length === 0 ||
+      !reported.every((report) => isText(report?.text) && isHttps(report?.url)) ||
+      (item.outcome !== 'merged' && item.outcome !== 'open') ||
+      !isText(item.outcomeText) ||
+      !isHttps(item.outcomeUrl) ||
+      !isDate(item.date)
+    )
+      throw new Error(`item ${index} is incomplete or has a link that is not https`);
+    return {
+      project: item.project,
+      repository: item.repository,
+      broke: item.broke,
+      reported: reported.map((report) => ({ text: report.text as string, url: report.url as string })),
+      outcome: item.outcome,
+      outcomeText: item.outcomeText,
+      outcomeUrl: item.outcomeUrl,
+      date: item.date,
+    };
+  });
+  return { checked: file.checked, items };
+}
+
 const REPOSITORY = 'https://github.com/mskrad/Epochnotes';
 const SIMD_REPOSITORY = 'https://github.com/solana-foundation/solana-improvement-documents';
 
@@ -137,10 +199,45 @@ ${rows}
 </table></div>`;
 }
 
+function projectCell(project: string, repository: string): string {
+  const slash = project.indexOf('/');
+  if (slash <= 0) return link(repository, project);
+  return `${link(repository, project.slice(slash + 1))}<br><span class="muted">${escapeHtml(project.slice(0, slash))}</span>`;
+}
+
+function findingsSection(findings: SiteFindings): string {
+  const merged = findings.items.filter((item) => item.outcome === 'merged').length;
+  const rows = findings.items
+    .map(
+      (item) => `<tr>
+<td>${projectCell(item.project, item.repository)}</td>
+<td>${escapeHtml(item.broke)}</td>
+<td>${item.reported.map((report) => link(report.url, report.text)).join(', ')}</td>
+<td><span class="state ${item.outcome === 'merged' ? 'active' : 'scheduled'}">${item.outcome === 'merged' ? 'merged' : 'open'}</span> ${link(item.outcomeUrl, item.outcomeText)}<br><span class="muted">${escapeHtml(item.date)}</span></td>
+</tr>`,
+    )
+    .join('\n');
+  return `<section id="findings">
+<p class="section-label">03 / Found in the field</p>
+<h2>What it found in public code</h2>
+<p>We ran <code>epochnotes check repo</code> over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. <strong>${findings.items.length}</strong> reported, <strong>${merged}</strong> already fixed and merged.</p>
+<div class="scroll"><table>
+<thead><tr><th>Project</th><th>What broke</th><th>Report</th><th>Outcome</th></tr></thead>
+<tbody>
+${rows}
+</tbody>
+</table></div>
+<p class="muted">Outcomes as of ${escapeHtml(findings.checked)}. An open pull request is a proposal, not an acceptance.</p>
+</section>
+`;
+}
+
 /**
  * The project page as one self-contained HTML document: no script, no external resource, every value escaped.
  */
-export function renderSite(entries: Entry[], watch?: SiteWatch): string {
+export function renderSite(entries: Entry[], watch?: SiteWatch, findings?: SiteFindings): string {
+  const shown = findings !== undefined && findings.items.length > 0 ? findings : undefined;
+  const label = (n: number) => String(shown === undefined ? n : n + 1).padStart(2, '0');
   const sorted = [...entries].sort((a, b) => a.id.localeCompare(b.id));
   const chains = [...new Set(sorted.flatMap((entry) => chainsOf(activationsOf(entry))))].sort(
     (a, b) => chainRank(a) - chainRank(b) || a.localeCompare(b),
@@ -168,7 +265,7 @@ ${STYLE}
 <main id="content">
 <header class="masthead">
 <a class="brand" href="#content" aria-label="Epochnotes home">${MARK}<span>Epochnotes</span></a>
-<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
+<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a>${shown === undefined ? '' : '<a href="#findings">Found</a>'}<a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a>${link(REPOSITORY, 'GitHub ↗')}</nav>
 </header>
 <section class="hero">
 <div>
@@ -232,20 +329,20 @@ Registry: version 1, root 77216c0c..., signature verified, on-chain anchor match
 Not checked: the web3.js version (my-app has no lockfile); the runtime probe</code></pre>
 </section>
 
-<section id="watcher">
-<p class="section-label">03 / The latest field reading</p>
+${shown === undefined ? '' : findingsSection(shown)}<section id="watcher">
+<p class="section-label">${label(3)} / The latest field reading</p>
 <h2>What the Solana watcher sees</h2>
 ${watchSection(watch)}
 </section>
 
 <section id="registry">
-<p class="section-label">04 / Layers in the record</p>
+<p class="section-label">${label(4)} / Layers in the record</p>
 <h2>The registry (${sorted.length} entries)</h2>
 ${sorted.map(entryCard).join('\n')}
 </section>
 
 <section id="get-started">
-<p class="section-label">05 / Put the record to work</p>
+<p class="section-label">${label(5)} / Put the record to work</p>
 <h2>Check it yourself</h2>
 <p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
@@ -259,7 +356,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <section class="roadmap">
-<p class="section-label">06 / What comes next</p>
+<p class="section-label">${label(6)} / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
@@ -281,7 +378,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <footer>
-<p>Generated by <code>npm run site</code> from <code>registry/entries</code>${watch === undefined ? '' : ` and the watcher report of ${escapeHtml(watch.agave.retrieved)}`}. ${link(REPOSITORY, 'mskrad/Epochnotes')}</p>
+<p>Generated by <code>npm run site</code> from <code>registry/entries</code>${watch === undefined ? '' : ` and the watcher report of ${escapeHtml(watch.agave.retrieved)}`}${shown === undefined ? '' : `, findings checked ${escapeHtml(shown.checked)}`}. ${link(REPOSITORY, 'mskrad/Epochnotes')}</p>
 </footer>
 </main>
 </body>

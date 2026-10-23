@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
-import { renderSite, siteWatchOf, validatePath } from '../packages/core/dist/index.js';
+import { renderSite, siteFindingsOf, siteWatchOf, validatePath } from '../packages/core/dist/index.js';
 
 const root = new URL('..', import.meta.url);
 const watchFile = new URL('site/watch.json', root);
+const findingsFile = new URL('site/findings.json', root);
 
 function refuse(message) {
   console.error(message);
@@ -30,9 +31,17 @@ if (registry.files.some((file) => file.entry === undefined))
 const entries = registry.files.map((file) => file.entry);
 const watch =
   reading?.watch ?? (existsSync(watchFile) ? JSON.parse(readFileSync(watchFile, 'utf8')) : undefined);
+let findings;
+if (existsSync(findingsFile)) {
+  try {
+    findings = siteFindingsOf(JSON.parse(readFileSync(findingsFile, 'utf8')));
+  } catch (error) {
+    refuse(`site/findings.json cannot be shown: ${error.message}`);
+  }
+}
 let page;
 try {
-  page = renderSite(entries, watch);
+  page = renderSite(entries, watch, findings);
 } catch (error) {
   refuse(
     `${reading?.reportPath ?? 'site/watch.json'} is not a report written by epochnotes watch solana: ${error.message}`,
@@ -44,5 +53,5 @@ if (reading !== undefined) {
 }
 writeFileSync(new URL('index.html', root), page);
 console.log(
-  `index.html: ${entries.length} entries${watch === undefined ? '' : `, watcher report of ${watch.agave.retrieved}`}`,
+  `index.html: ${entries.length} entries${watch === undefined ? '' : `, watcher report of ${watch.agave.retrieved}`}${findings === undefined ? '' : `, ${findings.items.length} findings checked ${findings.checked}`}`,
 );

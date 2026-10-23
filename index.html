@@ -59,7 +59,8 @@ code{font:0.85em var(--mono);background:var(--code);padding:2px 5px;border-radiu
 pre{background:var(--fg);color:var(--bg);padding:24px;border-radius:4px;overflow-x:auto;font:13px/1.8 var(--mono)}pre code{background:none;color:inherit;padding:0;overflow-wrap:normal}
 details{margin-top:24px;padding-top:16px;border-top:1px solid var(--line)}summary{cursor:pointer;color:var(--accent);font-size:14px}
 .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--card)}
-table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:16px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+#findings table{min-width:680px}#findings td:first-child,#findings td a{white-space:nowrap}th{background:var(--tag);color:var(--muted);font:11px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.04em}
 .state{display:inline-block;border-radius:3px;padding:2px 7px;font:12px/1.6 var(--mono);white-space:nowrap}
 .state.active{color:var(--ok);background:var(--ok-bg)}.state.scheduled{color:var(--warn);background:var(--warn-bg)}.state.absent{color:var(--off);background:var(--off-bg)}.state.unknown,.state.uncovered{color:var(--bad);background:var(--bad-bg)}
 .roadmap .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -77,7 +78,7 @@ footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--line);font-si
 <path fill="#98664b" d="M15 180C65 163 95 195 153 179C189 169 209 185 241 173L221 215C184 237 144 215 111 224C75 234 47 216 17 221C7 206 8 190 15 180Z"/>
 <path fill="#bc6239" d="M252 172L278 155C292 179 283 199 264 211L239 225L228 215Z"/>
 <path fill="#302c28" d="M22 233C63 230 78 247 113 237C151 226 183 250 220 228L249 242C222 261 203 286 179 282L63 269C41 267 30 252 22 233Z"/></svg><span>Epochnotes</span></a>
-<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a><a href="https://github.com/mskrad/Epochnotes">GitHub ↗</a></nav>
+<nav aria-label="Main navigation"><a href="#agents">Ask your agent</a><a href="#findings">Found</a><a href="#registry">Registry</a><a href="#watcher">Watcher</a><a href="#get-started">Get started</a><a href="https://github.com/mskrad/Epochnotes">GitHub ↗</a></nav>
 </header>
 <section class="hero">
 <div>
@@ -145,8 +146,73 @@ Registry: version 1, root 77216c0c..., signature verified, on-chain anchor match
 Not checked: the web3.js version (my-app has no lockfile); the runtime probe</code></pre>
 </section>
 
+<section id="findings">
+<p class="section-label">03 / Found in the field</p>
+<h2>What it found in public code</h2>
+<p>We ran <code>epochnotes check repo</code> over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. <strong>9</strong> reported, <strong>2</strong> already fixed and merged.</p>
+<div class="scroll"><table>
+<thead><tr><th>Project</th><th>What broke</th><th>Report</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/solana-foundation/solana-com">solana-com</a><br><span class="muted">solana-foundation</span></td>
+<td>The slot-time page read blocks with maxSupportedTransactionVersion 0, which the RPC refuses once a block holds a v1 transaction.</td>
+<td><a href="https://github.com/solana-foundation/solana-com/issues/2141">issue #2141</a></td>
+<td><span class="state active">merged</span> <a href="https://github.com/solana-foundation/solana-com/pull/2150">fix #2150</a><br><span class="muted">2026-10-07</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/helius-labs/core-ai">core-ai</a><br><span class="muted">helius-labs</span></td>
+<td>The MCP server and CLI asked for full blocks with maxSupportedTransactionVersion 0, so getBlock failed on v1 blocks.</td>
+<td><a href="https://github.com/helius-labs/core-ai/issues/183">issue #183</a></td>
+<td><span class="state active">merged</span> <a href="https://github.com/helius-labs/core-ai/pull/190">fix #190</a><br><span class="muted">2026-10-14</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/OpenZeppelin/openzeppelin-monitor">openzeppelin-monitor</a><br><span class="muted">OpenZeppelin</span></td>
+<td>The Solana monitor could not load nearly any recent mainnet block: every getBlock failed with -32015.</td>
+<td><a href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">PR #515</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515">PR #515</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/wormhole-foundation/wormhole-sdk-ts">wormhole-sdk-ts</a><br><span class="muted">wormhole-foundation</span></td>
+<td>parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.</td>
+<td><a href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">PR #1049</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049">PR #1049</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/zenmoney/ZenPlugins">ZenPlugins</a><br><span class="muted">zenmoney</span></td>
+<td>Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.</td>
+<td><a href="https://github.com/zenmoney/ZenPlugins/pull/1213">PR #1213</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/zenmoney/ZenPlugins/pull/1213">PR #1213</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/helius-labs/photon-explorer">photon-explorer</a><br><span class="muted">helius-labs</span></td>
+<td>The explorer showed &quot;Failed to load transaction&quot; for any v1 transaction.</td>
+<td><a href="https://github.com/helius-labs/photon-explorer/pull/5">PR #5</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/helius-labs/photon-explorer/pull/5">PR #5</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/Squads-Protocol/public-v4-client">public-v4-client</a><br><span class="muted">Squads-Protocol</span></td>
+<td>The multisig lookup stopped at the first v1 transaction in a vault&#39;s history.</td>
+<td><a href="https://github.com/Squads-Protocol/public-v4-client/issues/48">issue #48</a>, <a href="https://github.com/Squads-Protocol/public-v4-client/pull/49">PR #49</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/Squads-Protocol/public-v4-client/pull/49">PR #49</a><br><span class="muted">2026-10-22</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/sendaifun/solana-new">solana-new</a><br><span class="muted">sendaifun</span></td>
+<td>The debug-program agent skill taught a getTransaction call that fails on v1 transactions.</td>
+<td><a href="https://github.com/sendaifun/solana-new/pull/62">PR #62</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/sendaifun/solana-new/pull/62">PR #62</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+<tr>
+<td><a href="https://github.com/sendaifun/solana-mpp">solana-mpp</a><br><span class="muted">sendaifun</span></td>
+<td>Payment verification threw for a payment sent as a v1 transaction.</td>
+<td><a href="https://github.com/sendaifun/solana-mpp/pull/7">PR #7</a></td>
+<td><span class="state scheduled">open</span> <a href="https://github.com/sendaifun/solana-mpp/pull/7">PR #7</a><br><span class="muted">2026-10-23</span></td>
+</tr>
+</tbody>
+</table></div>
+<p class="muted">Outcomes as of 2026-10-23. An open pull request is a proposal, not an acceptance.</p>
+</section>
 <section id="watcher">
-<p class="section-label">03 / The latest field reading</p>
+<p class="section-label">04 / The latest field reading</p>
 <h2>What the Solana watcher sees</h2>
 <p>Read on 2026-10-15 from agave <a href="https://github.com/anza-xyz/agave/tree/929e9fb658d89b74b1142f31ae79feac820c7d95">929e9fb658d8</a> and three clusters (mainnet-beta slot 457175726, testnet slot 452698980, devnet slot 511293223): <strong>290</strong> feature gates declared, <strong>11</strong> of them covered by the registry.</p>
 <h3>On the way to mainnet-beta (5)</h3>
@@ -189,7 +255,7 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 </section>
 
 <section id="registry">
-<p class="section-label">04 / Layers in the record</p>
+<p class="section-label">05 / Layers in the record</p>
 <h2>The registry (5 entries)</h2>
 <article class="card entry" id="alpenglow">
 <header>
@@ -269,7 +335,7 @@ Not checked: the web3.js version (my-app has no lockfile); the runtime probe</co
 </section>
 
 <section id="get-started">
-<p class="section-label">05 / Put the record to work</p>
+<p class="section-label">06 / Put the record to work</p>
 <h2>Check it yourself</h2>
 <p>Install the CLI with <code>npm install -g @epochnotes/cli</code>, then read from the published signed log:</p>
 <pre><code>export EPOCHNOTES_VERSIONS=https://mskrad.github.io/Epochnotes/registry/versions
@@ -283,7 +349,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <section class="roadmap">
-<p class="section-label">06 / What comes next</p>
+<p class="section-label">07 / What comes next</p>
 <h2>Roadmap</h2>
 <div class="grid">
 <div class="card"><h3>Now</h3><ul>
@@ -305,7 +371,7 @@ epochnotes check rpc --rpc-url &lt;endpoint&gt;               # does this provid
 </section>
 
 <footer>
-<p>Generated by <code>npm run site</code> from <code>registry/entries</code> and the watcher report of 2026-10-15. <a href="https://github.com/mskrad/Epochnotes">mskrad/Epochnotes</a></p>
+<p>Generated by <code>npm run site</code> from <code>registry/entries</code> and the watcher report of 2026-10-15, findings checked 2026-10-23. <a href="https://github.com/mskrad/Epochnotes">mskrad/Epochnotes</a></p>
 </footer>
 </main>
 </body>

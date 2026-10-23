@@ -6,27 +6,52 @@ export const STRATA = `<path fill="#302c28" d="M38 111C51 76 88 78 113 50C145 15
 
 export const MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true" focusable="false">${STRATA}</svg>`;
 
-export function brandSvg(width: number, height: number, kind: 'banner' | 'social' | 'board'): string {
+const FACE = '"Work Sans",Helvetica,Arial,sans-serif';
+
+/**
+ * The README cover, the social preview and the style board, drawn like the homepage: a limestone masthead
+ * carrying the mark, then a charcoal hero. The mark stays on limestone because its outer strata are
+ * charcoal and would vanish on the hero. `fontDataUrl` embeds Work Sans, since an SVG shown as an image
+ * cannot fetch a font; without it the artwork falls back to Helvetica or Arial.
+ */
+export function brandSvg(
+  width: number,
+  height: number,
+  kind: 'banner' | 'social' | 'board',
+  fontDataUrl?: string,
+): string {
   const board = kind === 'board';
-  const titleSize = board ? 72 : 94;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1280 ${board ? 1000 : 640}" role="img" aria-labelledby="title desc">
-<title id="title">Epochnotes — read the layers of change</title>
-<desc id="desc">A geological cross-section in charcoal, sandstone, clay and copper. A field journal for network changes.</desc>
-<rect width="1280" height="${board ? 1000 : 640}" fill="#f5f1e9"/>
-<path d="M48 48H1232M48 592H1232" stroke="#d8cdbf"/>
-<text x="64" y="85" fill="#705f50" font-family="monospace" font-size="14" letter-spacing="3">A FIELD JOURNAL FOR NETWORK CHANGES</text>
-<g transform="translate(865 150) scale(1.05)">${STRATA}</g>
-<text x="64" y="290" fill="#302c28" font-family="Georgia,serif" font-size="${titleSize}" letter-spacing="-4">Epochnotes</text>
-<text x="68" y="355" fill="#705f50" font-family="system-ui,sans-serif" font-size="26">Read the layers of change.</text>
-<text x="68" y="405" fill="#705f50" font-family="system-ui,sans-serif" font-size="19">Signed records. Clear impact. Checks you can run.</text>
-<text x="64" y="553" fill="#705f50" font-family="monospace" font-size="14" letter-spacing="2">SOLANA / ETHEREUM / BASE</text>
-<text x="1030" y="553" fill="#705f50" font-family="monospace" font-size="14">epochnotes</text>
+  const total = board ? 1000 : 640;
+  const font =
+    fontDataUrl === undefined
+      ? ''
+      : `<style>@font-face{font-family:"Work Sans";src:url(${fontDataUrl}) format("woff2");font-weight:100 900}</style>\n`;
+  const swatches: [string, string][] = [
+    ['#302c28', 'Charcoal'],
+    ['#f5f1e9', 'Limestone'],
+    ['#d1b897', 'Sandstone'],
+    ['#98664b', 'Clay'],
+    ['#bc6239', 'Copper'],
+    ['#934521', 'Ink copper'],
+  ];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1280 ${total}" role="img" aria-labelledby="title desc">
+<title id="title">Epochnotes: keep up with network changes</title>
+<desc id="desc">The Epochnotes strata mark on a limestone masthead above a charcoal panel: know what breaks in your code, with fixes tied to signed records and primary sources.</desc>
+${font}<rect width="1280" height="${total}" fill="#f5f1e9"/>
+<g transform="translate(64 26) scale(0.2)">${STRATA}</g>
+<text x="138" y="70" fill="#302c28" font-family='${FACE}' font-size="36" font-weight="700" letter-spacing="-0.7">Epochnotes</text>
+<text x="1216" y="68" fill="#665d54" font-family='${FACE}' font-size="20" text-anchor="end">Free, open source, MIT.</text>
+<path d="M0 111.5H1280" stroke="#d8cdbf"/>
+<rect y="112" width="1280" height="528" fill="#302c28"/>
+<text fill="#f5f1e9" font-family='${FACE}' font-size="108" font-weight="750" letter-spacing="-4.3"><tspan x="60" y="262">Keep up with</tspan><tspan x="60" y="372">network changes.</tspan></text>
+<text fill="#e4ddd4" font-family='${FACE}' font-size="30" letter-spacing="-0.6"><tspan x="64" y="448">Know what breaks in your code, with fixes tied to</tspan><tspan x="64" y="488">signed records and primary sources.</tspan></text>
+<rect x="64" y="532" width="360" height="52" rx="6" fill="#934521"/>
+<text x="244" y="566" fill="#fcfaf5" font-family='${FACE}' font-size="22" font-weight="600" text-anchor="middle">Solana · Ethereum · Base</text>
 ${
   board
-    ? `<text x="64" y="665" fill="#302c28" font-family="Georgia,serif" font-size="34">The visual language</text>
-${['#302c28', '#f5f1e9', '#d1b897', '#98664b', '#bc6239'].map((color, i) => `<rect x="${64 + i * 230}" y="700" width="208" height="84" rx="4" fill="${color}" stroke="#d8cdbf"/><text x="${64 + i * 230}" y="817" fill="#705f50" font-family="monospace" font-size="16">${color}</text>`).join('')}
-<text x="64" y="880" fill="#302c28" font-family="Georgia,serif" font-size="30">Editorial headings / quiet interfaces / precise data</text>
-<text x="64" y="930" fill="#705f50" font-family="system-ui,sans-serif" font-size="19">Organic strata. Open space. Copper marks the point of change.</text>`
+    ? `<text x="64" y="700" fill="#302c28" font-family='${FACE}' font-size="34" font-weight="700" letter-spacing="-0.7">The visual language</text>
+${swatches.map(([color, name], i) => `<rect x="${64 + i * 192}" y="730" width="176" height="84" rx="6" fill="${color}" stroke="#d8cdbf"/><text x="${64 + i * 192}" y="842" fill="#302c28" font-family='${FACE}' font-size="17" font-weight="600">${name}</text><text x="${64 + i * 192}" y="866" fill="#665d54" font-family="ui-monospace,Menlo,monospace" font-size="15">${color}</text>`).join('')}
+<text x="64" y="930" fill="#665d54" font-family='${FACE}' font-size="20">Work Sans throughout. Charcoal hero, limestone reading surfaces, ink-copper actions.</text>`
     : ''
 }
 </svg>\n`;

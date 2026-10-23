@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/github-banner.svg" alt="Epochnotes — read the layers of change. A field journal for network changes." width="100%">
+  <img src="assets/brand/github-banner.svg" alt="Epochnotes: keep up with network changes. Know what breaks in your code, with fixes tied to signed records and primary sources." width="100%">
 </p>
 
 <p align="center">

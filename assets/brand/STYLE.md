@@ -19,7 +19,7 @@ Dark pages use warm charcoal `#211f1c`, pale text `#f0e9df` and light copper `#e
 
 ## Typography
 
-The homepage uses Work Sans for headings, its wordmark and body text. The variable Latin font is bundled in `assets/fonts/work-sans-latin.woff2` under the SIL Open Font License in `assets/fonts/OFL.txt`; the page makes no font request to another host. Monospace is reserved for commands and code. The existing README cover and social artwork retain their editorial Georgia typography.
+The homepage uses Work Sans for headings, its wordmark and body text. The variable Latin font is bundled in `assets/fonts/work-sans-latin.woff2` under the SIL Open Font License in `assets/fonts/OFL.txt`; the page makes no font request to another host. Monospace is reserved for commands and code. The README cover, the social preview and the style board use the same Work Sans, embedded in each SVG because an SVG shown as an image cannot fetch a font.
 
 Large headlines use short lines, tight spacing and bold weight. Body text uses a 1.6 line height and a maximum reading width of 72 characters. Labels use sentence case and ordinary spacing.
 
@@ -27,7 +27,7 @@ Large headlines use short lines, tight spacing and bold weight. Body text uses a
 
 Use `mark.svg` as the source mark. Keep one quarter of its width clear around it. Use it at 32 px or larger; for smaller favicons retain the silhouette and omit interior hairlines. Preserve the strata's proportions, irregular boundaries and copper exposure. Do not stretch, rotate, add shadows or enclose it in a shield.
 
-The homepage pairs a charcoal hero with limestone reading surfaces and ink-copper actions. Its product example layers source, signed record and code impact as sandstone sheets with simple chevrons; text stays level. On phones the sheets become a vertical reading sequence. Use flat surfaces, open text groups and native disclosures for detailed records. Keep command output readable and date every snapshot.
+The homepage pairs a charcoal hero with limestone reading surfaces and ink-copper actions; the cover and social preview repeat it as a limestone masthead with the mark above a charcoal panel, because the mark's outer strata are charcoal and would vanish on the hero. Its product example layers source, signed record and code impact as sandstone sheets with simple chevrons; text stays level. On phones the sheets become a vertical reading sequence. Use flat surfaces, open text groups and native disclosures for detailed records. Keep command output readable and date every snapshot.
 
 ## Assets and publishing
 

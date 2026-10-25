@@ -164,7 +164,7 @@ function changeExplorer(entries: Entry[]): string {
 <div class="source-flow">
 <div class="flow-cell"><p>Primary source</p><h3>${escapeHtml(subject.name)}</h3><p>${escapeHtml(tx ? 'Transaction v1 specification' : (subject.title ?? subject.name))}</p>${source === undefined ? '' : link(source.ref, 'View source').replace('</a>', ` ${EXTERNAL}</a>`)}</div>
 ${CHEVRON}
-<div class="flow-cell"><p>Signed record</p><h3>${escapeHtml(name)}</h3><p>${chainsOf(activationsOf(entry)).map(escapeHtml).join(' · ')} · Registry v1</p><a href="#${escapeHtml(entry.id)}">View record ${EXTERNAL}</a></div>
+<div class="flow-cell"><p>Signed record</p><h3>${escapeHtml(name)}</h3><p>${chainsOf(activationsOf(entry)).map(escapeHtml).join(' · ')} · rev ${escapeHtml(String(entry.rev))}</p><a href="#${escapeHtml(entry.id)}">View record ${EXTERNAL}</a></div>
 ${CHEVRON}
 <div class="flow-cell impact"><p>Impact on your code</p><p class="impact-statement">${escapeHtml(tx ? 'RPC reads limited to version 0 can fail' : (entry.breaks[0]?.summary ?? 'Read the entry for affected code'))}</p></div>
 </div>

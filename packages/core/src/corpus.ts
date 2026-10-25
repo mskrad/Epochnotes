@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
 
-import { checkDirectory } from './check-repo.js';
-import { validatePath } from './load.js';
+import { checkUntrackedDirectory } from './check-repo.js';
+import { type RegistryReport, validatePath } from './load.js';
 
 /** Licences under which an excerpt may be copied into this repository, with attribution. */
 const COPYABLE = ['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'Unlicense', 'CC0-1.0'];
@@ -80,10 +80,13 @@ export interface CorpusReport {
  * the manifest calls detected must be reported with the expected rule and confidence; a known miss must still
  * be missed, so that closing a gap is recorded and not just enjoyed; `after` must be silent for the entry.
  */
-export function checkCorpus(corpusDir: string, registryDir: string): CorpusReport {
+export function checkCorpus(corpusDir: string, registryDirOrReport: string | RegistryReport): CorpusReport {
   const problems: string[] = [];
   const rows: CorpusRow[] = [];
-  const registry = validatePath(registryDir);
+  // A caller that checks many copies of the corpus against one registry validates it once: the slow-pattern
+  // probe of every rule costs more than the whole corpus.
+  const registry =
+    typeof registryDirOrReport === 'string' ? validatePath(registryDirOrReport) : registryDirOrReport;
   const entries = registry.files.flatMap((file) => (file.entry === undefined ? [] : [file.entry]));
   if (!registry.ok) problems.push('the registry is not valid: run `epochnotes registry validate`');
 
@@ -151,7 +154,7 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
         if (name !== item.file) problems.push(`${item.id}: ${name} is not its sample file`);
       const target = join(scratch, item.id);
       cpSync(join(directory, item.file), join(target, item.file), { recursive: true });
-      const checked = checkDirectory(target, [entry]);
+      const checked = checkUntrackedDirectory(target, [entry]);
       // a sample no rule reads is quiet for the wrong reason
       if (checked.filesScanned === 0)
         problems.push(`${item.id}: no rule of ${item.entry} reads ${item.file}`);
@@ -233,7 +236,7 @@ export function checkCorpus(corpusDir: string, registryDir: string): CorpusRepor
         cpSync(join(directory, item.files[side]), join(target, item.files.as ?? item.files[side]), {
           recursive: true,
         });
-        return checkDirectory(target, [entry]).findings;
+        return checkUntrackedDirectory(target, [entry]).findings;
       };
       const before = run('before');
       const hit = before.some(

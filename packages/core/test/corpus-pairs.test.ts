@@ -4,10 +4,11 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { checkCorpus } from '../src/index.js';
+import { checkCorpus, validatePath } from '../src/index.js';
 
 const registry = new URL('../../../registry/entries', import.meta.url).pathname;
 const corpus = new URL('../../../corpus', import.meta.url).pathname;
+const validated = validatePath(registry);
 const work = mkdtempSync(join(tmpdir(), 'epochnotes-corpus-test-'));
 afterAll(() => rmSync(work, { recursive: true, force: true }));
 
@@ -16,7 +17,7 @@ function problemsAfter(name: string, change: (dir: string) => void): string[] {
   const dir = join(work, name);
   cpSync(corpus, dir, { recursive: true });
   change(dir);
-  return checkCorpus(dir, registry).problems;
+  return checkCorpus(dir, validated).problems;
 }
 const edit = (file: string, from: string, to: string) => {
   const text = readFileSync(file, 'utf8');
@@ -140,7 +141,7 @@ describe('the corpus of before/after pairs', () => {
     expect(
       problemsAfter('no-licence-text', (dir) => rmSync(join(dir, 'pairs/LICENSES/MIT.txt'))),
     ).toContainEqual(expect.stringContaining('pairs/LICENSES/MIT.txt is missing'));
-    // It runs the whole corpus once per broken copy: 3-4 s alone, and its time grows with the corpus. The limit
+    // It runs the whole corpus once per broken copy: 0.2 s alone, and its time grows with the corpus. The limit
     // leaves room for a loaded machine, not for a regression several times slower.
   }, 15_000);
 

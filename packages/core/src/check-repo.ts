@@ -114,6 +114,28 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
   }
 }
 
+function gitFiles(realRoot: string): string[] | undefined {
+  try {
+    // Tracked files and files not yet added, but never ignored ones: an ignored file is where a project keeps what
+    // is not code (keys, builds, caches), and a new file not yet committed is as much the project as any other.
+    const listed = execFileSync(
+      'git',
+      ['-C', realRoot, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+      {
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
+    return listed
+      .split('\0')
+      .filter(Boolean)
+      .map((file) => join(realRoot, file));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The files to check, by their real paths. In a git work tree these are the files git does not ignore — tracked
  * ones and new ones not yet added: that leaves out dependencies and build output without guessing directory
@@ -131,7 +153,10 @@ function* walk(root: string, skipped: Skipped[], directory = root): Generator<st
  * Not covered: hard links, which cannot be told from the file itself, and a path swapped between resolving and
  * reading. The scanner is not a sandbox; run it with the rights you would give the repository's own scripts.
  */
-function sourceFiles(root: string): {
+function sourceFiles(
+  root: string,
+  git: boolean,
+): {
   realRoot: string;
   /** `names`: the file's own name and the names of links to it; a lockfile is recognised by any of them. */
   files: { path: string; bytes: number; names: string[] }[];
@@ -140,28 +165,9 @@ function sourceFiles(root: string): {
   const realRoot = realpathSync(root);
   const prefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
   const skipped: Skipped[] = [];
-  let candidates: string[];
-  let tracked = true;
-  try {
-    // Tracked files and files not yet added, but never ignored ones: an ignored file is where a project keeps what
-    // is not code (keys, builds, caches), and a new file not yet committed is as much the project as any other.
-    const listed = execFileSync(
-      'git',
-      ['-C', realRoot, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-      {
-        encoding: 'utf8',
-        maxBuffer: 256 * 1024 * 1024,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      },
-    );
-    candidates = listed
-      .split('\0')
-      .filter(Boolean)
-      .map((file) => join(realRoot, file));
-  } catch {
-    tracked = false;
-    candidates = [...walk(realRoot, skipped)];
-  }
+  const listed = git ? gitFiles(realRoot) : undefined;
+  const tracked = listed !== undefined;
+  const candidates = listed ?? [...walk(realRoot, skipped)];
   const files = new Map<string, number>();
   const aliases: { file: string; real: string }[] = [];
   const names = new Map<string, string[]>();
@@ -368,6 +374,24 @@ export function checkDirectory(
   entries: Entry[],
   limits: CheckLimits = {},
 ): Extract<CheckReport, { ok: true }> {
+  return checkFiles(root, entries, limits, true);
+}
+
+/**
+ * The same check over a directory this process made itself, such as a scratch copy, read the way a directory
+ * outside git is read. Asking git first costs a process per call, which a corpus of many small copies pays
+ * dozens of times for an answer known in advance.
+ */
+export function checkUntrackedDirectory(root: string, entries: Entry[]): Extract<CheckReport, { ok: true }> {
+  return checkFiles(root, entries, {}, false);
+}
+
+function checkFiles(
+  root: string,
+  entries: Entry[],
+  limits: CheckLimits,
+  git: boolean,
+): Extract<CheckReport, { ok: true }> {
   const maxFileBytes = limits.maxFileBytes ?? MAX_FILE_BYTES;
   const maxLockfileBytes = limits.maxLockfileBytes ?? MAX_LOCKFILE_BYTES;
   const findings: Finding[] = [];
@@ -427,7 +451,7 @@ export function checkDirectory(
       .map((fix) => fix.summary);
 
   let filesScanned = 0;
-  const { realRoot, files, skipped } = sourceFiles(root);
+  const { realRoot, files, skipped } = sourceFiles(root, git);
   for (const { path, bytes, names } of files) {
     const file = relative(realRoot, path);
     const matching = patterns.filter((item) => item.extensions.has(extname(path)));

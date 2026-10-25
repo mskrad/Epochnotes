@@ -20,6 +20,7 @@ import {
   validateEntry,
   validatePath,
 } from '../src/index.js';
+import { signedVersionOneEntries } from './entries.js';
 import { writeTestKey } from './keys.js';
 
 const v1Dir = new URL('./fixtures/schema-v1', import.meta.url).pathname;
@@ -126,7 +127,8 @@ describe('a version signed in schema 1', () => {
 
 describe('one entry, two schemas', () => {
   const v1 = new Map(entriesIn(v1Dir).map((entry) => [entry.id, entry]));
-  const v2 = new Map(entriesIn(v2Dir).map((entry) => [entry.id, entry]));
+  // The migration is what version 1 signed; the live entries have moved on since, each with its rev raised.
+  const v2 = new Map(signedVersionOneEntries().map((entry) => [entry.id, entry]));
 
   it.each([...v1.keys()])('%s reads the same through the view in either schema', (id) => {
     const old = v1.get(id);

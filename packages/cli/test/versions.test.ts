@@ -3,8 +3,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { firstVersionEntries } from '../../core/test/entries.js';
 import { writeTestKey } from '../../core/test/keys.js';
-import { root, run, scratch } from './run.js';
+import { run, scratch } from './run.js';
 
 const dir = scratch('versions');
 
@@ -12,7 +13,7 @@ describe('epochnotes registry publish / verify', () => {
   const versions = join(dir, 'versions');
   const key = writeTestKey(join(dir, 'publisher-key.json'));
   const publishers = join(dir, 'publishers.json');
-  const entries = `${root}registry/entries`;
+  const entries = firstVersionEntries(join(dir, 'entries'));
 
   it('publishes a version, then proves an entry against it', async () => {
     const published = await run(

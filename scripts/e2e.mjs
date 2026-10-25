@@ -61,6 +61,12 @@ try {
     ]),
   );
   cpSync(join(root, 'registry/entries'), entries, { recursive: true });
+  // This log starts from nothing and takes a new id only at rev 1; the repository's entries carry the revisions
+  // of the signed log.
+  for (const name of readdirSync(entries)) {
+    const path = join(entries, name);
+    writeFileSync(path, readFileSync(path, 'utf8').replace(/^rev: \d+$/m, 'rev: 1'));
+  }
   const publishArgs = [
     'registry',
     'publish',

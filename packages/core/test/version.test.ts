@@ -21,9 +21,9 @@ import {
   verifyLog,
   writeNewFile,
 } from '../src/index.js';
+import { firstVersionEntries, liveEntries } from './entries.js';
 import { writeTestKey } from './keys.js';
 
-const liveEntries = new URL('../../../registry/entries', import.meta.url).pathname;
 const root = mkdtempSync(join(tmpdir(), 'epochnotes-version-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -37,7 +37,7 @@ beforeEach(async () => {
   dir = mkdtempSync(join(root, 'case-'));
   entries = join(dir, 'entries');
   versions = join(dir, 'versions');
-  cpSync(liveEntries, entries, { recursive: true });
+  firstVersionEntries(entries);
   keyFile = writeTestKey(join(dir, 'key.json'));
   publisher = (await loadPublisherKey(keyFile)).address;
 });

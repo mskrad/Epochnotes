@@ -6,8 +6,9 @@ import { join } from 'node:path';
 import { CLUSTER_GENESIS } from '@epochnotes/core';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { firstVersionEntries } from '../../core/test/entries.js';
 import { writeTestKey } from '../../core/test/keys.js';
-import { root, run, scratch } from './run.js';
+import { run, scratch } from './run.js';
 
 const dir = scratch('read');
 
@@ -15,7 +16,7 @@ describe('epochnotes registry read / check rpc', () => {
   const versions = join(dir, 'versions');
   const key = writeTestKey(join(dir, 'publisher-key.json'));
   const publishers = join(dir, 'publishers.json');
-  const entries = `${root}registry/entries`;
+  const entries = firstVersionEntries(join(dir, 'entries'));
   const source = ['--versions', versions, '--publishers', publishers];
   const nowhere = 'http://127.0.0.1:1';
 

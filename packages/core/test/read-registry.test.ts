@@ -17,11 +17,12 @@ import {
   solanaActivationReader,
   type SolanaReadSource,
 } from '../src/index.js';
+import { firstVersionEntries } from './entries.js';
 import { writeTestKey } from './keys.js';
 
-const entries = new URL('../../../registry/entries', import.meta.url).pathname;
 const dir = mkdtempSync(join(tmpdir(), 'epochnotes-read-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+const entries = firstVersionEntries(join(dir, 'entries'));
 const versions = join(dir, 'versions');
 const keyFile = writeTestKey(join(dir, 'key.json'));
 const nothingScheduled: SolanaReadSource = {

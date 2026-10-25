@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { loadPublisherKey, publishVersion, readRawLogFrom, verifyEntry } from '../src/index.js';
+import { firstVersionEntries } from './entries.js';
 import { writeTestKey } from './keys.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'epochnotes-remote-'));
@@ -32,7 +33,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   publisher = (await loadPublisherKey(keyFile)).address;
-  cpSync(new URL('../../../registry/entries', import.meta.url).pathname, entries, { recursive: true });
+  firstVersionEntries(entries);
   const publish = () =>
     publishVersion({
       entriesDir: entries,
@@ -75,7 +76,7 @@ describe('a version log served over HTTP', () => {
     const log = join(elsewhere, 'versions');
     // a log of its own starts from rev 1 entries, so it gets a fresh copy of the registry
     const fresh = join(elsewhere, 'entries');
-    cpSync(new URL('../../../registry/entries', import.meta.url).pathname, fresh, { recursive: true });
+    firstVersionEntries(fresh);
     const result = await publishVersion({
       entriesDir: fresh,
       versionsDir: log,

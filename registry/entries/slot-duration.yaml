@@ -2,7 +2,7 @@
 # Activation status is not stored here: it is read from the feature gate accounts at check time.
 schema_version: 2
 id: slot-duration
-rev: 1
+rev: 2
 axis: protocol
 subject:
   standard: simd
@@ -60,11 +60,49 @@ breaks:
       An epoch stays 432,000 slots, so it lasts half as long at 200 ms as at 400 ms. Anything scheduled per
       epoch happens twice as often in wall-clock time.
     evidence: [0]
+detect:
+  - rule: slot-time-400ms-conversion
+    kind: code-pattern
+    confidence: breaks
+    summary: >-
+      Converts between slots and time at a fixed 400 ms per slot: 400, 0.4 or 2.5 in arithmetic next to a slot or
+      a timestamp, or the SDK constant DEFAULT_MS_PER_SLOT or DEFAULT_S_PER_SLOT. With shorter slots the result is
+      off in proportion, and the error grows with the distance in slots.
+    languages: [ts, js, rust, python, go]
+    pattern: '[*/](?<![/*][*/])(?![/*=])(?:[ \t]{0,8}(?:(?<![\w.])(?:400(?:\.0)?|0?\.4|2\.5)(?![\d.])|(?:[\w$]{1,40}(?:\.|::)){0,3}DEFAULT_M?S_PER_SLOT\b)|(?<=(?:(?<![\w.])(?:400(?:\.0)?|0?\.4|2\.5)(?![\d.])|\bDEFAULT_M?S_PER_SLOT\b)[ \t]{0,8}\*)(?![ \t]{0,8}time\.))(?:(?<=(?:[sS]lot|SLOT|432_?000\b|[bB]lock_?[tT]ime|[tT]imestamp)[^\n]{0,80})|(?=[^\n]{0,80}(?:[sS]lot|SLOT|432_?000\b|[bB]lock_?[tT]ime|[tT]imestamp)))(?<!(?:\b(?:sleep|wait|delay|poll|retry|backoff)|Sleep|Wait|Delay|Poll|Retry|Backoff|setTimeout|setInterval|[tT]imeout|[iI]nterval|from_millis|from_secs|Duration::|Duration\(|\.Millisecond|\.Second\b)[^\n;]{0,60})(?![^\n;]{0,60}(?:\b(?:sleep|wait|delay|poll|retry|backoff)|Sleep|Wait|Delay|Poll|Retry|Backoff|setTimeout|setInterval|[tT]imeout|[iI]nterval|from_millis|from_secs|Duration::|Duration\(|\.Millisecond|\.Second\b))'
+  - rule: slot-time-400ms-wait
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      Waits for a number of slots at a fixed 400 ms per slot. A pause or a poll only gets longer than needed on a
+      cluster with shorter slots; a refresh or a timeout that has to stay inside a window counted in slots or
+      blocks fires late.
+    languages: [ts, js, rust, python, go]
+    pattern: '[*/](?<![/*][*/])(?![/*=])(?:[ \t]{0,8}(?:(?<![\w.])(?:400(?:\.0)?|0?\.4|2\.5)(?![\d.])|(?:[\w$]{1,40}(?:\.|::)){0,3}DEFAULT_M?S_PER_SLOT\b)|(?<=(?:(?<![\w.])(?:400(?:\.0)?|0?\.4|2\.5)(?![\d.])|\bDEFAULT_M?S_PER_SLOT\b)[ \t]{0,8}\*)(?![ \t]{0,8}time\.))(?:(?<=(?:[sS]lot|SLOT|432_?000\b|[bB]lock_?[tT]ime|[tT]imestamp)[^\n]{0,80})|(?=[^\n]{0,80}(?:[sS]lot|SLOT|432_?000\b|[bB]lock_?[tT]ime|[tT]imestamp)))(?:(?<=(?:\b(?:sleep|wait|delay|poll|retry|backoff)|Sleep|Wait|Delay|Poll|Retry|Backoff|setTimeout|setInterval|[tT]imeout|[iI]nterval|from_millis|from_secs|Duration::|Duration\(|\.Millisecond|\.Second\b)[^\n;]{0,60})|(?=[^\n;]{0,60}(?:\b(?:sleep|wait|delay|poll|retry|backoff)|Sleep|Wait|Delay|Poll|Retry|Backoff|setTimeout|setInterval|[tT]imeout|[iI]nterval|from_millis|from_secs|Duration::|Duration\(|\.Millisecond|\.Second\b)))'
+  - rule: slot-time-400ms-constant
+    kind: code-pattern
+    confidence: check
+    summary: >-
+      Declares a slot duration of 400 ms (0.4 s, 2.5 slots per second, or 150, 9,000, 216,000 or 78,840,000 slots
+      per minute, hour, day or year). Check what it is used for: a pause is only slower, a conversion between slots
+      and time is wrong in proportion to the shorter slot.
+    languages: [ts, js, rust, python, go]
+    pattern: '=(?:(?=[ \t]{0,8}(?<![\w.])(?:400(?:\.0)?|0?\.4|2\.5)(?![\d.]))(?<=(?:\b[A-Z0-9_]{0,30}(?:M?S_PER_SLOT|SECONDS_PER_SLOT|MILLIS(?:ECONDS)?_PER_SLOT|SLOT_(?:TIME|DURATION|MS|LENGTH)|SLOTS_PER_SEC(?:OND)?)[A-Z0-9_]{0,20}|\b(?:const|static)[ \t]{1,8}(?:mut[ \t]{1,8})?[\w$]{0,30}(?:(?:[mM][sS]|[mM]illis|[sS]ec(?:ond)?s?)(?:Per|_per_)(?:[sS]lot)|[sS]lot_?(?:[tT]ime|[dD]uration|[mM]s\b|Ms)|[sS]lots(?:Per|_per_)[sS]ec)[\w$]{0,20})[ \t]{0,8}(?::[ \t]{0,8}[\w:<>.&'']{1,30}[ \t]{0,8})?=)|(?=[ \t]{0,8}(?<![\w.])(?:150|9_?000|216_?000|78_?840_?000)(?![\d.]))(?<=(?:\b[A-Z0-9_]{0,30}SLOTS_PER_(?:MINUTE|MIN|HOUR|DAY|YEAR)[A-Z0-9_]{0,20}|\b(?:const|static)[ \t]{1,8}(?:mut[ \t]{1,8})?[\w$]{0,30}[sS]lots(?:Per|_per_)(?:Minute|Min|Hour|Day|Year|minute|min|hour|day|year)[\w$]{0,20})[ \t]{0,8}(?::[ \t]{0,8}[\w:<>.&'']{1,30}[ \t]{0,8})?=))[ \t]{0,8}[\d.]'
 fix:
   - summary: >-
       Keep slot counts only where slot semantics are intended; where a duration means wall-clock time, do not
       derive it from a fixed milliseconds-per-slot constant. The SIMD advises preferring cluster-provided
       timing parameters once they are available.
+  - summary: >-
+      Do not turn slots into time or time into slots with a fixed rate. Read getBlockTime for the time of a slot;
+      for the slot of a time, search getBlockTime between a slot known to be older and the latest slot, stepping
+      over skipped slots; for an estimate, take the current rate from getRecentPerformanceSamples. Space the
+      getBlockTime calls of a search: the public mainnet endpoint allows that method far fewer requests than getSlot.
+    for_rules: [slot-time-400ms-conversion, slot-time-400ms-constant]
+  - summary: >-
+      Where a wait has to end before a window counted in slots or blocks closes, count slots (getSlot) or block
+      height (getBlockHeight) instead of milliseconds; a plain pause can stay as it is.
+    for_rules: [slot-time-400ms-wait, slot-time-400ms-constant]
 sources:
   - kind: simd
     ref: https://github.com/solana-foundation/solana-improvement-documents/blob/2df3442ef8fc/proposals/0525-reduce-slot-times.md
@@ -77,3 +115,11 @@ sources:
     ref: https://github.com/anza-xyz/agave/blob/583d4560e7d1/feature-set/src/lib.rs
     retrieved: '2026-09-18'
     note: 'Four modules reduce_slot_time_to_*ms, registered as "SIMD-0525: Reduce slot time to 350ms" through 200ms.'
+  - kind: rpc-observation
+    ref: mainnet-beta getBlockTime, getRecentPerformanceSamples
+    retrieved: '2026-10-25'
+    note: >-
+      Block times of slots 460291500, 461191500 and 461291500 put 1,000,000 slots at 212,131 s and the last 100,000
+      at 21,224 s (212.1 and 212.2 ms per slot); five 60 s performance samples held 277 to 285 slots. The public
+      endpoint answered getBlockTime with the header x-ratelimit-method-limit 10, and getSlot and
+      getRecentPerformanceSamples with 150.

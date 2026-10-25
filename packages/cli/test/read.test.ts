@@ -243,11 +243,7 @@ describe('epochnotes registry read / check rpc', () => {
     const repo = join(dir, 'repo');
     const json = await run('check', 'repo', repo, ...source, '--json');
     const report = JSON.parse(json.stdout) as { entriesNotChecked: { entry: string }[] };
-    expect(report.entriesNotChecked.map((item) => item.entry)).toEqual([
-      'alpenglow',
-      'rent-simd-0437',
-      'slot-duration',
-    ]);
+    expect(report.entriesNotChecked.map((item) => item.entry)).toEqual(['alpenglow', 'rent-simd-0437']);
     const prose = await run('check', 'repo', repo, ...source);
     expect(prose.stdout).toContain('not checked: alpenglow@');
     expect(prose.stdout).toContain('never compared against it');

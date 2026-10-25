@@ -233,6 +233,63 @@ cases:
       kind: synthetic
       reason: The assembly spelling of the same assumption, kept to show what the rule leaves out and why.
 
+  - id: synthetic-timestamp-to-slot
+    entry: slot-duration
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: slot-time-400ms-conversion, confidence: breaks }
+    detected: true
+    source:
+      kind: synthetic
+      reason: >-
+        The shape of getBlockByTimestamp in DefiLlama/bridges-server, which on mainnet on 2026-10-24 missed a target
+        24 h back by 5.3 h, and of the search on block times that replaced it in DefiLlama/dimension-adapters.
+        Neither repository has a licence that allows copying, so both are referred to, not copied.
+
+  - id: synthetic-sdk-constant-age
+    entry: slot-duration
+    files: { before: before.rs, after: after.rs }
+    expect: { rule: slot-time-400ms-conversion, confidence: breaks }
+    detected: true
+    source:
+      kind: synthetic
+      reason: The SDK constant DEFAULT_MS_PER_SLOT used as a conversion rate; no public fix of this shape was found.
+
+  - id: synthetic-wait-for-confirmations
+    entry: slot-duration
+    files: { before: before.ts, after: after.ts }
+    expect: { rule: slot-time-400ms-wait, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: >-
+        Waits of the shape seen in the field (solana-playground, mango-v4): harmless in themselves, kept to show
+        that a wait is asked about rather than called broken.
+
+  - id: synthetic-slot-time-constant
+    entry: slot-duration
+    files: { before: before.go, after: after.go }
+    expect: { rule: slot-time-400ms-constant, confidence: check }
+    detected: true
+    source:
+      kind: synthetic
+      reason: >-
+        A declared slot time of 400 ms whose uses multiply by the name, the shape of the wormhole guardian's
+        estimate of the time until a slot; the rule reads the declaration, not the uses.
+
+  - id: synthetic-default-parameter
+    entry: slot-duration
+    files: { before: before.ts, after: after.ts }
+    expect: { confidence: check }
+    detected: false
+    gap: >-
+      Not read, on purpose. A default parameter is not a declared constant, and the conversion multiplies by the
+      parameter's name. Reading every assignment of 400 to a name with slot in it would also read the settings of
+      tests and mocks (let slot_time = 400, slot_time_ms = 400, msPerSlot_1min: 400): 23 of the 32 lines such a
+      rule found in the field corpus on 2026-10-25.
+    source:
+      kind: synthetic
+      reason: The shape of an example in an AI skill found in the field (an unused function); no fix of it exists.
+
 # Code that looks like a case and is not one: every rule of the entry must stay silent on it.
 quiet:
   - id: quiet-other-chain-same-method
@@ -243,3 +300,9 @@ quiet:
     entry: eip-7702
     file: sample.sol
     reason: Reads tx.origin without comparing it with msg.sender, and checks for code after a call, where a delegated EOA running its delegate's code is a correct answer.
+  - id: quiet-other-chain-slots
+    entry: slot-duration
+    file: sample.ts
+    reason: >-
+      Slots of Ethereum and Substrate, the word slot in markup, and 400, 0.4 and 2.5 away from any slot; seen in
+      multi-chain and interface code of the field corpus.

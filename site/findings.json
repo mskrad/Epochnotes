@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-24",
+  "checked": "2026-10-26",
   "items": [
     {
       "project": "solana-foundation/solana-com",
@@ -154,6 +154,21 @@
       "outcomeText": "PR #7",
       "outcomeUrl": "https://github.com/sendaifun/solana-mpp/pull/7",
       "date": "2026-10-23"
+    },
+    {
+      "project": "helius-labs/rpc-perf-dash",
+      "repository": "https://github.com/helius-labs/rpc-perf-dash",
+      "broke": "The getBlock benchmark sized its last-hour and last-24h windows at 9,000 slots an hour; with ~212 ms slots they covered about 32 minutes and 12.7 hours.",
+      "reported": [
+        {
+          "text": "PR #31",
+          "url": "https://github.com/helius-labs/rpc-perf-dash/pull/31"
+        }
+      ],
+      "outcome": "open",
+      "outcomeText": "PR #31",
+      "outcomeUrl": "https://github.com/helius-labs/rpc-perf-dash/pull/31",
+      "date": "2026-10-26"
     }
   ]
 }

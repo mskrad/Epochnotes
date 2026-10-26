@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-26",
+  "checked": "2026-10-27",
   "items": [
     {
       "project": "solana-foundation/solana-com",
@@ -169,6 +169,21 @@
       "outcomeText": "PR #31",
       "outcomeUrl": "https://github.com/helius-labs/rpc-perf-dash/pull/31",
       "date": "2026-10-26"
+    },
+    {
+      "project": "solana-foundation/pay",
+      "repository": "https://github.com/solana-foundation/pay",
+      "broke": "The fanout preflight priced each new token account at the old 2,039,280-lamport rent; mainnet charges 1,488,440, so it asked for 37% more SOL than needed.",
+      "reported": [
+        {
+          "text": "PR #535",
+          "url": "https://github.com/solana-foundation/pay/pull/535"
+        }
+      ],
+      "outcome": "open",
+      "outcomeText": "PR #535",
+      "outcomeUrl": "https://github.com/solana-foundation/pay/pull/535",
+      "date": "2026-10-27"
     }
   ]
 }

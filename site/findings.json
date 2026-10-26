@@ -41,10 +41,10 @@
           "url": "https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515"
         }
       ],
-      "outcome": "open",
+      "outcome": "merged",
       "outcomeText": "PR #515",
       "outcomeUrl": "https://github.com/OpenZeppelin/openzeppelin-monitor/pull/515",
-      "date": "2026-10-23"
+      "date": "2026-10-26"
     },
     {
       "project": "wormhole-foundation/wormhole-sdk-ts",

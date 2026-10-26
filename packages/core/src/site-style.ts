@@ -58,7 +58,7 @@ h1 span{display:block}
 .finding-project{color:#934521;font-weight:550;line-height:1.2;overflow-wrap:anywhere}
 .outcome-text{display:block;color:#665d54;font-weight:400;font-size:16px;margin-top:3px}
 .finding-summary{font-size:18px;line-height:1.3}
-.outcome-icon{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#934521;border:2px solid #934521}.outcome-icon.merged{color:#fcfaf5;background:#934521}.outcome-icon svg{width:24px;height:24px}
+.outcome-icon{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#934521;border:2px solid #934521}.outcome-icon.merged{color:#fcfaf5;background:#934521}.outcome-icon.closed{border-style:dashed}.outcome-icon svg{width:24px;height:24px}
 .finding-pr{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-height:40px;font-size:16px;white-space:nowrap}
 .finding-pr .external{width:20px;height:20px}
 .finding-body{padding-left:62px;font-size:16px}.finding-body p{margin-block:12px}

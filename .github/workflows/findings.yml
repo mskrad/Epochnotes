@@ -1,0 +1,43 @@
+name: Findings outcomes
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: findings-outcomes
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run findings:refresh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and publish the new outcomes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet; then
+            echo "Outcomes unchanged."
+            exit 0
+          fi
+          npx vitest run packages/core/test/site.test.ts packages/core/test/findings-watch.test.ts
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md site/findings.json index.html
+          git commit -m "chore(site): pull request outcomes checked $(date -u +%F)"
+          git push
+          gh api -X POST "repos/${{ github.repository }}/pages/builds"

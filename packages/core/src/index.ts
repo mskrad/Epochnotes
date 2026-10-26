@@ -84,6 +84,16 @@ export {
 } from './watch.js';
 export { type WatchFiles, watchSolanaFiles } from './watch-run.js';
 export {
+  fetchPullRequestState,
+  type FindingsRefresh,
+  type PullRequestRef,
+  pullRequestRef,
+  type PullRequestState,
+  readmeWithFindings,
+  refreshFindings,
+  watchedPullRequests,
+} from './findings-watch.js';
+export {
   renderSite,
   type SiteFinding,
   type SiteFindings,

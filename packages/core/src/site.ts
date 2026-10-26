@@ -50,7 +50,7 @@ export interface SiteFinding {
   repository: string;
   broke: string;
   reported: { text: string; url: string }[];
-  outcome: 'merged' | 'open';
+  outcome: 'merged' | 'open' | 'closed';
   outcomeText: string;
   outcomeUrl: string;
   date: string;
@@ -86,7 +86,7 @@ export function siteFindingsOf(data: unknown): SiteFindings {
       !Array.isArray(reported) ||
       reported.length === 0 ||
       !reported.every((report) => isText(report?.text) && isHttps(report?.url)) ||
-      (item.outcome !== 'merged' && item.outcome !== 'open') ||
+      (item.outcome !== 'merged' && item.outcome !== 'open' && item.outcome !== 'closed') ||
       !isText(item.outcomeText) ||
       !isHttps(item.outcomeUrl) ||
       !isDate(item.date)
@@ -259,7 +259,7 @@ function findingRow(item: SiteFinding): string {
   };
   const merged = item.outcome === 'merged';
   return `<article class="finding">
-<details><summary><span class="outcome-icon ${merged ? 'merged' : 'open'}" aria-hidden="true">${merged ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12 4 4 8-8"/></svg>' : ''}</span><span class="finding-project">${escapeHtml(item.project)}<span class="outcome-text">${escapeHtml(item.outcomeText)} ${merged ? 'merged' : 'open'}</span></span><span class="finding-summary">${escapeHtml(summaries[item.project] ?? item.broke)}</span><span class="sr-only"> — details and report</span></summary>
+<details><summary><span class="outcome-icon ${item.outcome}" aria-hidden="true">${merged ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 12 4 4 8-8"/></svg>' : ''}</span><span class="finding-project">${escapeHtml(item.project)}<span class="outcome-text">${escapeHtml(item.outcomeText)} ${item.outcome}</span></span><span class="finding-summary">${escapeHtml(summaries[item.project] ?? item.broke)}</span><span class="sr-only"> — details and report</span></summary>
 <div class="finding-body"><p>${escapeHtml(item.broke)}</p><p>${link(item.repository, item.project)} · ${item.reported.map((report) => link(report.url, report.text)).join(', ')} · ${escapeHtml(item.date)}</p></div></details>
 <a class="finding-pr" href="${/^https:\/\/[^\s"'<>]+$/.test(item.outcomeUrl) ? escapeHtml(item.outcomeUrl) : '#findings'}">View PR ${EXTERNAL}<span class="sr-only"> for ${escapeHtml(item.project)}</span></a>
 </article>`;

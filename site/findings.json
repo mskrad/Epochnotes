@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-27",
+  "checked": "2026-10-29",
   "items": [
     {
       "project": "solana-foundation/solana-com",
@@ -47,6 +47,21 @@
       "date": "2026-10-26"
     },
     {
+      "project": "zenmoney/ZenPlugins",
+      "repository": "https://github.com/zenmoney/ZenPlugins",
+      "broke": "Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.",
+      "reported": [
+        {
+          "text": "PR #1213",
+          "url": "https://github.com/zenmoney/ZenPlugins/pull/1213"
+        }
+      ],
+      "outcome": "merged",
+      "outcomeText": "PR #1213",
+      "outcomeUrl": "https://github.com/zenmoney/ZenPlugins/pull/1213",
+      "date": "2026-10-29"
+    },
+    {
       "project": "wormhole-foundation/wormhole-sdk-ts",
       "repository": "https://github.com/wormhole-foundation/wormhole-sdk-ts",
       "broke": "parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.",
@@ -59,21 +74,6 @@
       "outcome": "open",
       "outcomeText": "PR #1049",
       "outcomeUrl": "https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049",
-      "date": "2026-10-23"
-    },
-    {
-      "project": "zenmoney/ZenPlugins",
-      "repository": "https://github.com/zenmoney/ZenPlugins",
-      "broke": "Solana wallet sync stopped with a TypeError when the sync window held one v1 transaction, even an incoming one.",
-      "reported": [
-        {
-          "text": "PR #1213",
-          "url": "https://github.com/zenmoney/ZenPlugins/pull/1213"
-        }
-      ],
-      "outcome": "open",
-      "outcomeText": "PR #1213",
-      "outcomeUrl": "https://github.com/zenmoney/ZenPlugins/pull/1213",
       "date": "2026-10-23"
     },
     {

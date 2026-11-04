@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-29",
+  "checked": "2026-11-04",
   "items": [
     {
       "project": "solana-foundation/solana-com",
@@ -62,6 +62,21 @@
       "date": "2026-10-29"
     },
     {
+      "project": "GetBlock-io/getblock-docs",
+      "repository": "https://github.com/GetBlock-io/getblock-docs",
+      "broke": "The pump.fun migrations listener guide fetched each migration with maxSupportedTransactionVersion 0 and silently dropped the ones sent as v1, and the getTransaction and getBlock references taught the same 0.",
+      "reported": [
+        {
+          "text": "PR #25",
+          "url": "https://github.com/GetBlock-io/getblock-docs/pull/25"
+        }
+      ],
+      "outcome": "merged",
+      "outcomeText": "PR #25",
+      "outcomeUrl": "https://github.com/GetBlock-io/getblock-docs/pull/25",
+      "date": "2026-11-03"
+    },
+    {
       "project": "wormhole-foundation/wormhole-sdk-ts",
       "repository": "https://github.com/wormhole-foundation/wormhole-sdk-ts",
       "broke": "parseTransaction and parseMessages threw on v1 transactions, and Wormhole messages are already posted in them.",
@@ -75,21 +90,6 @@
       "outcomeText": "PR #1049",
       "outcomeUrl": "https://github.com/wormhole-foundation/wormhole-sdk-ts/pull/1049",
       "date": "2026-10-23"
-    },
-    {
-      "project": "GetBlock-io/getblock-docs",
-      "repository": "https://github.com/GetBlock-io/getblock-docs",
-      "broke": "The pump.fun migrations listener guide fetched each migration with maxSupportedTransactionVersion 0 and silently dropped the ones sent as v1, and the getTransaction and getBlock references taught the same 0.",
-      "reported": [
-        {
-          "text": "PR #25",
-          "url": "https://github.com/GetBlock-io/getblock-docs/pull/25"
-        }
-      ],
-      "outcome": "open",
-      "outcomeText": "PR #25",
-      "outcomeUrl": "https://github.com/GetBlock-io/getblock-docs/pull/25",
-      "date": "2026-10-24"
     },
     {
       "project": "helius-labs/photon-explorer",

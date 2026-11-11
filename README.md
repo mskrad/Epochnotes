@@ -96,7 +96,7 @@ The commands the skill runs are listed under [For AI assistants](#for-ai-assista
 
 ## Found in the field
 
-We ran `epochnotes check repo` over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. Twelve are reported; five are already fixed and merged. Outcomes as of 2026-11-04; an open pull request is a proposal, not an acceptance.
+We ran `epochnotes check repo` over 59 public Solana repositories, checked every hit by hand and reproduced each breakage on mainnet before reporting it. Twelve are reported; five are already fixed and merged. Outcomes as of 2026-11-11; an open pull request is a proposal, not an acceptance.
 
 | Project                                                                                       | What broke                                                                                                                                                | Report                                                                                                                                            | Outcome                                                                                      |
 | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
